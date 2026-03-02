@@ -1,0 +1,1 @@
+GRANT ALL PRIVILEGES ON DATABASE crm_db TO crm_user;
