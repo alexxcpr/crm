@@ -1,0 +1,6 @@
+CREATE DATABASE keycloak_db;
+
+CREATE USER keycloak_user WITH PASSWORD '1234';
+GRANT ALL PRIVILEGES ON DATABASE keycloak_db TO keycloak_user;
+
+GRANT ALL PRIVILEGES ON DATABASE crm_db TO crm_user;
