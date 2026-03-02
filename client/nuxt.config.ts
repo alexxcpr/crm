@@ -9,14 +9,15 @@ export default defineNuxtConfig({
 
   auth: {
     isEnabled: true,
-    baseURL: 'BACKEND_API', //url backend /api
+    globalAppMiddleware: true,
+    // baseURL: process.env.BACKEND_API, //url backend /api (setat automat in .env => NUXT_PUBLIC_AUTH_BASE_URL)
     provider: {
       type: 'local',
       endpoints: {
-        signIn: { path: '/auth/login', method: 'post' },
-        signOut: { path: '/auth/logout', method: 'post' },
-        signUp: { path: '/auth/register', method: 'post'},
-        getSession: { path: '/user/profile', method: 'get'} // Ruta din NestJS care returneaza datele userului curent bazat pe token
+        signIn: { path: '/auth/signin', method: 'post' },
+        signOut: { path: '/auth/signout', method: 'post' },
+        signUp: { path: '/auth/signup', method: 'post'},
+        getSession: { path: '/user/me', method: 'get'} // Ruta din NestJS care returneaza datele userului curent bazat pe token
       },
 
       token: {

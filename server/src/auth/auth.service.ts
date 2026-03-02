@@ -3,10 +3,14 @@ import { AuthDto } from "./dto";
 import { PrismaService } from "src/prisma/prisma.service";
 import * as argon from 'argon2'
 import { Prisma } from "@prisma/client";
+import { JwtService } from "@nestjs/jwt";
 
 @Injectable ()
 export class AuthService {
-    constructor (private prisma: PrismaService) {}
+    constructor (
+        private prisma: PrismaService,
+        private jwt: JwtService
+    ) {}
 
     async signup (dto: AuthDto) {
         //generate the password hash
@@ -21,9 +25,11 @@ export class AuthService {
                 }
             })
     
-            const { hash: _, ...userWithoutHash } = user;
-            // return the saved user
-            return userWithoutHash;
+            // const { hash: _, ...userWithoutHash } = user;
+            // // return the saved user
+            // return userWithoutHash;
+            //return the token
+            return this.signToken(user.id, user.email);
         }
         catch (error){
             if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -55,9 +61,23 @@ export class AuthService {
             throw new ForbiddenException('Credentials incorrect');
         }
         
-        //excludem hash-ul si returnam userul
-        const { hash: _, ...userWithoutHash } = user;
-            // return the saved user
-            return userWithoutHash;
-        }
+        // //excludem hash-ul si returnam userul
+        // const { hash: _, ...userWithoutHash } = user;
+        //     // return the saved user
+        //     return userWithoutHash;
+        return this.signToken(user.id, user.email);
+    }
+
+    private async signToken (userId: number, email: string): Promise<{ accessToken: string }> {
+        const payload = {
+            sub: userId,
+            email: email,
+        };
+
+        const token = await this.jwt.signAsync(payload);
+
+        return {
+            accessToken: token,
+        };
+    }
 }
