@@ -15,17 +15,17 @@
         </UButton>
       </UCard>
     </div>
-  </template>
+</template>
   
-  <script setup lang="ts">
-  // data contine tot ce returneaza getProfile din NestJS
-  const { data, signOut } = useAuth()
+<script setup lang="ts">
+// data contine tot ce returneaza getProfile din NestJS
+const { data, signOut } = useAuth()
 
-  const user = computed(() => data.value as { id: number; email: string } | null)
+const user = computed(() => data.value as { id: number; email: string } | null)
 
-  
-  async function handleLogout() {
-    // Apeleaza automat NestJS pentru logout si sterge cookie-ul local
-    await signOut({ callbackUrl: '/login' })
-  }
-  </script>
+
+async function handleLogout() {
+  // Apeleaza automat NestJS pentru logout si sterge cookie-ul local
+  await signOut({ callbackUrl: '/login' })
+}
+</script>

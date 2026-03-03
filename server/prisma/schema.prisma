@@ -24,18 +24,24 @@ model User {
   firstName String?
   lastName  String?
 
-  bookmarks Bookmark[]
+  @@map("users")
 }
 
-model Bookmark {
-  id        Int @id @default(autoincrement())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model Contact {
+  id        Int       @id @default(autoincrement())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt 
 
-  title       String
-  description String?
-  link        String
+  nume            String?
+  prenume         String?
+  emailCompanie   String?
+  isActiv         Boolean?
+  isDecisionMaker Boolean?
+  profileLinkedin String?
+  telefon1        String?
+  telefon2        String?
+  pozitie         String?
+  emailAlternativ String?
 
-  userId  Int
-  user    User @relation(fields: [userId], references: [id])
+  @@map("contacts")
 }
