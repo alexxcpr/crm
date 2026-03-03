@@ -15,7 +15,7 @@ const profileSchema = z.object({
 type ProfileSchema = z.output<typeof profileSchema>
 
 const profile = reactive<Partial<ProfileSchema>>({
-  name: 'Benjamin Canac',
+  name: 'Benjamin CANAJAMBE',
   email: 'ben@nuxtlabs.com',
   username: 'benjamincanac',
   avatar: undefined,

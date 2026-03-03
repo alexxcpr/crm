@@ -1,4 +1,3 @@
-<!-- client/pages/login.vue -->
 <template>
     <div class="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
       <UCard class="w-full max-w-sm">
@@ -69,7 +68,7 @@
       // Apelam metoda signIn (astfel, Nuxt face automat un POST spre http://localhost:4000/api/auth/signin)
       await signIn(
         { email: email.value, password: password.value },
-        { callbackUrl: '/dashboard' } // Unde sa ne redirectioneze daca login-ul are succes
+        { callbackUrl: '/' } // Unde sa ne redirectioneze daca login-ul are succes
       )
     } catch (error: any) {
       console.error('Eroare la login:', error)
@@ -82,6 +81,7 @@
   
   // Folosim guest middleware - daca userul e deja logat, si intra pe /login, il trimitem in dashboard
   definePageMeta({
+    layout: false,
     auth: {
       unauthenticatedOnly: true,
       navigateAuthenticatedTo: '/dashboard',

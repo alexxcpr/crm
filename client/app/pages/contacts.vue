@@ -128,11 +128,11 @@ const columns: TableColumn<User>[] = [
       })
     }
   },
-  {
-    accessorKey: 'location',
-    header: 'Location',
-    cell: ({ row }) => row.original.location
-  },
+  // {
+  //   accessorKey: 'location',
+  //   header: 'Location',
+  //   cell: ({ row }) => row.original.location
+  // },
   {
     accessorKey: 'status',
     header: 'Status',
@@ -207,9 +207,9 @@ const pagination = ref({
 </script>
 
 <template>
-  <UDashboardPanel id="customers">
+  <UDashboardPanel id="contacts">
     <template #header>
-      <UDashboardNavbar title="Customers">
+      <UDashboardNavbar title="Contacts">
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
