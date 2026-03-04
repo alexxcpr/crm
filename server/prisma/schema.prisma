@@ -15,33 +15,33 @@ datasource db {
 
 model User {
   id        Int       @id @default(autoincrement())
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  date_created DateTime  @default(now())
+  date_updated DateTime  @updatedAt
 
   email String @unique
   hash  String
 
-  firstName String?
-  lastName  String?
+  first_name String?
+  last_name  String?
 
   @@map("users")
 }
 
 model Contact {
   id        Int       @id @default(autoincrement())
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt 
+  date_created DateTime  @default(now())
+  date_updated DateTime  @updatedAt 
 
-  nume            String?
-  prenume         String?
-  emailCompanie   String?
-  isActiv         Boolean?
-  isDecisionMaker Boolean?
-  profileLinkedin String?
-  telefon1        String?
-  telefon2        String?
-  pozitie         String?
-  emailAlternativ String?
+  nume              String
+  prenume           String
+  email_companie    String
+  is_activ          Boolean
+  is_decision_maker Boolean?
+  profile_linkedin  String?
+  telefon1          String?
+  telefon2          String?
+  pozitie           String?
+  email_alternativ  String?
 
   @@map("contacts")
 }
