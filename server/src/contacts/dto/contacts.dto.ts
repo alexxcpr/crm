@@ -1,4 +1,4 @@
-import { IsBoolean, IsOptional, IsEmail, IsNotEmpty, IsString } from "class-validator"
+import { IsBoolean, IsOptional, IsEmail, IsNotEmpty, IsString, ValidateIf } from "class-validator"
 
 export class ContactDto {
     @IsNotEmpty()
@@ -12,6 +12,7 @@ export class ContactDto {
     @IsNotEmpty()
     email_companie: string;
     @IsOptional()
+    @ValidateIf(o => o.email_alternativ !== null && o.email_alternativ !== '')
     @IsEmail()
     email_alternativ: string | null;
     

@@ -14,23 +14,23 @@ datasource db {
 }
 
 model User {
-  id        Int       @id @default(autoincrement())
+  id           Int       @id @default(autoincrement())
   date_created DateTime  @default(now())
   date_updated DateTime  @updatedAt
 
-  email String @unique
-  hash  String
+  email        String    @unique
+  hash         String
 
-  first_name String?
-  last_name  String?
+  first_name   String?
+  last_name    String?
 
   @@map("users")
 }
 
 model Contact {
-  id        Int       @id @default(autoincrement())
-  date_created DateTime  @default(now())
-  date_updated DateTime  @updatedAt 
+  id                Int       @id @default(autoincrement())
+  date_created      DateTime  @default(now())
+  date_updated      DateTime  @updatedAt 
 
   nume              String
   prenume           String

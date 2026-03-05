@@ -66,3 +66,13 @@ cum va functiona in end
 
 - scripturi backend:
     restart db (delete container + create container): db-dev-restart
+
+
+
+## API
+### Contact
+/api/contacts     - POST   - creare contact
+/api/contacts     - GET    - get all contacts
+/api/contacts/:id - GET    - get contact by id
+/api/contacts/:id - PUT    - update contact
+/api/contacts/:id - DELETE - delete contact
