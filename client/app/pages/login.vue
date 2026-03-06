@@ -5,23 +5,27 @@
           <h2 class="text-2xl font-bold text-center">Login la CRM</h2>
         </template>
   
-        <form @submit.prevent="handleLogin" class="space-y-4">
-          <UFormGroup label="Email" name="email">
+        <form @submit.prevent="handleLogin" class="flex flex-col items-center w-full">
+          <UFormGroup label="Email" name="email" class="w-full text-center mb-2">
             <UInput 
               v-model="email" 
               type="email" 
               placeholder="admin@exemplu.com" 
               icon="i-heroicons-envelope" 
+              input-class="text-center"
+              class="w-full"
               required 
             />
           </UFormGroup>
   
-          <UFormGroup label="Parolă" name="password">
+          <UFormGroup label="Parolă" name="password" class="w-full text-center mb-3">
             <UInput 
               v-model="password" 
               type="password" 
               placeholder="********" 
               icon="i-heroicons-lock-closed" 
+              input-class="text-center"
+              class="w-full"
               required 
             />
           </UFormGroup>
@@ -31,6 +35,7 @@
             color="primary" 
             block 
             :loading="isLoading"
+            class=""
           >
             Autentificare
           </UButton>
