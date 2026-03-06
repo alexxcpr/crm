@@ -19,6 +19,8 @@ const user = ref({
   }
 })
 
+const { signOut } = useAuth()
+
 const items = computed<DropdownMenuItem[][]>(() => ([[{
   type: 'label',
   label: user.value.name,
@@ -117,7 +119,10 @@ const items = computed<DropdownMenuItem[][]>(() => ([[{
   target: '_blank'
 }, {
   label: 'Log out',
-  icon: 'i-lucide-log-out'
+  icon: 'i-lucide-log-out',
+  onSelect: async () => {
+    await signOut ({ callbackUrl: '/login'})
+  }
 }]]))
 </script>
 

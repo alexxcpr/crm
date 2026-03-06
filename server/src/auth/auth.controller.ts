@@ -20,4 +20,11 @@ export class AuthController {
         return this.authService.signin(dto);
     }
 
+    // auth/signout
+    @Post('signout')
+    signout () {
+        console.log('signout');
+        return { message: 'Logged out successfully'}
+    }
+
 }
