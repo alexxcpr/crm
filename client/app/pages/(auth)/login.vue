@@ -10,7 +10,7 @@
             <UInput 
               v-model="email" 
               type="email" 
-              placeholder="admin@exemplu.com" 
+              placeholder="Email" 
               icon="i-heroicons-envelope" 
               input-class="text-center"
               class="w-full"
@@ -22,7 +22,7 @@
             <UInput 
               v-model="password" 
               type="password" 
-              placeholder="********" 
+              placeholder="Parola" 
               icon="i-heroicons-lock-closed" 
               input-class="text-center"
               class="w-full"

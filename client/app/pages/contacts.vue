@@ -3,29 +3,39 @@ import type { TableColumn } from '@nuxt/ui'
 import { upperFirst } from 'scule'
 import { getPaginationRowModel } from '@tanstack/table-core'
 import type { Row } from '@tanstack/table-core'
-import type { User } from '~/types'
+import type { ContactDto } from '~/types'
+import { stringCoalesceNull } from '../utils/string.utils'
+import { boolReturnBadge } from '../utils/bool.utils'
 
-const UAvatar = resolveComponent('UAvatar')
+
 const UButton = resolveComponent('UButton')
-const UBadge = resolveComponent('UBadge')
 const UDropdownMenu = resolveComponent('UDropdownMenu')
 const UCheckbox = resolveComponent('UCheckbox')
 
 const toast = useToast()
 const table = useTemplateRef('table')
 
-const columnFilters = ref([{
-  id: 'email',
-  value: ''
-}])
-const columnVisibility = ref()
-const rowSelection = ref({ 1: true })
+const config = useRuntimeConfig()
+const { token } = useAuth()
 
-const { data, status } = await useFetch<User[]>('/api/customers', {
-  lazy: true
+// const columnFilters = ref([{
+//   id: 'email_companie',
+//   value: ''
+// }])
+
+const columnFilters = ref([])
+const columnVisibility = ref()
+const rowSelection = ref({})
+
+const { data, status, refresh } = await useFetch<ContactDto[]>(`/contacts`, {
+  baseURL: config.public.apiBase,
+  lazy: true,
+  headers: {
+    Authorization: token.value as string
+  }
 })
 
-function getRowItems(row: Row<User>) {
+function getRowItems(row: Row<ContactDto>) {
   return [
     {
       type: 'label',
@@ -70,7 +80,7 @@ function getRowItems(row: Row<User>) {
   ]
 }
 
-const columns: TableColumn<User>[] = [
+const columns: TableColumn<ContactDto>[] = [
   {
     id: 'select',
     header: ({ table }) =>
@@ -94,60 +104,100 @@ const columns: TableColumn<User>[] = [
     header: 'ID'
   },
   {
-    accessorKey: 'name',
+    accessorKey: 'nume',
     header: 'Name',
-    cell: ({ row }) => {
-      return h('div', { class: 'flex items-center gap-3' }, [
-        h(UAvatar, {
-          ...row.original.avatar,
-          size: 'lg'
-        }),
-        h('div', undefined, [
-          h('p', { class: 'font-medium text-highlighted' }, row.original.name),
-          h('p', { class: '' }, `@${row.original.name}`)
-        ])
-      ])
-    }
+    cell: ({ row }) => stringCoalesceNull(row.original.nume)
+    // cell: ({ row }) => {
+    //   return h('div', { class: 'flex items-center gap-3' }, [
+    //     h('div', undefined, [
+    //       h('p', { class: 'font-medium text-highlighted' }, row.original.nume ?? ''),
+    //       h('p', { class: '' }, row.original.nume ? `@${row.original.nume}` : '')
+    //     ])
+    //   ])
+    // }
   },
   {
-    accessorKey: 'email',
-    header: ({ column }) => {
-      const isSorted = column.getIsSorted()
+    accessorKey: 'prenume',
+    header: 'Prenume',
+    cell: ({ row }) => stringCoalesceNull(row.original.prenume)
+  },
+  {
+    accessorKey: 'telefon1',
+    header: 'Telefon 1',
+    cell: ({ row }) => stringCoalesceNull(row.original.telefon1)
+  },
+  {
+    accessorKey: 'telefon2',
+    header: 'Telefon 2', 
+    cell: ({ row }) => stringCoalesceNull(row.original.telefon2)
+  },
+  {
+    accessorKey: 'email_companie',
+    header: 'Email Companie',
+    cell: ({ row }) => stringCoalesceNull(row.original.email_companie)
 
-      return h(UButton, {
-        color: 'neutral',
-        variant: 'ghost',
-        label: 'Email',
-        icon: isSorted
-          ? isSorted === 'asc'
-            ? 'i-lucide-arrow-up-narrow-wide'
-            : 'i-lucide-arrow-down-wide-narrow'
-          : 'i-lucide-arrow-up-down',
-        class: '-mx-2.5',
-        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
-      })
-    }
+    // header: ({ column }) => {
+    //   const isSorted = column.getIsSorted()
+
+    //   return h(UButton, {
+    //     color: 'neutral',
+    //     variant: 'ghost',
+    //     label: 'Email companie',
+    //     icon: isSorted
+    //       ? isSorted === 'asc'
+    //         ? 'i-lucide-arrow-up-narrow-wide'
+    //         : 'i-lucide-arrow-down-wide-narrow'
+    //       : 'i-lucide-arrow-up-down',
+    //     class: '-mx-2.5',
+    //     onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
+    //   })
+    // }
+  },
+  {
+    accessorKey: 'email_alternativ',
+    header: 'Email Alternativ',
+    cell: ({ row }) => stringCoalesceNull(row.original.email_alternativ)
+  },
+  {
+    accessorKey: 'pozitie',
+    header: 'Poziție în companie',
+    cell: ({ row }) => stringCoalesceNull(row.original.pozitie)
+  },
+  {
+    accessorKey: 'is_decision_maker',
+    header: 'BDM (Business Decision Maker)',
+    cell: ({ row }) => boolReturnBadge (row.original.is_decision_maker)
   },
   // {
   //   accessorKey: 'location',
   //   header: 'Location',
   //   cell: ({ row }) => row.original.location
   // },
-  {
-    accessorKey: 'status',
-    header: 'Status',
-    filterFn: 'equals',
-    cell: ({ row }) => {
-      const color = {
-        subscribed: 'success' as const,
-        unsubscribed: 'error' as const,
-        bounced: 'warning' as const
-      }[row.original.status]
+  // {
+  //   accessorKey: 'status',
+  //   header: 'Status',
+  //   filterFn: 'equals',
+  //   cell: ({ row }) => {
+  //     const color = {
+  //       subscribed: 'success' as const,
+  //       unsubscribed: 'error' as const,
+  //       bounced: 'warning' as const
+  //     }[row.original.status]
 
-      return h(UBadge, { class: 'capitalize', variant: 'subtle', color }, () =>
-        row.original.status
-      )
-    }
+  //     return h(UBadge, { class: 'capitalize', variant: 'subtle', color }, () =>
+  //       row.original.status
+  //     )
+  //   }
+  // },
+  {
+    accessorKey: 'profile_linkedin',
+    header: 'Profil LinkedIn',
+    cell: ({ row }) => stringCoalesceNull(row.original.profile_linkedin)
+  },
+  {
+    accessorKey: 'is_activ',
+    header: 'Activ?',
+    cell: ({ row }) => boolReturnBadge (row.original.is_activ)
   },
   {
     id: 'actions',
@@ -193,10 +243,10 @@ watch(() => statusFilter.value, (newVal) => {
 
 const email = computed({
   get: (): string => {
-    return (table.value?.tableApi?.getColumn('email')?.getFilterValue() as string) || ''
+    return (table.value?.tableApi?.getColumn('email_companie')?.getFilterValue() as string) || ''
   },
   set: (value: string) => {
-    table.value?.tableApi?.getColumn('email')?.setFilterValue(value || undefined)
+    table.value?.tableApi?.getColumn('email_companie')?.setFilterValue(value || undefined)
   }
 })
 

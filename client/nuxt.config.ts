@@ -7,6 +7,12 @@ export default defineNuxtConfig({
     '@sidebase/nuxt-auth'
   ],
 
+  runtimeConfig: {
+    public: {
+      apiBase: 'http://localhost:4000/api'
+    }
+  },
+
   auth: {
     isEnabled: true,
     globalAppMiddleware: true,

@@ -10,7 +10,7 @@ export interface ContactDto {
   email_companie: string | null
   is_activ: boolean | null
   is_decision_maker: boolean | null
-  profil_linkedin: string | null
+  profile_linkedin: string | null
   telefon1: string | null
   telefon2: string | null
   pozitie: string | null
