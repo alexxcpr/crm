@@ -24,7 +24,7 @@ model User {
   first_name   String?
   last_name    String?
 
-  @@map("users")
+  @@map("user")
 }
 
 model Contact {
@@ -43,5 +43,109 @@ model Contact {
   pozitie           String?
   email_alternativ  String?
 
-  @@map("contacts")
+  @@map("contact")
+}
+
+model Module {
+  id_module     String    @id @default(uuid())     // PK
+  name          String    @db.VarChar(100)         // Numele afisat al modulului ("CRM", "Inventar")
+  slug          String    @unique @db.VarChar(100) // Identificator URL-friendly, unic ("crm", "inventar") - folosit in rute si API
+  icon          String?   @db.VarChar(50)          // Clasa icon Nuxt UI/Heroicons ("i-heroicons-users") — optional, pentru sidebar
+  rank          Int       @default(0)              // Ordinea de afisare in sidebar/meniu - 0 = primul
+  is_active     Boolean   @default(true)           // Soft delete / toggle vizibilitate - false = modulul nu apare in UI
+  date_created  DateTime  @default(now())          
+  date_updated  DateTime  @updatedAt
+
+  entities      Entity[]                           // Relatie 1:N - un modul contine mai multe entitati (Contacte, Companii, etc.)
+
+  @@map("module")                                  // Numele real al tabelei in Postgres va fi "module", nu "Module"
+}
+
+model Entity {
+  id_entity       String    @id @default(uuid())      // PK
+  id_module       String?                             // FK catre module.id_module - optional, permite entitati fara modul
+  name            String    @db.VarChar(100)          // Numele intern al entitatii ("Contacte")
+  slug            String    @unique @db.VarChar(100)  // Identificator URL-friendly, unic ("contacts") - folosit in rute: /contacts, /companies
+  table_name      String    @unique @db.VarChar(100)  // Numele tabelei SQL reale create dinamic ("ent_contacts") - prefixata cu "ent_"
+  icon            String?   @db.VarChar(50)           // Icon Nuxt UI pentru afisare in sidebar/header
+  is_system       Boolean   @default(false)           // true = entitate critica - nu poate fi stearsa de admin din UI
+  label_singular  String?   @db.VarChar(100)          // Label UI singular ("Contact") - folosit in butoane: "Adauga Contact"
+  label_plural    String?   @db.VarChar(100)          // Label UI plural ("Contacte") - folosit in titlul paginii de listing
+  rank            Int       @default(0)               // Ordinea de afisare in sidebar, in cadrul modulului
+  date_created    DateTime  @default(now())           
+  date_updated    DateTime  @updatedAt
+
+  module          Module?   @relation(fields: [id_module], references: [id_module], onDelete: SetNull)
+  // Relatie N:1 catre Module - daca modulul e sters, id_module devine NULL (entitatea ramane, dar fara modul)
+
+  fields          Field[]
+  // Relatie 1:N - o entitate are mai multe campuri (name, email, cf_industry, etc.)
+
+  relation_fields Field[]   @relation("RelationTarget")
+  // Relatie inversa: toate campurile din ALTE entitati care pointeaza catre ACEASTA entitate
+  // Ex: daca entitatea "contacts" are un camp "cf_company_id" de tip relation catre "companies",
+  // atunci "companies.relation_fields" va contine acel camp
+
+  @@map("entity")
+}
+
+model Field {
+  id_field            String        @id @default(uuid()) // PK
+  id_entity           String                             // FK catre entity.id_entity - obligatoriu, fiecare camp apartine unei entitati
+    
+  name                String        @db.VarChar(100)     // Numele afisat al campului in UI ("Industrie", "Numar telefon", "Email companie")
+  slug                String        @db.VarChar(100)     // Identificator unic per entitate ("industry") - folosit in API requests si in query params // nu e @unique global, ci unic per entitate (vezi @@unique([id_entity, slug]) de la sfarsit)
+  column_name         String        @db.VarChar(100)     // Numele coloanei SQL reale din tabela dinamica ("cf_industry")
+                                                         // Campurile custom sunt prefixate cu "cf_", campurile system nu (ex: "name"), unic per entitate (vezi @@unique([id_entity, column_name]))
+  data_type           String        @db.VarChar(50)      // Tipul de date SQL al coloanei: "varchar", "integer", "numeric", "boolean", "date", "timestamp", "uuid", "text", "jsonb"
+                                                         // Folosit in DynamicSchemaService cand face ALTER TABLE ADD COLUMN - determina tipul coloanei
+  ui_type             String        @db.VarChar(50)      // Tipul de componenta UI pe frontend: "text", "textarea", "number", "select", "multi-select", "datepicker", "checkbox", "radio", "relation", "email", "phone", "currency", "file"   -> DynamicForm.vue foloseste asta pentru a decide ce componenta Nuxt UI sa randeze
+  default_value       String?                            // Valoarea default ca string ("0", "true", "2025-01-01") - se casteaza pe backend dupa data_type. Optional - daca e null, campul nu are default
+    
+  placeholder         String?       @db.VarChar(255)     // Text placeholder in input ("Introduceti numele companiei") - optional
+  help_text           String?       @db.VarChar(500)     // Text ajutator afisat sub camp ("Selectati industria principala a contactului") - optional
+  options             Json?                              // JSONB - optiuni pentru campuri de tip select/radio/multi-select
+                                                         // Format: [{"label": "IT", "value": "it"}, {"label": "Finance", "value": "finance"}]
+                                                         // null pentru campuri care nu au optiuni (text, number, date, etc.)
+  is_required         Boolean       @default(false)      // true = campul e obligatoriu - frontend afiseaza *, backend returneaza 400 daca lipseste
+  is_unique           Boolean       @default(false)      // true = valoarea trebuie sa fie unica in tabela - backend verifica la INSERT/UPDATE, returneaza 409 conflict 
+  is_filterable       Boolean       @default(true)       // true = campul apare in panoul de filtre din DynamicTable - backend creeaza index B-Tree pe coloana
+  is_sortable         Boolean       @default(true)       // true = coloana poate fi sortata in DynamicTable - click pe header activeaza ORDER BY ASC/DESC
+  visible_in_table    Boolean       @default(true)       // true = campul apare ca coloana in DynamicTable (listing) -> Vizibil in SV
+  visible_in_form     Boolean       @default(true)       // true = campul apare in DynamicForm (create/edit)  -> Vizibil in EV
+  is_system           Boolean       @default(false)      // true = camp fix al entitatii (ex: name) - nu poate fi sters/modificat de admin din UI
+                                                         // false = camp custom adaugat de admin - poate fi sters (ALTER TABLE DROP COLUMN)
+
+  validation_rules        Json?                          // JSONB - reguli de validare interpretate de backend si frontend
+                                                         // Format: {"min_length": 2, "max_length": 100, "pattern": "^[a-zA-Z]+$", "min": 0, "max": 999999}
+                                                         // Frontendul construieste schema Zod din aceste reguli; backend-ul le valideaza la INSERT/UPDATE
+
+  id_relation_entity      String?                        // FK optional catre entity.id_entity - populat DOAR cand ui_type = "relation"
+                                                         // Indica entitatea tinta a relatiei (ex: id-ul entitatii "companies")
+                                                         // null pentru orice alt tip de camp
+  relation_display_field  String?   @db.VarChar(100)     // Slug-ul campului din entitatea tinta care se afiseaza ca label in dropdown
+                                                         // Ex: "name" - cand selectezi o companie, vezi numele ei, nu UUID-ul. Populat DOAR cand ui_type = "relation"
+
+  group_name              String    @default("general") @db.VarChar(100)  //Sectiunea/tab-ul in care apare campul in DynamicForm. Ex: "general", "contact_info", "detalii_financiare". Frontend grupeaza campurile dupa aceasta valoare si randeaza cate o sectiune per grup
+  rank                    Int       @default(0)          // Ordinea de afisare a campului IN CADRUL GRUPULUI - 0 = primul
+
+  date_created            DateTime  @default(now())
+  date_updated            DateTime  @updatedAt
+
+  entity                  Entity    @relation(fields: [id_entity], references: [id_entity], onDelete: Cascade)
+  // Relatie N:1 catre Entity - daca entitatea e stearsa, toate campurile ei se sterg automat (Cascade)
+  
+  relation_entity         Entity?   @relation("RelationTarget", fields: [id_relation_entity], references: [id_entity], onDelete: SetNull)
+  // Relatie N:1 optionala catre Entity - folosita DOAR pe campuri de tip relation
+  // "RelationTarget" = alias care diferentiaza aceasta relatie de relatia principala (entity)
+  
+  @@unique([id_entity, slug])
+  // Constraint compus: slug-ul trebuie sa fie unic PER entitate
+  // Poti avea "name" in contacts SI "name" in companies, dar nu doua campuri "name" in contacts
+
+  @@unique([id_entity, column_name])
+  // Constraint compus: column_name unic PER entitate
+  // Previne crearea a doua coloane SQL cu acelasi nume in aceeasi tabela
+  
+  @@map("field")
 }
