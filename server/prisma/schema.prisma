@@ -27,24 +27,24 @@ model User {
   @@map("user")
 }
 
-model Contact {
-  id                Int       @id @default(autoincrement())
-  date_created      DateTime  @default(now())
-  date_updated      DateTime  @updatedAt 
+// model Contact {
+//   id                Int       @id @default(autoincrement())
+//   date_created      DateTime  @default(now())
+//   date_updated      DateTime  @updatedAt 
 
-  nume              String
-  prenume           String
-  email_companie    String
-  is_activ          Boolean
-  is_decision_maker Boolean?
-  profile_linkedin  String?
-  telefon1          String?
-  telefon2          String?
-  pozitie           String?
-  email_alternativ  String?
+//   nume              String
+//   prenume           String
+//   email_companie    String
+//   is_activ          Boolean
+//   is_decision_maker Boolean?
+//   profile_linkedin  String?
+//   telefon1          String?
+//   telefon2          String?
+//   pozitie           String?
+//   email_alternativ  String?
 
-  @@map("contact")
-}
+//   @@map("contact")
+// }
 
 model Module {
   id_module     String    @id @default(uuid())     // PK

@@ -84,7 +84,7 @@ CREATE TABLE module (
   name          VARCHAR(100) NOT NULL,        -- "CRM", "Inventar"
   slug          VARCHAR(100) NOT NULL UNIQUE,  -- "crm", "inventar"
   icon          VARCHAR(50),                   -- "i-heroicons-users", icon Nuxt UI
-  position      INT NOT NULL DEFAULT 0,        -- ordinea in sidebar
+  rank          INT NOT NULL DEFAULT 0,        -- ordinea in sidebar
   is_active     BOOLEAN NOT NULL DEFAULT true,
   date_created  TIMESTAMP NOT NULL DEFAULT now(),
   date_updated  TIMESTAMP NOT NULL DEFAULT now()
@@ -150,7 +150,7 @@ CREATE TABLE field (
 
   -- Pozitionare
   group_name            VARCHAR(100) DEFAULT 'general', -- sectiune/tab in formular ("General", "Detalii financiare")
-  position              INT NOT NULL DEFAULT 0,         -- ordinea in grup
+  rank                  INT NOT NULL DEFAULT 0,         -- ordinea in grup
 
   date_created          TIMESTAMP NOT NULL DEFAULT now(),
   date_updated          TIMESTAMP NOT NULL DEFAULT now(),
@@ -161,16 +161,16 @@ CREATE TABLE field (
 ```
 
 #### Cum functioneaza campurile de tip `relation`:
-- `ui_type = 'relation'` + `relation_entity_id` = UUID-ul entitatii tinta
+- `ui_type = 'relation'` + `id_relation_entity` = UUID-ul entitatii tinta
 - `relation_display_field` = slug-ul campului care se afiseaza in dropdown (ex: `name`)
 - `data_type = 'uuid'` + `column_name = 'cf_company_id'`
 - Backend-ul creeaza coloana cu `REFERENCES <target_table>(id)`
 - Frontend-ul randeaza un `<USelectMenu>` care incarca optiunile din `GET /api/v1/data/:targetEntity?fields=id,:displayField`
 
 ### Taskuri Faza 1:
-- [ ] Crearea migrarilor Prisma pentru `modules`, `entity_definitions`, `field_definitions`
-- [ ] Seeding initial: modulul "CRM" + entitatea "contacts" + field definitions pentru campurile existente (name, email, phone, - marcate `is_system: true`)
-- [ ] Verificare ca schema Prisma genereaza corect clientul
+- [x] Crearea migrarilor Prisma pentru `module`, `entity`, `field`
+- [x] Seeding initial: modulul "CRM" + entitatea "contacts" + field definitions pentru campurile existente (name, email, phone, - marcate `is_system: true`)
+- [x] Verificare ca schema Prisma genereaza corect clientul
 
 ---
 
