@@ -224,7 +224,7 @@ jsonb       → JSONB DEFAULT '{}'
 - Nu se permite `DROP TABLE` din API — doar soft delete (flag `is_active = false`)
 
 ### Taskuri Faza 2:
-- [ ] Configurare Knex in NestJS (modul separat `DynamicDatabaseModule`)
+- [x] Configurare Knex in NestJS (modul separat)
 - [ ] Implementare `DynamicSchemaService` cu metodele: `createEntityTable`, `addColumn`, `removeColumn`
 - [ ] Mapping complet `data_type` → SQL type (inclusiv relatii cu FK)
 - [ ] Sanitizare si validare stricta a slug-urilor si numelor de coloane
