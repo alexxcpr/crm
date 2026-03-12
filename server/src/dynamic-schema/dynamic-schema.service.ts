@@ -18,7 +18,7 @@ export class DynamicSchemaService {
 
     // ─── 1. Creeaza tabela dinamica pentru o entitate (din informatiile din prisma, tabel Entity, generic, doar scheletele) ───
     async createEntityTable(entity: Entity): Promise<void> {
-        const tableName = entity.table_name;
+        const tableName = this.ensureTablePrefix(entity.table_name);
 
         const exists = await this.knex.instance.schema.hasTable(tableName);
         if (exists) {
@@ -44,16 +44,17 @@ export class DynamicSchemaService {
         const tableName = entity.table_name;
 
         //verifica daca exista coloana
-        const hasColumn = await this.knex.instance.schema.hasColumn(tableName, field.column_name);
+        const columnName = this.ensureColumnPrefix(field);
+        const hasColumn = await this.knex.instance.schema.hasColumn(tableName, columnName);
         if (hasColumn) {
-            this.logger.warn(`Coloana "${field.column_name}" exista deja in "${tableName}", skip`);
+            this.logger.warn(`Coloana "${columnName}" exista deja in "${tableName}", skip`);
             return;
         }
 
         //face modificarea in db (alter table)
         await this.knex.instance.schema.alterTable(tableName, (table) => {
             const colDef: ColumnDefinition = {
-                columnName: field.column_name,
+                columnName: this.ensureColumnPrefix(field),
                 dataType: field.data_type,
                 isRequired: field.is_required,
                 isUnique: field.is_unique,
@@ -70,10 +71,10 @@ export class DynamicSchemaService {
 
         // Index automat pe campuri filterable
         if (field.is_filterable) {
-            await this.createIndex(tableName, field.column_name);
+            await this.createIndex(tableName, columnName);
         }
 
-        this.logger.log(`Coloana "${field.column_name}" a fost adaugata in "${tableName}".`);
+        this.logger.log(`Coloana "${columnName}" a fost adaugata in "${tableName}".`);
     }
 
     // ─── 3. Șterge o coloană ───
@@ -87,7 +88,7 @@ export class DynamicSchemaService {
         const tableName = entity.table_name;
 
         await this.knex.instance.schema.alterTable(tableName, (table) => {
-            table.dropColumn(field.column_name);
+            table.dropColumn(this.ensureColumnPrefix(field));
         });
 
         this.logger.log(`Coloana "${field.column_name}" a fost stearsa din "${tableName}".`);
@@ -156,5 +157,14 @@ export class DynamicSchemaService {
         await this.knex.instance.schema.alterTable(tableName, (table) => {
             table.foreign(field.column_name).references('id').inTable(targetEntity.table_name);
         })
+    }
+
+    private ensureTablePrefix(tableName: string): string {
+        return tableName.startsWith('ent_') ? tableName : `ent_${tableName}`;
+    }
+
+    private ensureColumnPrefix(field: Field): string {
+        if (field.is_system) return field.column_name;
+        return field.column_name.startsWith('cf_') ? field.column_name : `cf_${field.column_name}`;
     }
 }

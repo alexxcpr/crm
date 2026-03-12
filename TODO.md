@@ -225,10 +225,10 @@ jsonb       → JSONB DEFAULT '{}'
 
 ### Taskuri Faza 2:
 - [x] Configurare Knex in NestJS (modul separat)
-- [ ] Implementare `DynamicSchemaService` cu metodele: `createEntityTable`, `addColumn`, `removeColumn`
-- [ ] Mapping complet `data_type` → SQL type (inclusiv relatii cu FK)
-- [ ] Sanitizare si validare stricta a slug-urilor si numelor de coloane
-- [ ] Creare index automat pe coloanele marcate `is_filterable`
+- [x] Implementare `DynamicSchemaService` cu metodele: `createEntityTable`, `addColumn`, `removeColumn`
+- [x] Mapping complet `data_type` → SQL type (inclusiv relatii cu FK)
+- [x] Sanitizare si validare stricta a slug-urilor si numelor de coloane
+- [x] Creare index automat pe coloanele marcate `is_filterable`
 - [ ] Unit tests pe `DynamicSchemaService` (testeaza ca ALTER TABLE se genereaza corect)
 
 ---

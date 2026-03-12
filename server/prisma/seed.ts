@@ -1,12 +1,18 @@
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
+import knex from 'knex';
+import { applyColumn } from 'src/dynamic-schema/data-type.mapper';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
+const db = knex({
+  client:'pg',
+  connection: process.env.DATABASE_URL,
+});
 
 async function main () {
     await seedCRM()
@@ -310,7 +316,48 @@ async function seedCRM() {
         ...field,
       },
     });
-    console.log(`  Field creat: ${created.name} (${created.column_name})`);
+    console.log(`Field creat: ${created.name} (${created.column_name})`);
+  }
+
+  console.log('Fielduri create cu succes (finish prisma)')
+
+  console.log('Conectare la Knex + incepere creare tabele dinamic')
+
+  const entities = await prisma.entity.findMany();
+
+  for (const entity of entities) {
+    // Creează tabela cu coloanele sistem (id, date_created, etc.)
+    if (!(await db.schema.hasTable(entity.table_name))) {
+      await db.schema.createTable(entity.table_name, (table) => {
+        table.uuid('id').primary().defaultTo(db.fn.uuid());
+        table.timestamp('date_created', { useTz: true }).notNullable().defaultTo(db.fn.now());
+        table.timestamp('date_updated', { useTz: true }).notNullable().defaultTo(db.fn.now());
+        table.uuid('owner_id').nullable();
+        table.jsonb('extra_data').defaultTo('{}');
+      });
+      console.log(`Tabela "${entity.table_name}" creata.`);
+    }
+
+    // Adaugă coloanele din field definitions
+    const fields = await prisma.field.findMany({
+      where: { id_entity: entity.id_entity },
+      orderBy: { rank: 'asc' },
+    });
+
+    for (const field of fields) {
+      if (!(await db.schema.hasColumn(entity.table_name, field.column_name))) {
+        await db.schema.alterTable(entity.table_name, (table) => {
+          applyColumn(table, {
+            columnName: field.column_name,
+            dataType: field.data_type,
+            isRequired: field.is_required,
+            isUnique: field.is_unique,
+            defaultValue: field.default_value,
+          });
+        });
+        console.log(`  Coloana "${field.column_name}" adaugata in "${entity.table_name}".`);
+      }
+    }
   }
 
   console.log('\nSeed complet!');
@@ -324,4 +371,5 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
     await pool.end();
+    await db.destroy();
   });
