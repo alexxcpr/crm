@@ -332,7 +332,7 @@ async function seedCRM() {
         table.uuid('id').primary().defaultTo(db.fn.uuid());
         table.timestamp('date_created', { useTz: true }).notNullable().defaultTo(db.fn.now());
         table.timestamp('date_updated', { useTz: true }).notNullable().defaultTo(db.fn.now());
-        table.uuid('owner_id').nullable();
+        table.uuid('id_owner').nullable();
         table.jsonb('extra_data').defaultTo('{}');
       });
       console.log(`Tabela "${entity.table_name}" creata.`);
