@@ -304,13 +304,13 @@ Construieste query-uri SQL dinamic folosind Knex pe baza field_definitions.
 - Nu se concateneaza NICIODATA valori direct in query string
 
 ### Taskuri Faza 3:
-- [ ] Implementare `DynamicDataController` cu cele 5 rute CRUD
-- [ ] Implementare `DynamicQueryService` cu metodele: `findAll`, `findOne`, `create`, `update`, `delete`
-- [ ] Implementare `FilterParserService` — parseaza query params in obiecte de filtrare
-- [ ] Implementare `DynamicValidationService` — valideaza body-ul request-ului contra field_definitions
-- [ ] Paginare: `{ data, meta: { total, page, limit, totalPages } }`
-- [ ] Sortare: `?sort=name` (ASC), `?sort=-name` (DESC), `?sort=name,-created_at` (multiplu)
-- [ ] Testare manuala cu Postman/Insomnia pe entitatea "contacts"
+- [x] Implementare `DynamicDataController` cu cele 5 rute CRUD
+- [x] Implementare `DynamicQueryService` cu metodele: `findAll`, `findOne`, `create`, `update`, `delete`
+- [x] Implementare `FilterParserService` — parseaza query params in obiecte de filtrare
+- [x] Implementare `DynamicValidationService` — valideaza body-ul request-ului contra field_definitions
+- [x] Paginare: `{ data, meta: { total, page, limit, totalPages } }`
+- [x] Sortare: `?sort=name` (ASC), `?sort=-name` (DESC), `?sort=name,-created_at` (multiplu)
+- [x] Testare manuala cu Postman/Insomnia pe entitatea "contacts"
 - [ ] Error handling unificat: 400 (validare), 404 (entitate/record), 409 (unique conflict)
 
 ---
