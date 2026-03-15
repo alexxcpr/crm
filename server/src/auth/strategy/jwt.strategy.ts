@@ -26,14 +26,22 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
             where: {
                 id: payload.sub,
             },
+            include: {
+                roles: {
+                    include: {role: true},
+                },
+            },
         });
 
         if (!user) {
             throw new UnauthorizedException();
         }
 
-        const { hash: _, ...userWithoutHash } = user;
+        const { hash: _, roles: userRoles, ...userWithoutHash } = user;
         // return the saved user
-        return userWithoutHash;
+        return {
+            ...userWithoutHash,
+            roles: userRoles.map((ur) => ur.role.slug),
+        };
     }
 }
