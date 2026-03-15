@@ -7,7 +7,7 @@ import { returnValidResponse } from 'src/utils/crud.utils';
 import { ModuleDto } from '../dto/module.dto';
 
 @Controller('v1/admin/modules')
-// @UseGuards(AuthGuard('jwt'), RolesGuard)
+@UseGuards(AuthGuard('jwt'), RolesGuard)
 @Roles('admin')
 export class AdminModulesController {
     constructor(private readonly modulesService: AdminModulesService) {}
