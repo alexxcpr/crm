@@ -1,10 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
 import { Roles } from 'src/guards/roles.decorator';
 import { AdminFieldsService } from './admin-fields.service';
 import { returnValidResponse } from 'src/utils/crud.utils';
 import { CreateFieldDto, UpdateFieldDto } from '../dto/field.dto';
+import { AuthGuard } from '@nestjs/passport';
+import { RolesGuard } from 'src/guards/roles.guard';
 
 @Controller('v1/admin/entities/:entityId/fields')
+@UseGuards(AuthGuard('jwt'), RolesGuard)
 @Roles('admin')
 export class AdminFieldsController {
     constructor(private readonly fieldsService: AdminFieldsService){}

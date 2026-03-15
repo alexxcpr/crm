@@ -311,7 +311,7 @@ Construieste query-uri SQL dinamic folosind Knex pe baza field_definitions.
 - [x] Paginare: `{ data, meta: { total, page, limit, totalPages } }`
 - [x] Sortare: `?sort=name` (ASC), `?sort=-name` (DESC), `?sort=name,-created_at` (multiplu)
 - [x] Testare manuala cu Postman/Insomnia pe entitatea "contacts"
-- [ ] Error handling unificat: 400 (validare), 404 (entitate/record), 409 (unique conflict)
+- [x] Error handling unificat: 400 (validare), 404 (entitate/record), 409 (unique conflict)
 
 ---
 
@@ -403,11 +403,12 @@ Response example:
 ```
 
 ### Taskuri Faza 4:
-- [ ] CRUD pe `modules` (simplu, Prisma)
-- [ ] CRUD pe `entity_definitions` — POST apeleaza si `DynamicSchemaService.createEntityTable()`
-- [ ] CRUD pe `field_definitions` — POST apeleaza si `DynamicSchemaService.addColumn()`
+- [x] CRUD pe `modules` (simplu, Prisma)
+- [x] CRUD pe `entity` — POST apeleaza si `DynamicSchemaService.createEntityTable()`
+- [x] CRUD pe `field` — POST apeleaza si `DynamicSchemaService.addColumn()`
+- [x] Endpoint `GET /api/v1/schema/:entitySlug` 
 - [ ] Endpoint `GET /api/v1/schema/:entitySlug` optimizat cu cache in-memory (invalidat la orice modificare admin)
-- [ ] Guard/Middleware pe rutele admin: doar userii cu rol `admin` pot accesa
+- [x] Guard/Middleware pe rutele admin: doar userii cu rol `admin` pot accesa
 - [ ] Validari: nu permiti stergerea campurilor `is_system`, nu permiti stergerea entitatilor `is_system`
 
 ---

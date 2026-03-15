@@ -3,8 +3,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { DynamicDataService } from './dynamic-data.service';
 
 @Controller('v1/data')
-//TODO: DE decomentat asta ca sa am rute protejate
-// @UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'))
 export class DynamicDataController {
     constructor(private readonly dataService: DynamicDataService) {}
 
