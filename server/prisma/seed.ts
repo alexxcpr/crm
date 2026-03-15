@@ -15,7 +15,67 @@ const db = knex({
 });
 
 async function main () {
-    await seedCRM()
+  await seedRoles();
+  await seedCRM();
+}
+
+async function seedRoles() {
+  const adminRole = await prisma.role.upsert({
+    where:{
+      slug: 'admin'
+    },
+    update: {},
+    create: {
+      name: 'Administrator',
+      slug: 'admin',
+      description: 'Acces complet la tot sistemul',
+      is_system: true,
+    },
+  });
+
+  const userRole = await prisma.role.upsert({
+    where: {
+      slug: 'user'
+    },
+    update: {},
+    create: {
+      name: 'Utilizator',
+      slug: 'user',
+      description: 'Acces standard de citire si editare pe entitatile permise',
+      is_system: true,
+    },
+  });
+
+  console.log('Roluri create:', adminRole.name, userRole.name);
+
+
+  //Admin: permisiune globala "manage" (poate totul)
+  await upsertPermission(adminRole.id_role, 'manage');
+  await upsertPermission(userRole.id_role, 'read');
+
+  console.log('Permisiuni create pentru admin si user');
+}
+
+async function upsertPermission(id_role: string, action: string, id_module: string | null = null, id_entity: string | null = null) {
+  const existing = await prisma.rolePermission.findFirst({
+    where: {
+      id_role, 
+      id_module, 
+      id_entity, 
+      action,
+    },
+  });
+
+  if (!existing) {
+    await prisma.rolePermission.create({
+      data: {
+        id_role, 
+        id_module,
+        id_entity,
+        action,
+      }
+    })
+  }
 }
 
 async function seedCRM() {

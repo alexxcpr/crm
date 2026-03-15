@@ -1,9 +1,10 @@
 import { Controller, UseGuards, Get, Req } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { User } from '@prisma/client';
 import { Request } from 'express';
 
 interface RequestWithUser extends Request {
-    user: any;
+    user: User;
 }
 
 @Controller('user')

@@ -21,7 +21,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
     // Daca token-ul este valid, Passport apeleaza automat aceasta functie
     // cu payload-ul decriptat (cel creat de noi: { sub: userId, email: email })
-    async validate (payload : {sub: number, email: string}) {
+    async validate (payload : {sub: string, email: string}) {
         const user = await this.prisma.user.findUnique({
             where: {
                 id: payload.sub,

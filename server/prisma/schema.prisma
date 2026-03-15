@@ -14,7 +14,7 @@ datasource db {
 }
 
 model User {
-  id           Int       @id @default(autoincrement())
+  id           String    @id @default(uuid())
   date_created DateTime  @default(now())
   date_updated DateTime  @updatedAt
 
@@ -23,6 +23,8 @@ model User {
 
   first_name   String?
   last_name    String?
+
+  roles UserRole[]
 
   @@map("user")
 }
@@ -57,6 +59,7 @@ model Module {
   date_updated  DateTime  @updatedAt
 
   entities      Entity[]                           // Relatie 1:N - un modul contine mai multe entitati (Contacte, Companii, etc.)
+  permissions   RolePermission[]
 
   @@map("module")                                  // Numele real al tabelei in Postgres va fi "module", nu "Module"
 }
@@ -85,6 +88,8 @@ model Entity {
   // Relatie inversa: toate campurile din ALTE entitati care pointeaza catre ACEASTA entitate
   // Ex: daca entitatea "contacts" are un camp "cf_company_id" de tip relation catre "companies",
   // atunci "companies.relation_fields" va contine acel camp
+
+  permissions    RolePermission[]
 
   @@map("entity")
 }
@@ -148,4 +153,47 @@ model Field {
   // Previne crearea a doua coloane SQL cu acelasi nume in aceeasi tabela
   
   @@map("field")
+}
+
+model Role {
+  id_role         String    @id @default(uuid())
+  name            String    @db.VarChar(100)   //Administrator, Sales Rep, Viewer
+  slug            String    @unique @db.VarChar(100)   //admin, sales_rep, viewer
+  description     String?
+  is_system       Boolean   @default(false)     //admin si user nu pot fi sterse
+  date_created    DateTime  @default(now())
+  date_updated    DateTime  @updatedAt
+
+  users           UserRole[]
+  permissions     RolePermission[]
+
+  @@map("role")
+}
+
+//un user poate avea mai multe roluri
+//permisiunile se aduna (union), daca rolul A permite READ pe contacts si rolul B permite CREATE pe contacts, userul poate face ambele
+model UserRole {
+  id_user     String
+  id_role     String
+
+  user        User @relation(fields: [id_user], references: [id], onDelete: Cascade)
+  role        Role @relation(fields: [id_role], references: [id_role], onDelete: Cascade)
+
+  @@id([id_user, id_role])
+  @@map("user_role")        
+}
+
+model RolePermission {
+  id_permission   String   @id @default(uuid())
+  id_role         String
+  id_module       String?                       // NULL = global
+  id_entity       String?                       // NULL = tot modulul / global
+  action          String   @db.VarChar(50)      // 'create', 'read', 'update', 'delete', 'manage'
+
+  role            Role     @relation(fields: [id_role], references: [id_role], onDelete: Cascade)
+  module          Module?  @relation(fields: [id_module], references: [id_module], onDelete: Cascade)
+  entity          Entity?  @relation(fields: [id_entity], references: [id_entity], onDelete: Cascade)
+
+  @@unique([id_role, id_module, id_entity, action])
+  @@map("role_permission")
 }
