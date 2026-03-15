@@ -8,13 +8,14 @@ import { ContactsModule } from './contacts/contacts.module';
 import { KnexModule } from './knex/knex.module';
 import { DynamicSchemaModule } from './dynamic-schema/dynamic-schema.module';
 import { DynamicDataModule } from './dynamic-data/dynamic-data.module';
+import { SchemaModule } from './schema/schema.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal:true,
     }),
-    AuthModule, UserModule, PrismaModule, ContactsModule, KnexModule, DynamicSchemaModule, DynamicDataModule],
+    AuthModule, UserModule, PrismaModule, ContactsModule, KnexModule, DynamicSchemaModule, DynamicDataModule, SchemaModule],
   providers: [],
   controllers: [],
 })
