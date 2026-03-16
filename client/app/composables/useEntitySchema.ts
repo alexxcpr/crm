@@ -1,4 +1,4 @@
-import type { EntitySchema, FieldDefinition } from '~/types/schema'
+import type { EntitySchema, Field } from '~/types/schema'
 
 const schemaCache = new Map<string, EntitySchema>()
 
@@ -68,11 +68,11 @@ export function useEntitySchema(entitySlug: MaybeRef<string>) {
 
   const groups = computed(() => schema.value?.groups ?? [])
 
-  function getFieldBySlug(fieldSlug: string): FieldDefinition | undefined {
+  function getFieldBySlug(fieldSlug: string): Field | undefined {
     return fields.value.find(f => f.slug === fieldSlug)
   }
 
-  function getFieldsByGroup(groupName: string): FieldDefinition[] {
+  function getFieldsByGroup(groupName: string): Field[] {
     return formFields.value.filter(f => f.group_name === groupName)
   }
 

@@ -1,6 +1,6 @@
 // ─── Field Definition (exact ce returneaza GET /api/v1/schema/:entitySlug) ───
 
-export interface FieldDefinition {
+export interface Field {
     id_field: string
     slug: string
     name: string
@@ -40,7 +40,7 @@ export interface FieldDefinition {
   
   export interface EntitySchema {
     entity: EntityMeta
-    fields: FieldDefinition[]
+    fields: Field[]
     groups: string[]
   }
   

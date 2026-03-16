@@ -481,7 +481,7 @@ Atat. Componenta face totul singura:
 - [ ] Bara de filtre dinamica: `DynamicFilters.vue` (genereaza input-uri din `filterFields`)
 - [ ] Sortare pe click header (single si multi-column)
 - [ ] Paginare cu `UPagination` din Nuxt UI
-- [ ] Buton "Adauga" care deschide `DynamicForm` in modal sau navigheaza la pagina de creare
+- [ ] Buton "Adauga" care deschide `DynamicForm`: navigheaza la pagina de creare
 - [ ] Loading state, empty state, error state
 
 ---
