@@ -229,7 +229,7 @@ jsonb       → JSONB DEFAULT '{}'
 - [x] Mapping complet `data_type` → SQL type (inclusiv relatii cu FK)
 - [x] Sanitizare si validare stricta a slug-urilor si numelor de coloane
 - [x] Creare index automat pe coloanele marcate `is_filterable`
-- [ ] Unit tests pe `DynamicSchemaService` (testeaza ca ALTER TABLE se genereaza corect)
+- [x] Unit tests pe `DynamicSchemaService` (testeaza ca ALTER TABLE se genereaza corect)
 
 ---
 
@@ -409,7 +409,7 @@ Response example:
 - [x] Endpoint `GET /api/v1/schema/:entitySlug` 
 - [ ] Endpoint `GET /api/v1/schema/:entitySlug` optimizat cu cache in-memory (invalidat la orice modificare admin)
 - [x] Guard/Middleware pe rutele admin: doar userii cu rol `admin` pot accesa
-- [ ] Validari: nu permiti stergerea campurilor `is_system`, nu permiti stergerea entitatilor `is_system`
+- [x] Validari: nu permiti stergerea campurilor `is_system`, nu permiti stergerea entitatilor `is_system`
 
 ---
 
