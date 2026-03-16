@@ -63,11 +63,11 @@ export class DynamicSchemaService {
 
             applyColumn(table, colDef);
 
-            //FK pentru campuri de tip relatie
-            if (field.ui_type === 'relation' && field.id_relation_entity) {
-                this.addForeignKeyAsync(tableName, field);
-            }
         });
+        //FK pentru campuri de tip relatie
+        if (field.ui_type === 'relation' && field.id_relation_entity) {
+            await this.addForeignKeyAsync(tableName, field);
+        }
 
         // Index automat pe campuri filterable
         if (field.is_filterable) {

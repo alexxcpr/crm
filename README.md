@@ -67,6 +67,8 @@ cum va functiona in end
 - scripturi backend:
     restart db (delete container + create container): db-dev-restart
 
+- teste backend (jest):
+    npm test -- --testPathPattern=dynamic-schema
 
 
 ## API
