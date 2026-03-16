@@ -18,6 +18,11 @@ const table = useTemplateRef('table')
 const config = useRuntimeConfig()
 const { token } = useAuth()
 
+const { entity, tableFields, loading: schemaLoading } = useEntitySchema('contacts')
+const { items, meta, loading: dataLoading, fetchItems } = useEntityData('contacts')
+
+await fetchItems({ page: 1, limit: 25 })
+
 // const columnFilters = ref([{
 //   id: 'email_companie',
 //   value: ''
@@ -363,7 +368,13 @@ const pagination = ref({
       <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto">
         <div class="text-sm text-muted">
           {{ table?.tableApi?.getFilteredSelectedRowModel().rows.length || 0 }} of
-          {{ table?.tableApi?.getFilteredRowModel().rows.length || 0 }} row(s) selected.
+          {{ table?.tableApi?.getFilteredRowModel().rows.length || 0 }} row(s) selected
+        </div>
+
+        <div>
+          <pre>Entity: {{ entity }}</pre>
+          <pre>Fields: {{ tableFields.length }} coloane</pre>
+          <pre>Items: {{ items.length }} / {{ meta.total }} total</pre>
         </div>
 
         <div class="flex items-center gap-1.5">

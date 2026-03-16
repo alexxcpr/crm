@@ -445,9 +445,9 @@ await fetch({ filter: { cf_industry: 'it' }, sort: '-created_at', page: 1 })
 ```
 
 ### Taskuri Faza 5:
-- [ ] Implementare `useEntitySchema.ts` cu `useFetch` / `useAsyncData` si caching
-- [ ] Implementare `useEntityData.ts` cu CRUD complet + paginare + filtrare
-- [ ] Tipuri TypeScript: `EntitySchema`, `FieldDefinition`, `FilterParams`, `PaginatedResponse<T>`
+- [x] Implementare `useEntitySchema.ts` cu `useFetch` / `useAsyncData` si caching
+- [x] Implementare `useEntityData.ts` cu CRUD complet + paginare + filtrare
+- [x] Tipuri TypeScript: `EntitySchema`, `FieldDefinition`, `FilterParams`, `PaginatedResponse<T>`
 - [ ] Tratare erori: toast notifications pe erori de API (Nuxt UI `useToast()`)
 
 ---
