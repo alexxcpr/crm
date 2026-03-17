@@ -8,9 +8,8 @@ interface RequestWithUser extends Request {
 }
 
 @Controller('user')
+@UseGuards(AuthGuard('jwt'))
 export class UserController {
-
-    @UseGuards(AuthGuard('jwt'))
     @Get('me')
     getProfile(@Req() req: RequestWithUser) {
         return req.user;
