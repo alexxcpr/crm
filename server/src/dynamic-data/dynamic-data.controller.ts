@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Post, Put, Param, Delete, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { returnValidResponse } from 'src/utils/crud.utils';
 import { DynamicDataService } from './dynamic-data.service';
 
 @Controller('v1/data')
@@ -24,27 +25,30 @@ export class DynamicDataController {
     }
 
     @Post(':entitySlug')
-    create (
+    async create(
         @Param('entitySlug') entitySlug: string,
         @Body() body: Record<string, any>,
     ) {
-        return this.dataService.create(entitySlug, body);
+        const result = await this.dataService.create(entitySlug, body);
+        return returnValidResponse('Inregistrarea a fost creata cu succes.', result.data);
     }
 
     @Put(':entitySlug/:id')
-    update (
+    async update(
         @Param('entitySlug') entitySlug: string,
         @Param('id') id: string,
-        @Body() body: Record<string, any>
+        @Body() body: Record<string, any>,
     ) {
-        return this.dataService.update(entitySlug, id, body);
+        const result = await this.dataService.update(entitySlug, id, body);
+        return returnValidResponse('Inregistrarea a fost actualizata cu succes.', result.data);
     }
 
     @Delete(':entitySlug/:id')
-    remove(
+    async remove(
         @Param('entitySlug') entitySlug: string,
         @Param('id') id: string,
     ) {
-        return this.dataService.remove(entitySlug, id);
+        await this.dataService.remove(entitySlug, id);
+        return returnValidResponse('Inregistrarea a fost stearsa cu succes.', null);
     }
 }

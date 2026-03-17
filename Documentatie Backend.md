@@ -6,7 +6,7 @@ Toate API-urile sunt prefixate cu `/api`. Exemplu: `http://localhost:4000/api/..
 
 ## APIs
 
-### (verificat) Autentificare (`/api/auth`)
+### Autentificare (`/api/auth`)
 
 | Metodă | Endpoint | Descriere |
 | ------ | -------- | --------- |
@@ -18,7 +18,7 @@ Toate API-urile sunt prefixate cu `/api`. Exemplu: `http://localhost:4000/api/..
 
 <div style="margin-top: 5em;"></div>
 
-### (verificat) Utilizator (`/api/user`)
+### Utilizator (`/api/user`)
 
 | Metodă | Endpoint | Descriere |
 | ------ | -------- | --------- |
@@ -28,7 +28,7 @@ Toate API-urile sunt prefixate cu `/api`. Exemplu: `http://localhost:4000/api/..
 
 <div style="margin-top: 5em;"></div>
 
-### (verificat) Schema (`/api/v1/schema`)
+### Schema (`/api/v1/schema`)
 
 | Metodă | Endpoint | Descriere |
 | ------ | -------- | --------- |
@@ -39,7 +39,7 @@ Toate API-urile sunt prefixate cu `/api`. Exemplu: `http://localhost:4000/api/..
 <div style="margin-top: 5em;"></div>
 
 <a id="endpoint-get-data"></a>
-### (verificat) Date dinamice (`/api/v1/data`)
+### Date dinamice (`/api/v1/data`)
 
 CRUD generic pentru orice entitate definită. **Necesită JWT.**
 
@@ -47,9 +47,10 @@ CRUD generic pentru orice entitate definită. **Necesită JWT.**
 | ------ | -------- | --------- |
 | GET | `/api/v1/data/:entitySlug` | Listează toate înregistrările unei entități. Suportă query params pentru filtrare, sortare și paginare (vezi exemplele mai jos). [Vezi structura răspunsului](#structura-raspunsului-get-data). |
 | GET | `/api/v1/data/:entitySlug/:id` | Returnează o singură înregistrare după ID. |
-| POST | `/api/v1/data/:entitySlug` | Creează o înregistrare nouă. Body: obiect cu valorile câmpurilor. |
-| PUT | `/api/v1/data/:entitySlug/:id` | Actualizează o înregistrare existentă. |
-| DELETE | `/api/v1/data/:entitySlug/:id` | Șterge o înregistrare. |
+| POST | `/api/v1/data/:entitySlug` | Creează o înregistrare nouă. Body: obiect cu valorile câmpurilor. Returnează formatul [SuccesResponse](#format-standard-succesresponse). |
+| PUT | `/api/v1/data/:entitySlug/:id` | Actualizează o înregistrare existentă. Returnează formatul [SuccesResponse](#format-standard-succesresponse). |
+| DELETE | `/api/v1/data/:entitySlug/:id` | Șterge o înregistrare. Returnează formatul [SuccesResponse](#format-standard-succesresponse). |
+
 #### Query params pentru `GET /api/v1/data/:entitySlug`
 
 | Param | Tip | Default | Descriere |
@@ -159,6 +160,23 @@ Gestionare câmpurile unei entități. **Necesită JWT + rol admin.**
 <div style="margin-top: 5em;"></div>
 
 ## Structura răspunsurilor API
+
+Răspunsurile pentru operațiunile CRUD (POST, PUT, DELETE) folosesc formatul definit în `server/src/utils/crud.utils.ts`:
+
+<a id="format-standard-succesresponse"></a>
+### Format standard (`SuccesResponse`)
+
+```typescript
+interface SuccesResponse<T> {
+  mesaj: string;   // Mesaj de succes (ex: "Actualizarea a fost efectuata cu succes")
+  data: T;        // Obiectul returnat (entitatea creată/actualizată)
+  cod: number;    // Cod HTTP (200 pentru succes)
+}
+```
+
+Funcția `returnValidResponse<T>(mesaj, entity)` generează acest răspuns standardizat pentru toate operațiunile CRUD.
+
+---
 
 <a id="structura-raspunsului-get-data"></a>
 

@@ -203,10 +203,5 @@ export class DynamicDataService {
         if (deleted === 0) {
             throw new NotFoundException(`Inregistrarea cu id "${id}" nu a fost gasita in "${entitySlug}".`);
         }
-
-        return { 
-            success: true, 
-            message: `Inregistrarea a fost stearsa cu succes.`
-        };
     }
 }
