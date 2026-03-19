@@ -34,6 +34,8 @@ Toate API-urile sunt prefixate cu `/api`. Exemplu: `http://localhost:4000/api/..
 | ------ | -------- | --------- |
 | GET | `/api/v1/schema/:entitySlug` | Returnează schema (câmpuri, tipuri) pentru o entitate dinamică. Ex: `contacts`, `companies`. |
 
+**Flux detaliat:** [Diagrama-Flux-Schema-Frontend.md](./Diagrama-Flux-Schema-Frontend.md) – cum frontend-ul primește structura pentru DynamicForm/DynamicTable.
+
 ---
 
 <div style="margin-top: 5em;"></div>

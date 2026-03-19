@@ -150,8 +150,8 @@ sequenceDiagram
 
 | Tip rute | Guard | Exemple |
 | -------- | ----- | ------- |
-| **Publice** | — | `/auth/signup`, `/auth/signin`, `/auth/signout`, `/v1/schema/:entitySlug` |
-| **JWT** | `AuthGuard('jwt')` | `/user/me`, `/v1/data/:entitySlug` (CRUD) |
+| **Publice** | — | `/auth/signup`, `/auth/signin`, `/auth/signout` |
+| **JWT** | `AuthGuard('jwt')` | `/user/me`, `/v1/schema/:entitySlug`, `/v1/data/:entitySlug` (CRUD) |
 | **JWT + Admin** | `AuthGuard('jwt')` + `RolesGuard` + `@Roles('admin')` | `/v1/admin/modules`, `/v1/admin/entities`, `/v1/admin/entities/:id/fields` |
 
 ---
