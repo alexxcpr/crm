@@ -24,6 +24,8 @@ export interface Field {
     relation_entity_slug: string | null
     group_name: string
     rank: number
+    grid_col: number
+    col_span: number
   }
   
   export interface EntityMeta {

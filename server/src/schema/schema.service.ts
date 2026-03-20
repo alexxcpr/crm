@@ -69,6 +69,8 @@ export class SchemaService {
                 relation_entity_slug: f.relation_entity?.slug ?? null,
                 group_name: f.group_name,
                 rank: f.rank,
+                grid_col: f.grid_col,
+                col_span: f.col_span,
             })),
             groups,
         };

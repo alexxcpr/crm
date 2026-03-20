@@ -12,6 +12,17 @@ export class AdminModulesService {
                 rank: 'asc'
             },
             include: {
+                entities: {
+                    orderBy: { rank: 'asc' },
+                    select: {
+                        id_entity: true,
+                        name: true,
+                        slug: true,
+                        icon: true,
+                        label_plural: true,
+                        rank: true,
+                    },
+                },
                 _count: {
                     select: {
                         entities: true

@@ -66,7 +66,14 @@ export function useEntitySchema(entitySlug: MaybeRef<string>) {
     fields.value.filter(f => f.is_filterable)
   )
 
-  const groups = computed(() => schema.value?.groups ?? [])
+  const groups = computed(() => {
+    const raw = schema.value?.groups ?? []
+    return [...raw].sort((a, b) => {
+      if (a === 'general') return -1
+      if (b === 'general') return 1
+      return a.localeCompare(b)
+    })
+  })
 
   function getFieldBySlug(fieldSlug: string): Field | undefined {
     return fields.value.find(f => f.slug === fieldSlug)

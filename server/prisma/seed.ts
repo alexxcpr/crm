@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import knex from 'knex';
+import * as argon2 from 'argon2';
 import { applyColumn } from 'src/dynamic-schema/data-type.mapper';
 
 const pool = new Pool({
@@ -15,8 +16,44 @@ const db = knex({
 });
 
 async function main () {
-  await seedRoles();
+  const { adminRole } = await seedRoles();
+  await seedUser(adminRole.id_role);
   await seedCRM();
+}
+
+async function seedUser(adminRoleId: string) {
+  const hash = await argon2.hash('1234');
+  
+  const rootUser = await prisma.user.upsert({
+    where: { email: 'root@gmail.com' },
+    update: { hash },
+    create: {
+      email: 'root@gmail.com',
+      hash: hash,
+      first_name: 'Root',
+      last_name: 'Admin',
+    }
+  });
+
+  const existingUserRole = await prisma.userRole.findUnique({
+    where: {
+      id_user_id_role: {
+        id_user: rootUser.id,
+        id_role: adminRoleId,
+      }
+    }
+  });
+
+  if (!existingUserRole) {
+    await prisma.userRole.create({
+      data: {
+        id_user: rootUser.id,
+        id_role: adminRoleId,
+      }
+    });
+  }
+
+  console.log('Utilizator root creat si asociat cu rolul de admin.');
 }
 
 async function seedRoles() {
@@ -54,6 +91,8 @@ async function seedRoles() {
   await upsertPermission(userRole.id_role, 'read');
 
   console.log('Permisiuni create pentru admin si user');
+
+  return { adminRole, userRole };
 }
 
 async function upsertPermission(id_role: string, action: string, id_module: string | null = null, id_entity: string | null = null) {
@@ -146,6 +185,8 @@ async function seedCRM() {
       validation_rules: { min_length: 2, max_length: 100 },
       group_name: 'general',
       rank: 0,
+      grid_col: 1,
+      col_span: 1,
     },
     {
       name: 'Prenume',
@@ -159,6 +200,8 @@ async function seedCRM() {
       validation_rules: { min_length: 2, max_length: 100 },
       group_name: 'general',
       rank: 1,
+      grid_col: 2,
+      col_span: 1,
     },
     {
       name: 'Email companie',
@@ -172,6 +215,22 @@ async function seedCRM() {
       validation_rules: { max_length: 255 },
       group_name: 'general',
       rank: 2,
+      grid_col: 3,
+      col_span: 1,
+    },
+    {
+      name: 'Pozitie',
+      slug: 'pozitie',
+      column_name: 'pozitie',
+      data_type: 'varchar',
+      ui_type: 'text',
+      is_required: false,
+      is_system: true,
+      placeholder: 'Ex: Director Vanzari',
+      group_name: 'general',
+      rank: 3,
+      grid_col: 1,
+      col_span: 1,
     },
     {
       name: 'Activ',
@@ -183,7 +242,9 @@ async function seedCRM() {
       is_system: true,
       default_value: 'true',
       group_name: 'general',
-      rank: 3,
+      rank: 4,
+      grid_col: 2,
+      col_span: 1,
     },
     {
       name: 'Decision Maker',
@@ -194,7 +255,51 @@ async function seedCRM() {
       is_required: false,
       is_system: true,
       group_name: 'general',
-      rank: 4,
+      rank: 5,
+      grid_col: 3,
+      col_span: 1,
+    },
+    {
+      name: 'Telefon 1',
+      slug: 'telefon1',
+      column_name: 'telefon1',
+      data_type: 'varchar',
+      ui_type: 'phone',
+      is_required: false,
+      is_system: true,
+      placeholder: '+40 7XX XXX XXX',
+      group_name: 'contact_info',
+      rank: 0,
+      grid_col: 1,
+      col_span: 1,
+    },
+    {
+      name: 'Telefon 2',
+      slug: 'telefon2',
+      column_name: 'telefon2',
+      data_type: 'varchar',
+      ui_type: 'phone',
+      is_required: false,
+      is_system: true,
+      placeholder: '+40 7XX XXX XXX',
+      group_name: 'contact_info',
+      rank: 1,
+      grid_col: 2,
+      col_span: 1,
+    },
+    {
+      name: 'Email alternativ',
+      slug: 'email_alternativ',
+      column_name: 'email_alternativ',
+      data_type: 'varchar',
+      ui_type: 'email',
+      is_required: false,
+      is_system: true,
+      placeholder: 'email@personal.ro',
+      group_name: 'contact_info',
+      rank: 2,
+      grid_col: 3,
+      col_span: 1,
     },
     {
       name: 'Profil LinkedIn',
@@ -207,55 +312,9 @@ async function seedCRM() {
       placeholder: 'https://linkedin.com/in/...',
       validation_rules: { max_length: 500 },
       group_name: 'contact_info',
-      rank: 0,
-    },
-    {
-      name: 'Telefon 1',
-      slug: 'telefon1',
-      column_name: 'telefon1',
-      data_type: 'varchar',
-      ui_type: 'phone',
-      is_required: false,
-      is_system: true,
-      placeholder: '+40 7XX XXX XXX',
-      group_name: 'contact_info',
-      rank: 1,
-    },
-    {
-      name: 'Telefon 2',
-      slug: 'telefon2',
-      column_name: 'telefon2',
-      data_type: 'varchar',
-      ui_type: 'phone',
-      is_required: false,
-      is_system: true,
-      placeholder: '+40 7XX XXX XXX',
-      group_name: 'contact_info',
-      rank: 2,
-    },
-    {
-      name: 'Pozitie',
-      slug: 'pozitie',
-      column_name: 'pozitie',
-      data_type: 'varchar',
-      ui_type: 'text',
-      is_required: false,
-      is_system: true,
-      placeholder: 'Ex: Director Vanzari',
-      group_name: 'general',
-      rank: 5,
-    },
-    {
-      name: 'Email alternativ',
-      slug: 'email_alternativ',
-      column_name: 'email_alternativ',
-      data_type: 'varchar',
-      ui_type: 'email',
-      is_required: false,
-      is_system: true,
-      placeholder: 'email@personal.ro',
-      group_name: 'contact_info',
       rank: 3,
+      grid_col: 1,
+      col_span: 3,
     },
   ];
 
@@ -290,6 +349,8 @@ async function seedCRM() {
       validation_rules: { min_length: 2, max_length: 200 },
       group_name: 'general',
       rank: 0,
+      grid_col: 1,
+      col_span: 1,
     },
     {
       name: 'CUI',
@@ -303,6 +364,8 @@ async function seedCRM() {
       is_unique: true,
       group_name: 'general',
       rank: 1,
+      grid_col: 2,
+      col_span: 1,
     },
     {
       name: 'Industrie',
@@ -323,6 +386,8 @@ async function seedCRM() {
       ],
       group_name: 'general',
       rank: 2,
+      grid_col: 3,
+      col_span: 1,
     },
     {
       name: 'Website',
@@ -335,6 +400,8 @@ async function seedCRM() {
       placeholder: 'https://www.exemplu.ro',
       group_name: 'contact_info',
       rank: 0,
+      grid_col: 1,
+      col_span: 1,
     },
     {
       name: 'Telefon',
@@ -347,6 +414,8 @@ async function seedCRM() {
       placeholder: '+40 XXX XXX XXX',
       group_name: 'contact_info',
       rank: 1,
+      grid_col: 2,
+      col_span: 1,
     },
     {
       name: 'Adresa',
@@ -359,6 +428,8 @@ async function seedCRM() {
       placeholder: 'Strada, numar, oras, judet',
       group_name: 'contact_info',
       rank: 2,
+      grid_col: 1,
+      col_span: 3,
     },
   ];
 

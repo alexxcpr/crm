@@ -68,6 +68,8 @@ CREATE TABLE "field" (
     "relation_display_field" VARCHAR(100),
     "group_name" VARCHAR(100) NOT NULL DEFAULT 'general',
     "rank" INTEGER NOT NULL DEFAULT 0,
+    "grid_col" INTEGER NOT NULL DEFAULT 1,
+    "col_span" INTEGER NOT NULL DEFAULT 1,
     "date_created" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "date_updated" TIMESTAMP(3) NOT NULL,
 

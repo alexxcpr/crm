@@ -97,6 +97,14 @@ export class CreateFieldDto {
     @IsOptional()
     @IsInt()
     rank?: number;
+
+    @IsOptional()
+    @IsInt()
+    grid_col?: number;
+
+    @IsOptional()
+    @IsInt()
+    col_span?: number;
 }
 
 export class UpdateFieldDto {
@@ -167,6 +175,14 @@ export class UpdateFieldDto {
     @IsOptional()
     @IsInt()
     rank?: number;
+
+    @IsOptional()
+    @IsInt()
+    grid_col?: number;
+
+    @IsOptional()
+    @IsInt()
+    col_span?: number;
 
     @IsOptional()
     @IsString()
