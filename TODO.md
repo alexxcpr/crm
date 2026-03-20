@@ -475,14 +475,14 @@ Atat. Componenta face totul singura:
 7. Paginare: footer cu numar pagini, items per page
 
 ### Taskuri Faza 6:
-- [ ] Componenta `DynamicTable.vue` cu props: `entity` (string, obligatoriu)
-- [ ] Generare dinamica coloane din schema (`tableFields`)
-- [ ] Componenta `DynamicCell.vue` — randeaza o celula diferit in functie de `ui_type`
-- [ ] Bara de filtre dinamica: `DynamicFilters.vue` (genereaza input-uri din `filterFields`)
-- [ ] Sortare pe click header (single si multi-column)
+- [x] Componenta `DynamicTable.vue` cu props: `entity` (string, obligatoriu)
+- [x] Generare dinamica coloane din schema (`tableFields`)
+- [x] Componenta `DynamicCell.vue` — randeaza o celula diferit in functie de `ui_type`
+- [x] Bara de filtre dinamica: `DynamicFilters.vue` (genereaza input-uri din `filterFields`)
+- [x] Sortare pe click header (single si multi-column)
 - [ ] Paginare cu `UPagination` din Nuxt UI
-- [ ] Buton "Adauga" care deschide `DynamicForm`: navigheaza la pagina de creare
-- [ ] Loading state, empty state, error state
+- [x] Buton "Adauga" care deschide `DynamicForm`: navigheaza la pagina de creare
+- [x] Loading state, empty state, error state
 
 ---
 
@@ -541,15 +541,15 @@ function buildZodSchema(fields: FieldDefinition[]) {
 ```
 
 ### Taskuri Faza 7:
-- [ ] Componenta `DynamicForm.vue` cu props: `entity`, `recordId?`, emit `saved`
-- [ ] Componenta `DynamicField.vue` — randeaza campul corect dupa `ui_type` (wrapper peste `<component :is>`)
-- [ ] Grupare campuri in sectiuni/tab-uri dupa `group_name`
-- [ ] Constructie schema Zod dinamica din `field_definitions`
-- [ ] Integrare `vee-validate` cu schema Zod generata
-- [ ] Mode create: formular gol, POST pe submit
-- [ ] Mode edit: pre-populare cu datele existente, PUT pe submit
+- [x] Componenta `DynamicForm.vue` cu props: `entity`, `recordId?`, emit `saved`
+- [x] Componenta `DynamicField.vue` — randeaza campul corect dupa `ui_type` (wrapper peste `<component :is>`)
+- [x] Grupare campuri in sectiuni/tab-uri dupa `group_name`
+- [x] Constructie schema Zod dinamica din `field_definitions`
+- [x] Integrare `vee-validate` cu schema Zod generata
+- [x] Mode create: formular gol, POST pe submit
+- [x] Mode edit: pre-populare cu datele existente, PUT pe submit
 - [ ] Campuri de tip `relation`: fetch optiuni din API-ul entitatii tinta, search async
-- [ ] Loading state pe submit, error handling cu toast
+- [] Loading state pe submit, error handling cu toast
 
 ---
 
