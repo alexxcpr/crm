@@ -1,7 +1,12 @@
-import { Body, Controller, Get, Post, Put, Param, Delete, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, Param, Delete, Query, UseGuards, Req } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Request } from 'express';
 import { returnValidResponse } from 'src/utils/crud.utils';
 import { DynamicDataService } from './dynamic-data.service';
+
+interface RequestWithUser extends Request {
+    user: { id: string; email: string };
+}
 
 @Controller('v1/data')
 @UseGuards(AuthGuard('jwt'))
@@ -28,8 +33,9 @@ export class DynamicDataController {
     async create(
         @Param('entitySlug') entitySlug: string,
         @Body() body: Record<string, any>,
+        @Req() req: RequestWithUser,
     ) {
-        const result = await this.dataService.create(entitySlug, body);
+        const result = await this.dataService.create(entitySlug, body, req.user.id);
         return returnValidResponse('Inregistrarea a fost creata cu succes.', result.data);
     }
 

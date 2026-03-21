@@ -154,7 +154,7 @@ export class DynamicDataService {
     }
 
     // ─── POST creare record ───
-    async create(entitySlug: string, body: Record<string, any>) {
+    async create(entitySlug: string, body: Record<string, any>, userId?: string) {
         const { entity, fields } = await this.resolveEntity(entitySlug);
 
         // Valideaza si sanitizeaza body
@@ -162,12 +162,19 @@ export class DynamicDataService {
             body, fields, entity.table_name, 'create', undefined,  
         );
 
+        const insertData: Record<string, any> = {
+            ...sanitized,
+            date_created: new Date(),
+            date_updated: new Date(),
+        };
+
+        // Seteaza id_owner daca este furnizat
+        if (userId) {
+            insertData.id_owner = userId;
+        }
+
         const [record] = await this.knex.instance(entity.table_name)
-            .insert({
-                ...sanitized,
-                date_created: new Date(),
-                date_updated: new Date(),
-            })
+            .insert(insertData)
             .returning('*');
 
         return { data: record };
