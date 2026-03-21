@@ -123,6 +123,19 @@ const columns = computed<TableColumn<Record<string, any>>[]>(() => {
     })
   })
 
+  // Quick open button
+  cols.push({
+    id: 'quick_open',
+    cell: ({ row }) => h(UButton, {
+      icon: 'i-lucide-pencil',
+      label: 'Edit',
+      color: 'neutral',
+      variant: 'ghost',
+      size: 'xs',
+      onClick: () => emit('edit', row.original.id)
+    })
+  })
+
   // Dynamic field columns
   for (const field of tableFields.value) {
     const col: TableColumn<Record<string, any>> = {
