@@ -9,7 +9,7 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      apiBase: 'http://localhost:4000/api'
+      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:4000/api'
     }
   },
 
@@ -44,12 +44,6 @@ export default defineNuxtConfig({
   },
 
   css: ['~/assets/css/main.css'],
-
-  routeRules: {
-    '/api/**': {
-      cors: true
-    }
-  },
 
   compatibilityDate: '2024-07-11',
 
