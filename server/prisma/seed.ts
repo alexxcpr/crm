@@ -117,6 +117,411 @@ async function upsertPermission(id_role: string, action: string, id_module: stri
   }
 }
 
+/** Entitate sandbox: toate tipurile SQL suportate, toate tipurile UI și ~10 taburi (group_name) pentru testare form/listă. */
+async function seedTestEntity(id_module: string, id_relation_target: string) {
+  const testEntity = await prisma.entity.upsert({
+    where: { slug: 'test_entity' },
+    update: {
+      id_module,
+      name: 'Test entity',
+      table_name: 'ent_test_entity',
+      icon: 'i-heroicons-beaker',
+      label_singular: 'Înregistrare test',
+      label_plural: 'Test entity',
+      rank: 2,
+    },
+    create: {
+      id_module,
+      name: 'Test entity',
+      slug: 'test_entity',
+      table_name: 'ent_test_entity',
+      icon: 'i-heroicons-beaker',
+      is_system: false,
+      label_singular: 'Înregistrare test',
+      label_plural: 'Test entity',
+      rank: 2,
+    },
+  });
+
+  const selOpts = [
+    { label: 'Opțiune Alfa', value: 'opt_a' },
+    { label: 'Opțiune Beta', value: 'opt_b' },
+    { label: 'Opțiune Gamma', value: 'opt_c' },
+  ];
+
+  const multiOpts = [
+    { label: 'Tag roșu', value: 'red' },
+    { label: 'Tag verde', value: 'green' },
+    { label: 'Tag albastru', value: 'blue' },
+    { label: 'Tag galben', value: 'yellow' },
+  ];
+
+  const testFields: Array<Record<string, unknown>> = [
+    // ── Tab 1: varchar × mai multe UI ──
+    {
+      name: 'Varchar → text',
+      slug: 'vc_text',
+      column_name: 'cf_test_vc_text',
+      data_type: 'varchar',
+      ui_type: 'text',
+      is_required: false,
+      is_system: false,
+      placeholder: 'Text scurt',
+      group_name: 'test_tab_01_varchar',
+      rank: 0,
+      grid_col: 1,
+      col_span: 1,
+    },
+    {
+      name: 'Varchar → email',
+      slug: 'vc_email',
+      column_name: 'cf_test_vc_email',
+      data_type: 'varchar',
+      ui_type: 'email',
+      is_required: false,
+      is_system: false,
+      group_name: 'test_tab_01_varchar',
+      rank: 1,
+      grid_col: 2,
+      col_span: 1,
+    },
+    {
+      name: 'Varchar → phone',
+      slug: 'vc_phone',
+      column_name: 'cf_test_vc_phone',
+      data_type: 'varchar',
+      ui_type: 'phone',
+      is_required: false,
+      is_system: false,
+      group_name: 'test_tab_01_varchar',
+      rank: 2,
+      grid_col: 3,
+      col_span: 1,
+    },
+    {
+      name: 'Varchar → file (URL)',
+      slug: 'vc_file',
+      column_name: 'cf_test_vc_file',
+      data_type: 'varchar',
+      ui_type: 'file',
+      is_required: false,
+      is_system: false,
+      placeholder: 'Cale sau URL fișier',
+      group_name: 'test_tab_01_varchar',
+      rank: 3,
+      grid_col: 1,
+      col_span: 2,
+    },
+    {
+      name: 'Varchar → number (input numeric)',
+      slug: 'vc_number',
+      column_name: 'cf_test_vc_number',
+      data_type: 'varchar',
+      ui_type: 'number',
+      is_required: false,
+      is_system: false,
+      placeholder: 'Stocat ca text în DB',
+      group_name: 'test_tab_01_varchar',
+      rank: 4,
+      grid_col: 3,
+      col_span: 1,
+    },
+    {
+      name: 'Varchar → textarea',
+      slug: 'vc_textarea',
+      column_name: 'cf_test_vc_textarea',
+      data_type: 'varchar',
+      ui_type: 'textarea',
+      is_required: false,
+      is_system: false,
+      placeholder: 'Text mai lung în coloană varchar(255)',
+      group_name: 'test_tab_01_varchar',
+      rank: 5,
+      grid_col: 1,
+      col_span: 3,
+    },
+
+    // ── Tab 2: text SQL ──
+    {
+      name: 'Text → textarea',
+      slug: 'txt_textarea',
+      column_name: 'cf_test_txt_textarea',
+      data_type: 'text',
+      ui_type: 'textarea',
+      is_required: false,
+      is_system: false,
+      group_name: 'test_tab_02_text',
+      rank: 0,
+      grid_col: 1,
+      col_span: 3,
+    },
+    {
+      name: 'Text → text (single line)',
+      slug: 'txt_text',
+      column_name: 'cf_test_txt_text',
+      data_type: 'text',
+      ui_type: 'text',
+      is_required: false,
+      is_system: false,
+      group_name: 'test_tab_02_text',
+      rank: 1,
+      grid_col: 1,
+      col_span: 2,
+    },
+
+    // ── Tab 3: numerice ──
+    {
+      name: 'Integer → number',
+      slug: 'int_number',
+      column_name: 'cf_test_int_number',
+      data_type: 'integer',
+      ui_type: 'number',
+      is_required: false,
+      is_system: false,
+      validation_rules: { min: 0, max: 999999 },
+      group_name: 'test_tab_03_numeric',
+      rank: 0,
+      grid_col: 1,
+      col_span: 1,
+    },
+    {
+      name: 'Numeric → number',
+      slug: 'num_number',
+      column_name: 'cf_test_num_number',
+      data_type: 'numeric',
+      ui_type: 'number',
+      is_required: false,
+      is_system: false,
+      group_name: 'test_tab_03_numeric',
+      rank: 1,
+      grid_col: 2,
+      col_span: 1,
+    },
+    {
+      name: 'Numeric → currency',
+      slug: 'num_currency',
+      column_name: 'cf_test_num_currency',
+      data_type: 'numeric',
+      ui_type: 'currency',
+      is_required: false,
+      is_system: false,
+      group_name: 'test_tab_03_numeric',
+      rank: 2,
+      grid_col: 3,
+      col_span: 1,
+    },
+
+    // ── Tab 4: boolean ──
+    {
+      name: 'Boolean → checkbox',
+      slug: 'bool_checkbox',
+      column_name: 'cf_test_bool_checkbox',
+      data_type: 'boolean',
+      ui_type: 'checkbox',
+      is_required: true,
+      is_system: false,
+      default_value: 'false',
+      group_name: 'test_tab_04_boolean',
+      rank: 0,
+      grid_col: 1,
+      col_span: 1,
+    },
+
+    // ── Tab 5: date ──
+    {
+      name: 'Date → datepicker',
+      slug: 'dt_date',
+      column_name: 'cf_test_dt_date',
+      data_type: 'date',
+      ui_type: 'datepicker',
+      is_required: false,
+      is_system: false,
+      group_name: 'test_tab_05_date',
+      rank: 0,
+      grid_col: 1,
+      col_span: 1,
+    },
+
+    // ── Tab 6: timestamp ──
+    {
+      name: 'Timestamp → datepicker',
+      slug: 'ts_datetime',
+      column_name: 'cf_test_ts_datetime',
+      data_type: 'timestamp',
+      ui_type: 'datepicker',
+      is_required: false,
+      is_system: false,
+      group_name: 'test_tab_06_timestamp',
+      rank: 0,
+      grid_col: 1,
+      col_span: 2,
+    },
+
+    // ── Tab 7: select & radio ──
+    {
+      name: 'Varchar → select',
+      slug: 'vc_select',
+      column_name: 'cf_test_vc_select',
+      data_type: 'varchar',
+      ui_type: 'select',
+      is_required: false,
+      is_system: false,
+      options: selOpts,
+      group_name: 'test_tab_07_choice',
+      rank: 0,
+      grid_col: 1,
+      col_span: 1,
+    },
+    {
+      name: 'Varchar → radio',
+      slug: 'vc_radio',
+      column_name: 'cf_test_vc_radio',
+      data_type: 'varchar',
+      ui_type: 'radio',
+      is_required: false,
+      is_system: false,
+      options: selOpts,
+      group_name: 'test_tab_07_choice',
+      rank: 1,
+      grid_col: 2,
+      col_span: 2,
+    },
+
+    // ── Tab 8: multi-select (JSON în DB) ──
+    {
+      name: 'JSONB → multi-select',
+      slug: 'json_multi',
+      column_name: 'cf_test_json_multi',
+      data_type: 'jsonb',
+      ui_type: 'multi-select',
+      is_required: false,
+      is_system: false,
+      options: multiOpts,
+      group_name: 'test_tab_08_multi',
+      rank: 0,
+      grid_col: 1,
+      col_span: 3,
+    },
+
+    // ── Tab 9: UUID + relație ──
+    {
+      name: 'UUID → text (manual)',
+      slug: 'uuid_text',
+      column_name: 'cf_test_uuid_text',
+      data_type: 'uuid',
+      ui_type: 'text',
+      is_required: false,
+      is_system: false,
+      placeholder: '00000000-0000-0000-0000-000000000000',
+      group_name: 'test_tab_09_uuid',
+      rank: 0,
+      grid_col: 1,
+      col_span: 2,
+    },
+    {
+      name: 'Relație → companie',
+      slug: 'rel_company',
+      column_name: 'cf_test_rel_company',
+      data_type: 'uuid',
+      ui_type: 'relation',
+      is_required: false,
+      is_system: false,
+      id_relation_entity: id_relation_target,
+      relation_display_field: 'name',
+      group_name: 'test_tab_09_uuid',
+      rank: 1,
+      grid_col: 3,
+      col_span: 1,
+    },
+
+    // ── Tab 10: JSON + unic ──
+    {
+      name: 'JSONB → text (JSON ca string)',
+      slug: 'json_text',
+      column_name: 'cf_test_json_text',
+      data_type: 'jsonb',
+      ui_type: 'text',
+      is_required: false,
+      is_system: false,
+      placeholder: '{"exemplu": true}',
+      group_name: 'test_tab_10_json',
+      rank: 0,
+      grid_col: 1,
+      col_span: 2,
+    },
+    {
+      name: 'Varchar unic (constraint)',
+      slug: 'vc_unique',
+      column_name: 'cf_test_vc_unique',
+      data_type: 'varchar',
+      ui_type: 'text',
+      is_required: false,
+      is_unique: true,
+      is_system: false,
+      placeholder: 'Valoare unică per rând',
+      group_name: 'test_tab_10_json',
+      rank: 1,
+      grid_col: 3,
+      col_span: 1,
+    },
+  ];
+
+  for (const field of testFields) {
+    const slug = field.slug as string;
+    const created = await prisma.field.upsert({
+      where: {
+        id_entity_slug: {
+          id_entity: testEntity.id_entity,
+          slug,
+        },
+      },
+      update: {
+        name: field.name as string,
+        column_name: field.column_name as string,
+        data_type: field.data_type as string,
+        ui_type: field.ui_type as string,
+        default_value: (field.default_value as string | undefined) ?? null,
+        placeholder: (field.placeholder as string | undefined) ?? null,
+        options: (field.options as object | undefined) ?? undefined,
+        is_required: field.is_required as boolean,
+        is_unique: (field.is_unique as boolean | undefined) ?? false,
+        is_system: field.is_system as boolean,
+        validation_rules: (field.validation_rules as object | undefined) ?? undefined,
+        id_relation_entity: (field.id_relation_entity as string | undefined) ?? null,
+        relation_display_field: (field.relation_display_field as string | undefined) ?? null,
+        group_name: field.group_name as string,
+        rank: field.rank as number,
+        grid_col: field.grid_col as number,
+        col_span: field.col_span as number,
+      },
+      create: {
+        id_entity: testEntity.id_entity,
+        name: field.name as string,
+        slug,
+        column_name: field.column_name as string,
+        data_type: field.data_type as string,
+        ui_type: field.ui_type as string,
+        default_value: (field.default_value as string | undefined) ?? null,
+        placeholder: (field.placeholder as string | undefined) ?? null,
+        options: (field.options as object | undefined) ?? undefined,
+        is_required: field.is_required as boolean,
+        is_unique: (field.is_unique as boolean | undefined) ?? false,
+        is_system: field.is_system as boolean,
+        validation_rules: (field.validation_rules as object | undefined) ?? undefined,
+        id_relation_entity: (field.id_relation_entity as string | undefined) ?? null,
+        relation_display_field: (field.relation_display_field as string | undefined) ?? null,
+        group_name: field.group_name as string,
+        rank: field.rank as number,
+        grid_col: field.grid_col as number,
+        col_span: field.col_span as number,
+      },
+    });
+    console.log(`[test_entity] Field: ${created.name} (${created.column_name})`);
+  }
+
+  console.log('Entitate test_entity si campurile ei au fost definite.');
+}
+
 async function seedCRM() {
   // 1. Modulul CRM
   const crmModule = await prisma.module.upsert({
@@ -449,6 +854,8 @@ async function seedCRM() {
     });
     console.log(`Field creat: ${created.name} (${created.column_name})`);
   }
+
+  await seedTestEntity(crmModule.id_module, companiesEntity.id_entity);
 
   console.log('Fielduri create cu succes (finish prisma)')
 

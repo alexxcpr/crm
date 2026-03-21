@@ -62,10 +62,10 @@ const selectItems = computed(() => {
       v-model="value"
       type="number"
       :placeholder="field.placeholder ?? '0.00'"
-      class="w-full"
+      class="w-full currency-input"
     >
-      <template #leading>
-        <span class="text-dimmed text-sm">RON</span>
+      <template #trailing>
+        <span class="text-dimmed text-sm ml-2">RON</span>
       </template>
     </UInput>
 
@@ -158,3 +158,17 @@ const selectItems = computed(() => {
     />
   </UFormField>
 </template>
+
+<style scoped>
+/* Ascunde săgețile native ale input-ului number pentru câmpul currency */
+.currency-input :deep(input[type="number"]) {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.currency-input :deep(input[type="number"]::-webkit-outer-spin-button),
+.currency-input :deep(input[type="number"]::-webkit-inner-spin-button) {
+  -webkit-appearance: none;
+  margin: 0;
+}
+</style>
