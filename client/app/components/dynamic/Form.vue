@@ -189,9 +189,20 @@ const loading = computed(() => schemaLoading.value || initialLoading.value)
     </template>
 
     <!-- Multiple groups: use tabs -->
-    <UTabs v-else :items="tabItems" :default-value="groups[0]" class="w-full">
+    <UTabs 
+      v-else 
+      :items="tabItems" 
+      :default-value="groups[0]" 
+      orientation="vertical" 
+      class="w-full"
+      :ui="{
+        root: 'flex flex-col md:flex-row items-start gap-6',
+        list: 'w-full md:w-56 shrink-0 max-h-[20vh] md:max-h-[70vh] overflow-y-auto',
+        trigger: 'justify-start w-full text-left snap-center shrink-0',
+        content: 'w-full flex-1 min-w-0'
+      }">
       <template v-for="group in groups" :key="group" #[group]>
-        <div class="pt-4">
+        <div class="pt-2 md:pt-0">
           <DynamicFormGrid :fields="getFieldsByGroup(group)" :form-state="formState" />
         </div>
       </template>
