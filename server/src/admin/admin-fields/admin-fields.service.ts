@@ -109,7 +109,7 @@ export class AdminFieldsService {
                 options: dto.options ?? undefined,
                 is_required: dto.is_required ?? false,
                 is_unique: dto.is_unique ?? false,
-                is_filterable: dto.is_filterable ?? true,
+                is_filterable: dto.is_filterable ?? false,
                 is_sortable: dto.is_sortable ?? true,
                 visible_in_table: dto.visible_in_table ?? true,
                 visible_in_form: dto.visible_in_form ?? true,

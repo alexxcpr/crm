@@ -114,7 +114,7 @@ model Field {
                                                          // null pentru campuri care nu au optiuni (text, number, date, etc.)
   is_required         Boolean       @default(false)      // true = campul e obligatoriu - frontend afiseaza *, backend returneaza 400 daca lipseste
   is_unique           Boolean       @default(false)      // true = valoarea trebuie sa fie unica in tabela - backend verifica la INSERT/UPDATE, returneaza 409 conflict 
-  is_filterable       Boolean       @default(true)       // true = campul apare in panoul de filtre din DynamicTable - backend creeaza index B-Tree pe coloana
+  is_filterable       Boolean       @default(false)      // true = campul apare in panoul de filtre din DynamicTable - backend creeaza index B-Tree pe coloana
   is_sortable         Boolean       @default(true)       // true = coloana poate fi sortata in DynamicTable - click pe header activeaza ORDER BY ASC/DESC
   visible_in_table    Boolean       @default(true)       // true = campul apare ca coloana in DynamicTable (listing) -> Vizibil in SV
   visible_in_form     Boolean       @default(true)       // true = campul apare in DynamicForm (create/edit)  -> Vizibil in EV
