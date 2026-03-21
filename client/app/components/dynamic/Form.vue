@@ -79,17 +79,8 @@ function formatGroupLabel(groupName: string): string {
     .replace(/\b\w/g, l => l.toUpperCase())
 }
 
-function formatDate(dateValue: string | null): string {
-  if (!dateValue) return '-'
-  return new Date(dateValue).toLocaleString('ro-RO', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  })
-}
+// Folosește utilitarul de formatare pentru metadate
+const formatDate = formatMetadataDate
 
 // ─── Initializare state ───
 function initFormState(record?: Record<string, any> | null) {
