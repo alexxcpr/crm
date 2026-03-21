@@ -35,6 +35,13 @@ const {
 
 const isEditMode = computed(() => !!props.recordId)
 const formState = reactive<Record<string, any>>({})
+const systemData = reactive({
+  date_created: null as string | null,
+  date_updated: null as string | null,
+  id_owner: null as string | null,
+  owner_email: null as string | null,
+  owner_name: null as string | null,
+})
 const submitting = ref(false)
 const initialLoading = ref(false)
 
@@ -42,6 +49,12 @@ const initialLoading = ref(false)
 const zodSchema = computed(() => {
   if (!formFields.value.length) return null
   return buildZodSchema(formFields.value)
+})
+
+// ─── Detectare mobil ───
+const isMobile = computed(() => {
+  if (import.meta.server) return false
+  return window.matchMedia('(max-width: 640px)').matches
 })
 
 // ─── Grupuri campuri pentru layout ───
@@ -64,6 +77,18 @@ function formatGroupLabel(groupName: string): string {
   return groupName
     .replace(/_/g, ' ')
     .replace(/\b\w/g, l => l.toUpperCase())
+}
+
+function formatDate(dateValue: string | null): string {
+  if (!dateValue) return '-'
+  return new Date(dateValue).toLocaleString('ro-RO', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
 }
 
 // ─── Initializare state ───
@@ -101,6 +126,13 @@ watch(() => schema.value, async (sch) => {
     initialLoading.value = true
     const record = await fetchOne(props.recordId)
     initFormState(record)
+    if (record) {
+      systemData.date_created = record.date_created || null
+      systemData.date_updated = record.date_updated || null
+      systemData.id_owner = record.id_owner || null
+      systemData.owner_email = record.owner_email || null  // NOU
+      systemData.owner_name = record.owner_name || null
+    }
     initialLoading.value = false
   }
   else {
@@ -124,6 +156,11 @@ async function onSubmit() {
     }
 
     if (result) {
+      // Actualizează date_updated reactiv după salvare
+      if (result.date_updated) {
+        systemData.date_updated = result.date_updated
+      }
+
       toast.add({
         title: isEditMode.value ? 'Actualizat cu succes' : 'Creat cu succes',
         color: 'success'
@@ -207,6 +244,56 @@ const loading = computed(() => schemaLoading.value || initialLoading.value)
         </div>
       </template>
     </UTabs>
+
+    <!-- Metadate - collapsable pe mobil -->
+    <template v-if="isEditMode">
+      <UCollapsible
+        class="flex flex-col gap-2 w-full"
+        :default-open="!isMobile"
+      >
+        <template #default="{ open }">
+          <UButton
+            color="neutral"
+            variant="ghost"
+            class="w-full justify-between"
+          >
+            <USeparator class="w-full">
+              <span class="text-xs text-muted uppercase tracking-wider flex items-center gap-2">
+                <span>Metadate</span>
+                <UIcon
+                  name="i-lucide-chevron-down"
+                  class="size-4 transition-transform duration-200"
+                  :class="{ 'rotate-180': open }"
+                />
+              </span>
+            </USeparator>
+          </UButton>
+        </template>
+
+        <template #content>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 text-sm">
+            <div class="bg-elevated/50 rounded-lg p-3 text-center sm:text-left">
+              <div class="text-xs text-muted uppercase mb-1">Creat</div>
+              <div class="font-medium">{{ formatDate(systemData.date_created) }}</div>
+            </div>
+            <div class="bg-elevated/50 rounded-lg p-3 text-center sm:text-left">
+              <div class="text-xs text-muted uppercase mb-1">Modificat</div>
+              <div class="font-medium">{{ formatDate(systemData.date_updated) }}</div>
+            </div>
+            <div class="bg-elevated/50 rounded-lg p-3 text-center sm:text-left">
+              <div class="text-xs text-muted uppercase mb-1">Deținător</div>
+              <div class="flex items-center justify-center sm:justify-start gap-2">
+                <UIcon name="i-lucide-user" class="text-muted" />
+                <span v-if="systemData.owner_email" class="font-medium">
+                  {{ systemData.owner_email }}
+                </span>
+                <span v-else class="text-muted">-</span>
+              </div>
+            </div>
+          </div>
+        </template>
+      </UCollapsible>
+    </template>
 
     <!-- Actions -->
     <div class="flex items-center gap-3 pt-4 border-t border-default">

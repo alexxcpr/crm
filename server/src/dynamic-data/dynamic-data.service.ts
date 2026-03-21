@@ -140,6 +140,16 @@ export class DynamicDataService {
             throw new NotFoundException(`Inregistrarea cu id "${id}}" nu a fost gasita in "${entitySlug}".`);
         }
 
+        // După ce obții record-ul
+        if (record.id_owner) {
+            const owner = await this.knex.instance('user')
+            .select('email', 'first_name', 'last_name')
+            .where('id', record.id_owner)
+            .first();
+            record.owner_email = owner?.email || null;
+            record.owner_name = owner ? `${owner.first_name} ${owner.last_name}` : null;
+        }
+
         return { data: record };
     }
 
