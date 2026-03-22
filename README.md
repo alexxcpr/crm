@@ -63,18 +63,26 @@ cum va functiona in end
 - pornire frontend
     - cd client && pnpm install
 
+### Configurare Backend (.env)
+Pentru rularea backend-ului, trebuie configurat fișierul `server/.env` cu următoarele variabile:
+
+| Variabilă | Descriere | Exemplu |
+|-----------|-----------|---------|
+| `DATABASE_URL` | URL-ul de conexiune la baza de date PostgreSQL | `postgresql://user:pass@host:5432/db` |
+| `FRONTEND_URL` | URL-ul frontend-ului pentru CORS | `http://localhost:3000` |
+| `JWT_SECRET` | Cheia secretă pentru semnarea token-urilor JWT | `your-secret-key-here` |
+
+### Configurare Frontend (.env)
+Pentru rularea frontend-ului Nuxt, trebuie configurat fișierul `client/.env` cu următoarele variabile:
+
+| Variabilă | Descriere | Exemplu |
+|-----------|-----------|---------|
+| `NUXT_PUBLIC_API_BASE` | URL-ul de bază pentru API-ul backend | `http://localhost:4000/api` |
+| `NUXT_PUBLIC_AUTH_BASE_URL` | URL-ul de bază pentru autentificare (identic cu `NUXT_PUBLIC_API_BASE`) | `http://localhost:4000/api` |
+
 
 - scripturi backend:
     restart db (delete container + create container): db-dev-restart
 
 - teste backend (jest):
     npm test -- --testPathPattern=dynamic-schema
-
-
-## API
-### Contact
-/api/contacts     - POST   - creare contact
-/api/contacts     - GET    - get all contacts
-/api/contacts/:id - GET    - get contact by id
-/api/contacts/:id - PUT    - update contact
-/api/contacts/:id - DELETE - delete contact
