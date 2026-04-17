@@ -166,7 +166,12 @@ const formSchema = z.object({
   slug: z.string()
     .min(2, 'Slug-ul trebuie sa aiba minim 2 caractere')
     .max(100)
-    .regex(/^[a-z][a-z0-9_]{1,50}$/, 'Doar litere mici, cifre si _ (incepe cu litera)')
+    .regex(/^[a-z][a-z0-9_]{1,50}$/, 'Doar litere mici, cifre si _ (incepe cu litera)'),
+  grid_col: z.coerce.number().int().min(1).max(3),
+  col_span: z.coerce.number().int().min(1).max(3),
+}).refine((data) => data.grid_col + data.col_span <= 4, {
+  message: 'Pe grila cu 3 coloane, coloana de start plus latimea nu pot depasi 3 (ex.: coloana 3 = doar latime 1)',
+  path: ['col_span']
 })
 
 // ─── Submit ───

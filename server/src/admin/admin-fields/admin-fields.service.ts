@@ -119,6 +119,8 @@ export class AdminFieldsService {
                 relation_display_field: dto.relation_display_field ?? null,
                 group_name: dto.group_name ?? 'general',
                 rank: dto.rank ?? 0,
+                grid_col: dto.grid_col ?? 1,
+                col_span: dto.col_span ?? 1,
             },
         });
 
@@ -158,6 +160,7 @@ export class AdminFieldsService {
                 help_text: dto.help_text !== undefined ? dto.help_text : field.help_text,
                 options: dto.options !== undefined ? dto.options : (field.options ?? Prisma.JsonNull),
                 is_required: dto.is_required ?? field.is_required,
+                is_unique: dto.is_unique ?? field.is_unique,
                 is_filterable: dto.is_filterable ?? field.is_filterable,
                 is_sortable: dto.is_sortable ?? field.is_sortable,
                 visible_in_table: dto.visible_in_table ?? field.visible_in_table,
@@ -165,6 +168,8 @@ export class AdminFieldsService {
                 validation_rules: dto.validation_rules !== undefined ? dto.validation_rules : (field.validation_rules ?? Prisma.JsonNull),
                 group_name: dto.group_name ?? field.group_name,
                 rank: dto.rank ?? field.rank,
+                grid_col: dto.grid_col ?? field.grid_col,
+                col_span: dto.col_span ?? field.col_span,
                 default_value: dto.default_value !== undefined ? dto.default_value : field.default_value,
             },
         });

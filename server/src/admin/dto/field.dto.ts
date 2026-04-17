@@ -149,6 +149,10 @@ export class UpdateFieldDto {
 
     @IsOptional()
     @IsBoolean()
+    is_unique?: boolean;
+
+    @IsOptional()
+    @IsBoolean()
     is_filterable?: boolean;
 
     @IsOptional()
