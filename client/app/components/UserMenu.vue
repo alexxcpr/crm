@@ -11,15 +11,20 @@ const appConfig = useAppConfig()
 const colors = ['red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose']
 const neutrals = ['slate', 'gray', 'zinc', 'neutral', 'stone']
 
-const user = ref({
-  name: 'User Anonim',
-  avatar: {
-    // src: 'https://github.com/benjamincanac.png',
-    alt: 'Anonymous'
+const { data: session, signOut } = useAuth()
+
+type SessionUser = { id?: number; email?: string; name?: string } | null
+
+const user = computed(() => {
+  const u = session.value as SessionUser
+  const userName = u?.email ?? u?.name ?? 'User Anonim'
+  return {
+    name: userName,
+    avatar: {
+      alt: userName
+    }
   }
 })
-
-const { signOut } = useAuth()
 
 const items = computed<DropdownMenuItem[][]>(() => ([[{
   type: 'label',

@@ -122,7 +122,12 @@ export class AdminFieldsService {
             },
         });
 
-        await this.dynamicSchema.addColumn(entity, field);
+        try {
+            await this.dynamicSchema.addColumn(entity, field);
+        } catch (error) {
+            await this.prisma.field.delete({ where: { id_field: field.id_field } });
+            throw error;
+        }
 
         return field;
     }

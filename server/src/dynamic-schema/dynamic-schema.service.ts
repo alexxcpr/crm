@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Entity, Field} from '@prisma/client';
+import { Knex } from 'knex';
 import { KnexService } from 'src/knex/knex.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { applyColumn, ColumnDefinition } from './data-type.mapper';
@@ -39,8 +40,8 @@ export class DynamicSchemaService {
 
     // ─── 2. Adaugă o coloană pe o tabelă existentă ───
     async addColumn(entity: Entity, field: Field): Promise<void> {
-        //validare slug (doar litere mici, cifre, underline, 2-51 caractere, sa nu inceapa cu cifra sau underline)
         this.validateSlug(field.slug);
+        //validare slug (doar litere mici, cifre, underline, 2-51 caractere, sa nu inceapa cu cifra sau underline)
         const tableName = entity.table_name;
 
         //verifica daca exista coloana
@@ -51,26 +52,57 @@ export class DynamicSchemaService {
             return;
         }
 
-        //face modificarea in db (alter table)
-        await this.knex.instance.schema.alterTable(tableName, (table) => {
-            const colDef: ColumnDefinition = {
-                columnName: this.ensureColumnPrefix(field),
-                dataType: field.data_type,
-                isRequired: field.is_required,
-                isUnique: field.is_unique,
-                defaultValue: field.default_value,
-            };
+        const needsNotNull = field.is_required && !field.default_value;
+        const rowCount = await this.knex.instance(tableName).count('* as cnt').first();
+        const tableHasData = rowCount && Number(rowCount.cnt) > 0;
 
-            applyColumn(table, colDef);
+        if (needsNotNull && tableHasData) {
+            // Tabela are date si coloana trebuie sa fie NOT NULL fara default explicit.
+            // Pas 1: adauga coloana ca nullable
+            await this.knex.instance.schema.alterTable(tableName, (table) => {
+                applyColumn(table, {
+                    columnName,
+                    dataType: field.data_type,
+                    isRequired: false,
+                    isUnique: false,
+                    defaultValue: null,
+                });
+            });
 
-        });
-        //FK pentru campuri de tip relatie
+            // Pas 2: pune o valoare default pe randurile existente
+            const fallback = this.getEmptyDefault(field.data_type);
+            await this.knex.instance(tableName)
+                .whereNull(columnName)
+                .update({ [columnName]: fallback });
+
+            // Pas 3: seteaza NOT NULL (si unique daca e cazul)
+            await this.knex.instance.schema.alterTable(tableName, (table) => {
+                const col = this.rebuildColumnBuilder(table, field.data_type, columnName);
+                col.notNullable().alter();
+            });
+            if (field.is_unique) {
+                await this.knex.instance.schema.alterTable(tableName, (table) => {
+                    table.unique([columnName]);
+                });
+            }
+        } else {
+            await this.knex.instance.schema.alterTable(tableName, (table) => {
+                applyColumn(table, {
+                    columnName,
+                    dataType: field.data_type,
+                    isRequired: field.is_required,
+                    isUnique: field.is_unique,
+                    defaultValue: field.default_value,
+                });
+            });
+        }
+
         if (field.ui_type === 'relation' && field.id_relation_entity) {
             await this.addForeignKeyAsync(tableName, field);
         }
 
-        // Index automat pe campuri filterable
         if (field.is_filterable) {
+        // Index automat pe campuri filterable
             await this.createIndex(tableName, columnName);
         }
 
@@ -157,6 +189,40 @@ export class DynamicSchemaService {
         await this.knex.instance.schema.alterTable(tableName, (table) => {
             table.foreign(field.column_name).references('id').inTable(targetEntity.table_name);
         })
+    }
+
+    private getEmptyDefault(dataType: string): any {
+        switch (dataType) {
+            case 'varchar':   return '';
+            case 'text':      return '';
+            case 'integer':   return 0;
+            case 'numeric':   return 0;
+            case 'boolean':   return false;
+            case 'date':      return new Date().toISOString().split('T')[0];
+            case 'timestamp': return new Date().toISOString();
+            case 'uuid':      return '00000000-0000-0000-0000-000000000000';
+            case 'jsonb':     return '{}';
+            default:          return '';
+        }
+    }
+
+    private rebuildColumnBuilder(
+        table: Knex.AlterTableBuilder,
+        dataType: string,
+        columnName: string,
+    ): Knex.ColumnBuilder {
+        switch (dataType) {
+            case 'varchar':   return table.string(columnName, 255);
+            case 'text':      return table.text(columnName);
+            case 'integer':   return table.integer(columnName);
+            case 'numeric':   return table.decimal(columnName, 15, 2);
+            case 'boolean':   return table.boolean(columnName);
+            case 'date':      return table.date(columnName);
+            case 'timestamp': return table.timestamp(columnName, { useTz: true });
+            case 'uuid':      return table.uuid(columnName);
+            case 'jsonb':     return table.jsonb(columnName);
+            default:          return table.string(columnName, 255);
+        }
     }
 
     private ensureTablePrefix(tableName: string): string {

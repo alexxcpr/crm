@@ -18,6 +18,7 @@ interface ModuleWithEntities {
 
 export function useNavigation() {
   const { apiFetch } = useApi()
+  const { data: session } = useAuth()
 
   const entityLinks = shallowRef<NavigationMenuItem[]>([])
   const loading = ref(false)
@@ -55,6 +56,12 @@ export function useNavigation() {
     }
   }
 
+  const isAdmin = computed(() => {
+    const user = session.value as Record<string, unknown> | null
+    const roles = user?.roles as string[] | undefined
+    return roles?.includes('admin') ?? false
+  })
+
   const staticLinks: NavigationMenuItem[] = [
     {
       label: 'Home',
@@ -63,13 +70,25 @@ export function useNavigation() {
     }
   ]
 
-  const bottomLinks: NavigationMenuItem[] = [
-    {
+  const bottomLinks = computed<NavigationMenuItem[]>(() => {
+    const links: NavigationMenuItem[] = []
+
+    if (isAdmin.value) {
+      links.push({
+        label: 'Admin',
+        icon: 'i-lucide-shield',
+        to: '/admin'
+      })
+    }
+
+    links.push({
       label: 'Settings',
       icon: 'i-lucide-settings',
       to: '/settings'
-    }
-  ]
+    })
+
+    return links
+  })
 
   fetchNavigation()
 
@@ -77,6 +96,7 @@ export function useNavigation() {
     staticLinks,
     entityLinks,
     bottomLinks,
+    isAdmin,
     loading,
     fetchNavigation
   }

@@ -448,7 +448,7 @@ await fetch({ filter: { cf_industry: 'it' }, sort: '-created_at', page: 1 })
 - [x] Implementare `useEntitySchema.ts` cu `useFetch` / `useAsyncData` si caching
 - [x] Implementare `useEntityData.ts` cu CRUD complet + paginare + filtrare
 - [x] Tipuri TypeScript: `EntitySchema`, `FieldDefinition`, `FilterParams`, `PaginatedResponse<T>`
-- [ ] Tratare erori: toast notifications pe erori de API (Nuxt UI `useToast()`)
+- [x] Tratare erori: toast notifications pe erori de API (Nuxt UI `useToast()`)
 
 ---
 
@@ -480,7 +480,7 @@ Atat. Componenta face totul singura:
 - [x] Componenta `DynamicCell.vue` — randeaza o celula diferit in functie de `ui_type`
 - [x] Bara de filtre dinamica: `DynamicFilters.vue` (genereaza input-uri din `filterFields`)
 - [x] Sortare pe click header (single si multi-column)
-- [ ] Paginare cu `UPagination` din Nuxt UI
+- [x] Paginare cu `UPagination` din Nuxt UI
 - [x] Buton "Adauga" care deschide `DynamicForm`: navigheaza la pagina de creare
 - [x] Loading state, empty state, error state
 
@@ -549,7 +549,7 @@ function buildZodSchema(fields: FieldDefinition[]) {
 - [x] Mode create: formular gol, POST pe submit
 - [x] Mode edit: pre-populare cu datele existente, PUT pe submit
 - [ ] Campuri de tip `relation`: fetch optiuni din API-ul entitatii tinta, search async
-- [] Loading state pe submit, error handling cu toast
+- [ ] Loading state pe submit, error handling cu toast
 
 ---
 
@@ -573,11 +573,11 @@ pages/
 - Sidebar-ul se genereaza din `GET /api/v1/admin/modules` + entitatile fiecarui modul
 
 ### Taskuri Faza 8:
-- [ ] Creare `pages/[entity]/index.vue`
-- [ ] Creare `pages/[entity]/create.vue`
-- [ ] Creare `pages/[entity]/[id].vue`
-- [ ] Middleware Nuxt: valideaza ca `:entity` exista (altfel redirect 404)
-- [ ] Sidebar dinamic: composable `useNavigation.ts` care genereaza meniul din API
+- [x] Creare `pages/[entity]/index.vue`
+- [x] Creare `pages/[entity]/create.vue`
+- [x] Creare `pages/[entity]/[id].vue`
+- [x] Middleware Nuxt: valideaza ca `:entity` exista (altfel redirect 404)
+- [x] Sidebar dinamic: composable `useNavigation.ts` care genereaza meniul din API
 
 ---
 
@@ -588,7 +588,6 @@ pages/
 - [ ] Cache schema pe backend: in-memory Map sau Redis, invalidat la orice operatie admin pe fields/entities
 - [ ] Cache schema pe frontend: `useState()` Nuxt persistent, invalidare manuala sau TTL
 - [ ] Indexare automata: la crearea campului filterable, backend-ul creeaza B-Tree index
-- [ ] Soft delete pe records: coloana `deleted_at` in fiecare tabela dinamica, filtrare automata `WHERE deleted_at IS NULL`
 - [ ] Audit log: tabela `audit_logs` (entity, record_id, action, old_values, new_values, user_id, timestamp)
 - [ ] Error handling consistent: middleware NestJS global care returneaza format unificat `{ success, data, error, message }`
 - [ ] Loading skeletons pe DynamicTable si DynamicForm

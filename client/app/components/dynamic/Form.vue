@@ -60,8 +60,8 @@ const isMobile = computed(() => {
 // ─── Grupuri campuri pentru layout ───
 function getFieldsByGroup(groupName: string): Field[] {
   return formFields.value
-    .filter(f => f.group_name === groupName)
-    .sort((a, b) => a.rank - b.rank)
+    .filter((f: { group_name: string; }) => f.group_name === groupName)
+    .sort((a: { rank: number; }, b: { rank: number; }) => a.rank - b.rank)
 }
 
 // ─── Tab-uri (doar daca > 1 grup) ───
