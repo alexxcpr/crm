@@ -6,7 +6,7 @@
         </template>
   
         <form @submit.prevent="handleLogin" class="flex flex-col items-center w-full">
-          <UFormGroup label="Email" name="email" class="w-full text-center mb-2">
+          <UFormField label="Email" name="email" class="w-full text-center mb-2">
             <UInput 
               v-model="email" 
               type="email" 
@@ -16,9 +16,9 @@
               class="w-full"
               required 
             />
-          </UFormGroup>
+          </UFormField>
   
-          <UFormGroup label="Parolă" name="password" class="w-full text-center mb-3">
+          <UFormField label="Parolă" name="password" class="w-full text-center mb-3">
             <UInput 
               v-model="password" 
               type="password" 
@@ -28,7 +28,7 @@
               class="w-full"
               required 
             />
-          </UFormGroup>
+          </UFormField>
   
           <UButton 
             type="submit" 
