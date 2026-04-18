@@ -2,7 +2,7 @@
 import type { Field } from '~/types/schema'
 import type { TableColumn } from '@nuxt/ui'
 
-defineProps<{
+const props = defineProps<{
   fields: Field[]
   loading?: boolean
 }>()
@@ -14,16 +14,39 @@ const emit = defineEmits<{
 }>()
 
 const columns: TableColumn<Field>[] = [
-  { accessorKey: 'rank', header: '#' },
+  { accessorKey: 'rank', header: 'Ordine' },
   { accessorKey: 'name', header: 'Nume' },
   { accessorKey: 'slug', header: 'Slug' },
   { accessorKey: 'column_name', header: 'Coloana' },
   { accessorKey: 'data_type', header: 'Tip date' },
   { accessorKey: 'ui_type', header: 'Tip UI' },
+  { accessorKey: 'grid_col', header: 'Col nr' },
+  { accessorKey: 'col_span', header: 'Col span' },
   { id: 'flags', header: 'Proprietati' },
   { id: 'visibility', header: 'Vizibilitate' },
   { id: 'actions', header: '' }
 ]
+
+const fieldsByGroup = computed(() => {
+  const sorted = [...props.fields].sort((a, b) => {
+    const ga = a.group_name || 'general'
+    const gb = b.group_name || 'general'
+    if (ga !== gb)
+      return ga.localeCompare(gb)
+    return a.rank - b.rank
+  })
+
+  const blocks: { group: string, fields: Field[] }[] = []
+  for (const f of sorted) {
+    const g = f.group_name?.trim() || 'general'
+    const last = blocks[blocks.length - 1]
+    if (last && last.group === g)
+      last.fields.push(f)
+    else
+      blocks.push({ group: g, fields: [f] })
+  }
+  return blocks
+})
 
 function getDropdownItems(field: Field) {
   return [[{
@@ -54,84 +77,117 @@ function getDropdownItems(field: Field) {
       />
     </div>
 
-    <UTable
-      :data="fields"
-      :columns="columns"
-      :loading="loading"
-      class="w-full"
-    >
-      <template #name-cell="{ row }">
-        <div class="flex items-center gap-2">
-          <span :class="{ 'font-medium': row.original.is_system }">{{ row.original.name }}</span>
+    <div v-if="loading && fields.length === 0" class="rounded-lg border border-default overflow-hidden">
+      <UTable
+        :data="[]"
+        :columns="columns"
+        :loading="true"
+        class="w-full"
+      />
+    </div>
+
+    <div v-else class="space-y-8">
+      <section
+        v-for="block in fieldsByGroup"
+        :key="block.group"
+        class="rounded-lg border border-default overflow-hidden bg-elevated/30"
+      >
+        <div
+          class="sticky top-0 z-1 flex items-center gap-2 border-b border-default px-4 py-2.5 bg-default/95 backdrop-blur-sm supports-backdrop-filter:bg-default/80"
+        >
+          <UIcon name="i-lucide-layout-grid" class="size-4 text-muted shrink-0" />
+          <h4 class="text-sm font-semibold text-highlighted truncate">
+            {{ block.group }}
+          </h4>
           <UBadge
-            v-if="row.original.is_system"
-            label="System"
-            color="warning"
-            variant="subtle"
-            size="xs"
+            :label="String(block.fields.length)"
+            color="info"
+            variant="solid"
+            size="sm"
+            class="shrink-0"
           />
         </div>
-      </template>
 
-      <template #data_type-cell="{ row }">
-        <UBadge :label="row.original.data_type" color="neutral" variant="subtle" size="sm" />
-      </template>
+        <UTable
+          :data="block.fields"
+          :columns="columns"
+          :loading="loading"
+          class="w-full"
+        >
+          <template #name-cell="{ row }">
+            <div class="flex items-center gap-2">
+              <span :class="{ 'font-medium': row.original.is_system }">{{ row.original.name }}</span>
+              <UBadge
+                v-if="row.original.is_system"
+                label="System"
+                color="warning"
+                variant="subtle"
+                size="sm"
+              />
+            </div>
+          </template>
 
-      <template #ui_type-cell="{ row }">
-        <UBadge :label="row.original.ui_type" color="info" variant="subtle" size="sm" />
-      </template>
+          <template #data_type-cell="{ row }">
+            <UBadge :label="row.original.data_type" color="neutral" variant="subtle" size="md" />
+          </template>
 
-      <template #flags-cell="{ row }">
-        <div class="flex items-center gap-1 flex-wrap">
-          <UBadge
-            v-if="row.original.is_required"
-            label="Required"
-            color="error"
-            variant="subtle"
-            size="xs"
-          />
-          <UBadge
-            v-if="row.original.is_unique"
-            label="Unique"
-            color="warning"
-            variant="subtle"
-            size="xs"
-          />
-          <UBadge
-            v-if="row.original.is_filterable"
-            label="Filtru"
-            color="neutral"
-            variant="subtle"
-            size="xs"
-          />
-        </div>
-      </template>
+          <template #ui_type-cell="{ row }">
+            <UBadge :label="row.original.ui_type" color="info" variant="subtle" size="md" />
+          </template>
 
-      <template #visibility-cell="{ row }">
-        <div class="flex items-center gap-1">
-          <UTooltip text="Vizibil in tabel">
-            <UIcon
-              name="i-lucide-table"
-              class="size-4"
-              :class="row.original.visible_in_table ? 'text-primary' : 'text-muted opacity-30'"
-            />
-          </UTooltip>
-          <UTooltip text="Vizibil in formular">
-            <UIcon
-              name="i-lucide-file-text"
-              class="size-4"
-              :class="row.original.visible_in_form ? 'text-primary' : 'text-muted opacity-30'"
-            />
-          </UTooltip>
-        </div>
-      </template>
+          <template #flags-cell="{ row }">
+            <div class="flex items-center gap-1 flex-wrap">
+              <UBadge
+                v-if="row.original.is_required"
+                label="Required"
+                color="error"
+                variant="subtle"
+                size="sm"
+              />
+              <UBadge
+                v-if="row.original.is_unique"
+                label="Unique"
+                color="warning"
+                variant="subtle"
+                size="sm"
+              />
+              <UBadge
+                v-if="row.original.is_filterable"
+                label="Filtru"
+                color="neutral"
+                variant="subtle"
+                size="sm"
+              />
+            </div>
+          </template>
 
-      <template #actions-cell="{ row }">
-        <UDropdownMenu :items="getDropdownItems(row.original)">
-          <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" size="xs" />
-        </UDropdownMenu>
-      </template>
-    </UTable>
+          <template #visibility-cell="{ row }">
+            <div class="flex items-center gap-1">
+              <UTooltip text="Vizibil in tabel">
+                <UIcon
+                  name="i-lucide-table"
+                  class="size-4"
+                  :class="row.original.visible_in_table ? 'text-primary' : 'text-muted opacity-30'"
+                />
+              </UTooltip>
+              <UTooltip text="Vizibil in formular">
+                <UIcon
+                  name="i-lucide-file-text"
+                  class="size-4"
+                  :class="row.original.visible_in_form ? 'text-primary' : 'text-muted opacity-30'"
+                />
+              </UTooltip>
+            </div>
+          </template>
+
+          <template #actions-cell="{ row }">
+            <UDropdownMenu :items="getDropdownItems(row.original)">
+              <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" size="xs" />
+            </UDropdownMenu>
+          </template>
+        </UTable>
+      </section>
+    </div>
 
     <div v-if="!loading && fields.length === 0" class="py-8">
       <UEmpty
