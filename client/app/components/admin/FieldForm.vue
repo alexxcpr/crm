@@ -84,7 +84,7 @@ const state = reactive({
   validation_max: (props.field?.validation_rules?.max as number) ?? undefined as number | undefined,
   validation_pattern: (props.field?.validation_rules?.pattern as string) ?? '',
   group_name: props.field?.group_name ?? 'general',
-  rank: props.field?.rank ?? 0,
+  rank: props.field?.rank ?? 1,
   grid_col: props.field?.grid_col ?? 1,
   col_span: props.field?.col_span ?? 1
 })
@@ -113,8 +113,9 @@ const filteredUiTypeOptions = computed(() => {
 watch(() => state.data_type, () => {
   if (isEdit.value) return
   const allowed = filteredUiTypeOptions.value
-  if (allowed.length && !allowed.some(o => o.value === state.ui_type)) {
-    state.ui_type = allowed[0].value as Field['ui_type']
+  const first = allowed[0]
+  if (first && !allowed.some(o => o.value === state.ui_type)) {
+    state.ui_type = first.value as Field['ui_type']
   }
 })
 
@@ -464,7 +465,7 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
 
       <div class="grid grid-cols-3 gap-4">
         <UFormField label="Ordine" name="rank" description="in afisare">
-          <UInput v-model.number="state.rank" type="number" :min="0" class="w-full" />
+          <UInput v-model.number="state.rank" type="number" :min="1" class="w-full" />
         </UFormField>
 
         <UFormField label="Coloana grid" name="grid_col" description="1-3">

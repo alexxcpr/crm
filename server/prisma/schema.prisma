@@ -132,7 +132,7 @@ model Field {
                                                          // Ex: "name" - cand selectezi o companie, vezi numele ei, nu UUID-ul. Populat DOAR cand ui_type = "relation"
 
   group_name              String    @default("general") @db.VarChar(100)  //Sectiunea/tab-ul in care apare campul in DynamicForm. Ex: "general", "contact_info", "detalii_financiare". Frontend grupeaza campurile dupa aceasta valoare si randeaza cate o sectiune per grup
-  rank                    Int       @default(0)          // Ordinea de afisare a campului IN CADRUL GRUPULUI - 0 = primul
+  rank                    Int       @default(1)          // Ordinea de afisare a campului IN CADRUL GRUPULUI - 1 = primul
 
   grid_col                Int       @default(1)          // Coloana in care apare campul in DynamicForm (1, 2 sau 3). Formularul foloseste un CSS Grid cu 3 coloane.
   col_span                Int       @default(1)          // Peste cate coloane se intinde campul (1, 2 sau 3). Ex: textarea cu col_span=3 ocupa toata latimea.

@@ -194,7 +194,7 @@ function getModuleName(moduleId: string | null): string {
     <USlideover
       v-model:open="showFieldSlideover"
       :title="editingField ? 'Editeaza camp' : 'Camp nou'"
-      :ui="{ width: 'max-w-lg' }"
+      :ui="{ content: 'max-w-lg' }"
     >
       <template #body>
         <AdminFieldForm

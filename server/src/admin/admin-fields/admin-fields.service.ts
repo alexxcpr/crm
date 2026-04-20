@@ -118,7 +118,7 @@ export class AdminFieldsService {
                 id_relation_entity: dto.id_relation_entity ?? null,
                 relation_display_field: dto.relation_display_field ?? null,
                 group_name: dto.group_name ?? 'general',
-                rank: dto.rank ?? 0,
+                rank: dto.rank ?? 1,
                 grid_col: dto.grid_col ?? 1,
                 col_span: dto.col_span ?? 1,
             },
