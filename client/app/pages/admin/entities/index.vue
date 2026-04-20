@@ -75,6 +75,8 @@ function goToDetail(entity: AdminEntity) {
 
 // ─── Table ───
 const columns: TableColumn<AdminEntity>[] = [
+  { id: 'edit', meta: { class: { th: 'w-10', td: 'w-10' } } },
+  { id: 'open', meta: { class: { th: 'w-10', td: 'w-10' } } },
   { accessorKey: 'name', header: 'Nume' },
   { accessorKey: 'slug', header: 'Slug' },
   { accessorKey: 'table_name', header: 'Tabela' },
@@ -137,6 +139,30 @@ function getDropdownItems(entity: AdminEntity) {
       :loading="loading"
       class="w-full"
     >
+      <!-- Butonul Edit -->
+      <template #edit-cell="{ row }">
+        <UButton
+          icon="i-lucide-pencil"
+          label="Edit"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          @click="openEdit(row.original)"
+        />
+      </template>
+
+      <!-- Butonul Deschide -->
+      <template #open-cell="{ row }">
+        <UButton
+          icon="i-lucide-external-link"
+          label="Deschide"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          @click="goToDetail(row.original)"
+        />
+      </template>
+
       <template #module-cell="{ row }">
         <span>{{ getModuleName(row.original.id_module) }}</span>
       </template>

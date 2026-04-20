@@ -14,6 +14,7 @@ const emit = defineEmits<{
 }>()
 
 const columns: TableColumn<Field>[] = [
+  { id: 'edit', header: '', meta: { class: { th: 'w-10', td: 'w-10' } } },
   { accessorKey: 'rank', header: 'Ordine', meta: { class: { th: 'w-20', td: 'w-20' } } },
   { accessorKey: 'name', header: 'Nume' },
   { accessorKey: 'slug', header: 'Slug' },
@@ -116,6 +117,17 @@ function getDropdownItems(field: Field) {
           class="w-full"
           :ui="{ td: 'whitespace-normal wrap-break-word max-w-xs' }"
         >
+          <template #edit-cell="{ row }">
+            <UButton
+              icon="i-lucide-pencil"
+              label="Edit"
+              color="neutral"
+              variant="ghost"
+              size="xs"
+              @click="emit('edit', row.original)"
+            />
+          </template>
+
           <template #name-cell="{ row }">
             <div class="flex items-center gap-2">
               <span :class="{ 'font-medium': row.original.is_system }">{{ row.original.name }}</span>

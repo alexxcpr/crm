@@ -52,6 +52,7 @@ async function onConfirmDelete() {
 
 // ─── Table ───
 const columns: TableColumn<AdminModule>[] = [
+  { id: 'edit', meta: { class: { th: 'w-10', td: 'w-10' } } },
   { accessorKey: 'name', header: 'Nume' },
   { accessorKey: 'slug', header: 'Slug' },
   { accessorKey: 'icon', header: 'Icon' },
@@ -94,6 +95,18 @@ function getDropdownItems(mod: AdminModule) {
       :loading="loading"
       class="w-full"
     >
+      <!-- Butonul Edit -->
+      <template #edit-cell="{ row }">
+        <UButton
+          icon="i-lucide-pencil"
+          label="Edit"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          @click="openEdit(row.original)"
+        />
+      </template>
+
       <template #icon-cell="{ row }">
         <div v-if="row.original.icon" class="flex items-center gap-2">
           <UIcon :name="row.original.icon" class="size-4" />
