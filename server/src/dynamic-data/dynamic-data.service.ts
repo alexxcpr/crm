@@ -1,10 +1,14 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Entity, Field } from '@prisma/client';
+import { Entity, Prisma } from '@prisma/client';
 import { KnexService } from 'src/knex/knex.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { FilterParserService } from './filter-parser.service';
 import { DynamicValidationService } from './dynamic-validation.service';
 import { PaginatedResponse } from './dto/query.dto';
+
+export type FieldWithRelation = Prisma.FieldGetPayload<{
+    include: { relation_entity: true }
+}>;
 
 @Injectable()
 export class DynamicDataService {
@@ -18,7 +22,7 @@ export class DynamicDataService {
     ) {}
 
     // ─── Helper: incarca entity + fields din Prisma ───
-    private async resolveEntity(entitySlug: string): Promise<{ entity: Entity; fields: Field[]}> {
+    private async resolveEntity(entitySlug: string): Promise<{ entity: Entity; fields: FieldWithRelation[] }> {
         //cauta entitatea(metadata din Prisma)
         const entity = await this.prisma.entity.findUnique({
             where: {
@@ -34,6 +38,9 @@ export class DynamicDataService {
         const fields = await this.prisma.field.findMany({
             where:{
                 id_entity: entity.id_entity
+            },
+            include: {
+                relation_entity: true
             },
             orderBy: {
                 rank: 'asc'
@@ -57,16 +64,36 @@ export class DynamicDataService {
 
         // Coloane selectate: sistem + din field_definitions
         const systemColumns = ['id', 'date_created', 'date_updated', 'id_owner'];
-        const fieldColumns = fields
-            .filter(f => f.visible_in_table)
-            .map(f => f.column_name);
-        const selectColumns = [...systemColumns, ...fieldColumns];
+        const selectColumns: any[] = [
+            ...systemColumns.map(c => `${tableName}.${c}`),
+            ...fields.filter(f => f.visible_in_table).map(f => `${tableName}.${f.column_name}`)
+        ];
 
         // Query principal
-        let dataQuery = this.knex.instance(tableName).select(selectColumns);
+        let dataQuery = this.knex.instance(tableName);
+
+        // Adaugam join-uri pentru campurile relationale pentru a aduce display field-ul
+        const relationFields = fields.filter(f => f.ui_type === 'relation' && f.visible_in_table && f.relation_entity);
+        for (const field of relationFields) {
+            if (!field.relation_entity) continue;
+            const relTableName = field.relation_entity.table_name;
+            const alias = `rel_${field.column_name}`;
+            
+            dataQuery = dataQuery.leftJoin(
+                `${relTableName} as ${alias}`,
+                `${tableName}.${field.column_name}`,
+                `${alias}.id`
+            );
+            
+            if (field.relation_display_field) {
+                selectColumns.push(`${alias}.${field.relation_display_field} as ${field.column_name}_display`);
+            }
+        }
+
+        dataQuery = dataQuery.select(selectColumns);
 
         // Aplica filtre
-        const filters = this.filterParser.parse(query, fields);
+        const filters = this.filterParser.parse(query, fields, tableName);
         for (const filter of filters) {
             dataQuery = this.filterParser.apply(dataQuery, filter);
         }
@@ -84,7 +111,7 @@ export class DynamicDataService {
                 //Daca e slug, translateaza in column_name
                 const field = fields.find(f => f.slug === column);
                 const realColumn = field ? field.column_name : column;
-                return { column: realColumn, order: desc ? 'desc' : 'asc'};
+                return { column: `${tableName}.${realColumn}`, order: desc ? 'desc' : 'asc'};
             }).filter(Boolean);
 
             if (orderBy.length > 0) {
@@ -92,11 +119,11 @@ export class DynamicDataService {
             }
         }
         else {
-            dataQuery = dataQuery.orderBy('date_created', 'desc');
+            dataQuery = dataQuery.orderBy(`${tableName}.date_created`, 'desc');
         }
 
         // Count total (inainte de limit/offset)
-        let countQuery = this.knex.instance(tableName).count('id as total');
+        let countQuery = this.knex.instance(tableName).count(`${tableName}.id as total`);
         for (const filter of filters) {
             countQuery = this.filterParser.apply(countQuery, filter);
         }
@@ -126,14 +153,36 @@ export class DynamicDataService {
     // ─── GET un singur record ───
     async findOne(entitySlug: string, id: string) {
         const { entity, fields } = await this.resolveEntity(entitySlug);
+        const tableName = entity.table_name;
 
         const systemColumns = ['id', 'date_created', 'date_updated', 'id_owner'];
-        const fieldColumns = fields.map(f => f.column_name);
-        const selectColumns = [...systemColumns, ...fieldColumns];
+        const selectColumns: any[] = [
+            ...systemColumns.map(c => `${tableName}.${c}`),
+            ...fields.map(f => `${tableName}.${f.column_name}`)
+        ];
 
-        const record = await this.knex.instance(entity.table_name)
+        let dataQuery = this.knex.instance(tableName);
+
+        const relationFields = fields.filter(f => f.ui_type === 'relation' && f.relation_entity);
+        for (const field of relationFields) {
+            if (!field.relation_entity) continue;
+            const relTableName = field.relation_entity.table_name;
+            const alias = `rel_${field.column_name}`;
+            
+            dataQuery = dataQuery.leftJoin(
+                `${relTableName} as ${alias}`,
+                `${tableName}.${field.column_name}`,
+                `${alias}.id`
+            );
+            
+            if (field.relation_display_field) {
+                selectColumns.push(`${alias}.${field.relation_display_field} as ${field.column_name}_display`);
+            }
+        }
+
+        const record = await dataQuery
             .select(selectColumns)
-            .where('id', id)
+            .where(`${tableName}.id`, id)
             .first();
 
         if (!record) {

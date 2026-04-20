@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
-import { Field } from "@prisma/client";
 import { KnexService } from "src/knex/knex.service";
+import { FieldWithRelation } from "./dynamic-data.service";
 
 @Injectable()
 export class DynamicValidationService {
@@ -8,7 +8,7 @@ export class DynamicValidationService {
 
     async validateAndSanitize(
         body: Record<string, any>,
-        fields: Field[],
+        fields: FieldWithRelation[],
         tableName: string,
         mode: 'create' | 'update',
         recordId?: string,

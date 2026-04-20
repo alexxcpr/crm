@@ -3,6 +3,7 @@ import type { Field } from '~/types/schema'
 
 defineProps<{
   value: any
+  displayValue?: any
   field: Field
 }>()
 
@@ -67,7 +68,7 @@ function getOptionLabel(options: { label: string; value: string }[] | null, val:
     :to="`/${field.relation_entity_slug}/${value}`"
     class="text-primary hover:underline"
   >
-    {{ value }}
+    {{ displayValue || value }}
   </NuxtLink>
 
   <span v-else>{{ value }}</span>

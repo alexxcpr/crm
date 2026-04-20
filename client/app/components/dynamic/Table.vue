@@ -142,6 +142,7 @@ const columns = computed<TableColumn<Record<string, any>>[]>(() => {
       accessorKey: field.column_name,
       cell: ({ row }) => h(DynamicCellComp, {
         value: row.original[field.column_name],
+        displayValue: row.original[`${field.column_name}_display`],
         field
       })
     }
@@ -304,7 +305,7 @@ const selectedCount = computed(() => Object.keys(rowSelection.value).length)
         thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
         tbody: '[&>tr]:last:[&>td]:border-b-0',
         th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
-        td: 'border-b border-default',
+        td: 'border-b border-default whitespace-normal wrap-break-down max-w-xs',
         separator: 'h-0'
       }"
     />

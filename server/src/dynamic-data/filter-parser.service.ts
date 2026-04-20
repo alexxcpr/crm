@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import { Field } from "@prisma/client";
 import { Knex } from 'knex';
+import { FieldWithRelation } from "./dynamic-data.service";
 
 export interface ParsedFilter {
     column: string;
@@ -11,7 +11,7 @@ export interface ParsedFilter {
 @Injectable()
 export class FilterParserService {
     
-    parse(query: Record<string, any>, fields: Field[]): ParsedFilter[] {
+    parse(query: Record<string, any>, fields: FieldWithRelation[], tableName?: string): ParsedFilter[] {
         const filters: ParsedFilter[] = [];
         const filterObj = query.filter;
         if (!filterObj || typeof filterObj !== 'object') return filters;
@@ -27,7 +27,10 @@ export class FilterParserService {
 
             //Gaseste column_name real
             const field = fields.find(f => f.slug === key || f.column_name === key);
-            const column = field ? field.column_name : key;
+            let column = field ? field.column_name : key;
+            if (tableName) {
+                column = `${tableName}.${column}`;
+            }
 
             const val = filterObj[key];
 

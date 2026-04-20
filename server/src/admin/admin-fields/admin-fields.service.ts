@@ -156,9 +156,12 @@ export class AdminFieldsService {
             },
             data: {
                 name: dto.name ?? field.name,
+                ui_type: dto.ui_type ?? field.ui_type,
                 placeholder: dto.placeholder !== undefined ? dto.placeholder : field.placeholder,
                 help_text: dto.help_text !== undefined ? dto.help_text : field.help_text,
                 options: dto.options !== undefined ? dto.options : (field.options ?? Prisma.JsonNull),
+                id_relation_entity: dto.id_relation_entity !== undefined ? dto.id_relation_entity : field.id_relation_entity,
+                relation_display_field: dto.relation_display_field !== undefined ? dto.relation_display_field : field.relation_display_field,
                 is_required: dto.is_required ?? field.is_required,
                 is_unique: dto.is_unique ?? field.is_unique,
                 is_filterable: dto.is_filterable ?? field.is_filterable,
