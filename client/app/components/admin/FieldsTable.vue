@@ -14,17 +14,17 @@ const emit = defineEmits<{
 }>()
 
 const columns: TableColumn<Field>[] = [
-  { accessorKey: 'rank', header: 'Ordine' },
+  { accessorKey: 'rank', header: 'Ordine', meta: { class: { th: 'w-20', td: 'w-20' } } },
   { accessorKey: 'name', header: 'Nume' },
   { accessorKey: 'slug', header: 'Slug' },
   { accessorKey: 'column_name', header: 'Coloana' },
-  { accessorKey: 'data_type', header: 'Tip date' },
-  { accessorKey: 'ui_type', header: 'Tip UI' },
-  { accessorKey: 'grid_col', header: 'Col nr' },
-  { accessorKey: 'col_span', header: 'Col span' },
-  { id: 'flags', header: 'Proprietati' },
-  { id: 'visibility', header: 'Vizibilitate' },
-  { id: 'actions', header: '' }
+  { accessorKey: 'data_type', header: 'Tip date', meta: { class: { th: 'w-32', td: 'w-32' } } },
+  { accessorKey: 'ui_type', header: 'Tip UI', meta: { class: { th: 'w-32', td: 'w-32' } } },
+  { accessorKey: 'grid_col', header: 'Col nr', meta: { class: { th: 'w-20', td: 'w-20' } } },
+  { accessorKey: 'col_span', header: 'Col span', meta: { class: { th: 'w-24', td: 'w-24' } } },
+  { id: 'flags', header: 'Proprietati', meta: { class: { th: 'w-48', td: 'w-48' } } },
+  { id: 'visibility', header: 'Vizibilitate', meta: { class: { th: 'w-32', td: 'w-32' } } },
+  { id: 'actions', header: '', meta: { class: { th: 'w-16', td: 'w-16' } } },
 ]
 
 const fieldsByGroup = computed(() => {
@@ -83,6 +83,7 @@ function getDropdownItems(field: Field) {
         :columns="columns"
         :loading="true"
         class="w-full"
+        :ui="{ td: 'whitespace-normal wrap-break-word max-w-xs' }"
       />
     </div>
 
@@ -113,6 +114,7 @@ function getDropdownItems(field: Field) {
           :columns="columns"
           :loading="loading"
           class="w-full"
+          :ui="{ td: 'whitespace-normal wrap-break-word max-w-xs' }"
         >
           <template #name-cell="{ row }">
             <div class="flex items-center gap-2">
