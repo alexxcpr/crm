@@ -96,6 +96,10 @@ watch(() => state.name, (name) => {
   if (!slugManuallyEdited.value && !isEdit.value) {
     state.slug = name
       .toLowerCase()
+      .replace(/[șş]/g, 's')
+      .replace(/[țţ]/g, 't')
+      .replace(/[ăâ]/g, 'a')
+      .replace(/î/g, 'i')
       .replace(/[^a-z0-9\s_]/g, '')
       .replace(/\s+/g, '_')
       .replace(/^_+/, '')
@@ -148,6 +152,10 @@ function autoFillOptionValue(index: number) {
   if (opt && opt.label && !opt.value) {
     opt.value = opt.label
       .toLowerCase()
+      .replace(/[șş]/g, 's')
+      .replace(/[țţ]/g, 't')
+      .replace(/[ăâ]/g, 'a')
+      .replace(/î/g, 'i')
       .replace(/[^a-z0-9\s_]/g, '')
       .replace(/\s+/g, '_')
   }
