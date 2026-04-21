@@ -78,7 +78,7 @@ const selectRange = (range: { days?: number, months?: number, years?: number }) 
 </script>
 
 <template>
-  <UPopover :content="{ align: 'start' }" :modal="true">
+  <UPopover :content="{ align: 'start' }" :modal="true" :ui="{ content: 'max-h-(--reka-popover-content-available-height,100vh) max-w-[calc(100vw-16px)] overflow-y-auto overscroll-contain' }">
     <UButton
       color="neutral"
       variant="ghost"

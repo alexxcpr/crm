@@ -246,6 +246,7 @@ const displayDateTime = computed(() => {
         v-model:open="popoverOpen"
         :content="{ align: 'start' }"
         :modal="true"
+        :ui="{ content: 'max-h-(--reka-popover-content-available-height,100vh) max-w-[calc(100vw-16px)] overflow-y-auto overscroll-contain' }"
         class="flex-1"
       >
         <UButton
@@ -286,6 +287,7 @@ const displayDateTime = computed(() => {
         v-model:open="popoverOpen"
         :content="{ align: 'start' }"
         :modal="true"
+        :ui="{ content: 'max-h-(--reka-popover-content-available-height,100vh) max-w-[calc(100vw-16px)] overflow-y-auto overscroll-contain' }"
         class="flex-1"
       >
         <UButton
