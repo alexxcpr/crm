@@ -15,16 +15,19 @@ const emit = defineEmits<{
 
 const columns: TableColumn<Field>[] = [
   { id: 'edit', header: '', meta: { class: { th: 'w-10', td: 'w-10' } } },
+
   { accessorKey: 'rank', header: 'Ordine', meta: { class: { th: 'w-20', td: 'w-20' } } },
-  { accessorKey: 'name', header: 'Nume' },
-  { accessorKey: 'slug', header: 'Slug' },
-  { accessorKey: 'column_name', header: 'Coloana' },
+  { accessorKey: 'name', header: 'Nume' , meta: { class: { th: 'w-48', td: 'w-48' } } },
+  { accessorKey: 'slug', header: 'Slug' , meta: { class: { th: 'w-48', td: 'w-48' } } },
+  { accessorKey: 'column_name', header: 'Coloana' , meta: { class: { th: 'w-48', td: 'w-48' } } },
+
   { accessorKey: 'data_type', header: 'Tip date', meta: { class: { th: 'w-32', td: 'w-32' } } },
   { accessorKey: 'ui_type', header: 'Tip UI', meta: { class: { th: 'w-32', td: 'w-32' } } },
   { accessorKey: 'grid_col', header: 'Col nr', meta: { class: { th: 'w-20', td: 'w-20' } } },
   { accessorKey: 'col_span', header: 'Col span', meta: { class: { th: 'w-24', td: 'w-24' } } },
   { id: 'flags', header: 'Proprietati', meta: { class: { th: 'w-48', td: 'w-48' } } },
   { id: 'visibility', header: 'Vizibilitate', meta: { class: { th: 'w-32', td: 'w-32' } } },
+  
   { id: 'actions', header: '', meta: { class: { th: 'w-16', td: 'w-16' } } },
 ]
 

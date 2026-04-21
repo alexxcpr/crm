@@ -107,6 +107,7 @@ const columns = computed<TableColumn<Record<string, any>>[]>(() => {
   // Checkbox column
   cols.push({
     id: 'select',
+    meta: { class: { th: 'w-4', td: 'w-4' } },
     header: ({ table }) => h(UCheckbox, {
       'modelValue': table.getIsSomePageRowsSelected()
         ? 'indeterminate'
