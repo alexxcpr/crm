@@ -126,6 +126,7 @@ const columns = computed<TableColumn<Record<string, any>>[]>(() => {
   // Quick open button
   cols.push({
     id: 'quick_open',
+    meta: { class: { th: 'w-10', td: 'w-10' } },
     cell: ({ row }) => h(UButton, {
       icon: 'i-lucide-pencil',
       label: 'Edit',
