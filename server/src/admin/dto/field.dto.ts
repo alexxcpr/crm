@@ -1,6 +1,6 @@
 import {
     IsBoolean, IsIn, IsInt, IsNotEmpty, IsOptional,
-    IsString, IsUUID, Matches, MaxLength, ValidateIf, IsObject, IsArray,
+    IsString, IsUUID, Matches, MaxLength, ValidateIf, IsObject, IsArray, Max, Min,
 } from 'class-validator';
 
 const DATA_TYPES = ['varchar', 'text', 'integer', 'numeric', 'boolean', 'date', 'timestamp', 'uuid', 'jsonb'];
@@ -96,14 +96,19 @@ export class CreateFieldDto {
 
     @IsOptional()
     @IsInt()
+    @Min(1)
     rank?: number;
 
     @IsOptional()
     @IsInt()
+    @Min(1)
+    @Max(3)
     grid_col?: number;
 
     @IsOptional()
     @IsInt()
+    @Min(1)
+    @Max(3)
     col_span?: number;
 }
 
@@ -178,14 +183,19 @@ export class UpdateFieldDto {
 
     @IsOptional()
     @IsInt()
+    @Min(1)
     rank?: number;
 
     @IsOptional()
     @IsInt()
+    @Min(1)
+    @Max(3)
     grid_col?: number;
 
     @IsOptional()
     @IsInt()
+    @Min(1)
+    @Max(3)
     col_span?: number;
 
     @IsOptional()

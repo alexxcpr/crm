@@ -3,6 +3,7 @@ import { DynamicSchemaService } from 'src/dynamic-schema/dynamic-schema.service'
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateFieldDto, UpdateFieldDto } from '../dto/field.dto';
 import { Prisma } from '@prisma/client';
+import { validateGroupFieldLayout } from './field-layout.util';
 
 @Injectable()
 export class AdminFieldsService {
@@ -93,6 +94,8 @@ export class AdminFieldsService {
             }
         }
 
+        await this.validateLayoutForCreate(entityId, dto);
+
         const columnName = `cf_${dto.slug}`;
 
         const field = await this.prisma.field.create({
@@ -149,6 +152,8 @@ export class AdminFieldsService {
                 `Campul cu id "${fieldId}" nu exista in entitatea "${entityId}".`,
             );
         }
+
+        await this.validateLayoutForUpdate(entityId, field, dto);
 
         return this.prisma.field.update({
             where: {
@@ -221,5 +226,76 @@ export class AdminFieldsService {
             throw new NotFoundException(`Entitatea cu id "${entityId}" nu exista.`);
         }
         return entity;
+    }
+
+    private async validateLayoutForCreate(entityId: string, dto: CreateFieldDto) {
+        const groupName = dto.group_name ?? 'general';
+
+        const existingFields = await this.getGroupLayoutFields(entityId, groupName);
+
+        validateGroupFieldLayout([
+            ...existingFields,
+            {
+                id_field: `new:${dto.slug}`,
+                name: dto.name,
+                slug: dto.slug,
+                group_name: groupName,
+                rank: dto.rank ?? 1,
+                grid_col: dto.grid_col ?? 1,
+                col_span: dto.col_span ?? 1,
+            },
+        ]);
+    }
+
+    private async validateLayoutForUpdate(entityId: string, field: {
+        id_field: string;
+        name: string;
+        slug: string;
+        group_name: string;
+        rank: number;
+        grid_col: number;
+        col_span: number;
+    }, dto: UpdateFieldDto) {
+        const groupName = dto.group_name ?? field.group_name ?? 'general';
+
+        const existingFields = await this.getGroupLayoutFields(entityId, groupName, field.id_field);
+
+        validateGroupFieldLayout([
+            ...existingFields,
+            {
+                id_field: field.id_field,
+                name: dto.name ?? field.name,
+                slug: field.slug,
+                group_name: groupName,
+                rank: dto.rank ?? field.rank,
+                grid_col: dto.grid_col ?? field.grid_col,
+                col_span: dto.col_span ?? field.col_span,
+            },
+        ]);
+    }
+
+    private async getGroupLayoutFields(entityId: string, groupName: string, excludeFieldId?: string) {
+        return this.prisma.field.findMany({
+            where: {
+                id_entity: entityId,
+                group_name: groupName,
+                ...(excludeFieldId
+                    ? {
+                        NOT: {
+                            id_field: excludeFieldId,
+                        },
+                    }
+                    : {}),
+            },
+            select: {
+                id_field: true,
+                name: true,
+                slug: true,
+                group_name: true,
+                rank: true,
+                grid_col: true,
+                col_span: true,
+            },
+        });
     }
 }
