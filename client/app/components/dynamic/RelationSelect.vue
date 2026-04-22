@@ -116,16 +116,19 @@ function onUpdate(val: string | string[] | undefined) {
 </script>
 
 <template>
-  <USelectMenu
-    :model-value="modelValue ?? undefined"
-    :items="items"
-    value-key="value"
-    :loading="loading"
-    :placeholder="field.placeholder ?? `Selecteaza ${field.name.toLowerCase()}...`"
-    :search-input="{ placeholder: 'Cauta...' }"
-    clear
-    @update:model-value="onUpdate"
-    @update:search-term="onSearch"
-    v-model:open="open"
-  />
+  <div class="w-full min-w-0">
+    <USelectMenu
+      :model-value="modelValue ?? undefined"
+      :items="items"
+      value-key="value"
+      :loading="loading"
+      :placeholder="field.placeholder ?? `Selecteaza ${field.name.toLowerCase()}...`"
+      :search-input="{ placeholder: 'Cauta...' }"
+      class="w-full"
+      clear
+      @update:model-value="onUpdate"
+      @update:search-term="onSearch"
+      v-model:open="open"
+    />
+  </div>
 </template>
