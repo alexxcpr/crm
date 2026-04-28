@@ -45,6 +45,47 @@ const systemData = reactive({
 const submitting = ref(false)
 const initialLoading = ref(false)
 
+// ─── Form ref for error handling ───
+const formRef = ref(null)
+const activeTab = ref('general')
+
+// Initialize activeTab when groups are loaded
+watch(() => groups.value, (newGroups) => {
+  if (newGroups.length > 0 && !newGroups.includes(activeTab.value)) {
+    activeTab.value = newGroups[0] || 'general'
+  }
+}, { immediate: true })
+
+// ─── Find which group contains fields with errors ───
+function findGroupWithErrors(errorFields: string[]): string | null {
+  for (const group of groups.value) {
+    const groupFields = getFieldsByGroup(group).map(f => f.slug)
+    const hasErrorInGroup = errorFields.some(fieldName =>
+      groupFields.includes(fieldName)
+    )
+    if (hasErrorInGroup) return group
+  }
+  return null
+}
+
+// ─── Handler for form validation errors ───
+function onFormError(event: { errors: Array<{ name?: string; message?: string }> }) {
+  const errorFieldNames = event.errors
+    .map(e => e.name)
+    .filter((name): name is string => !!name)
+  const targetGroup = findGroupWithErrors(errorFieldNames)
+
+  if (targetGroup && targetGroup !== activeTab.value) {
+    activeTab.value = targetGroup
+
+    toast.add({
+      title: 'Verificare necesară',
+      description: 'Unele câmpuri necesită atenție în alt tab',
+      color: 'warning'
+    })
+  }
+}
+
 // ─── Schema Zod (reactiva — se reconstruieste cand schema se incarca) ───
 const zodSchema = computed(() => {
   if (!formFields.value.length) return null
@@ -206,10 +247,12 @@ const loading = computed(() => schemaLoading.value || initialLoading.value)
   <!-- Form -->
   <UForm
     v-else-if="zodSchema"
+    ref="formRef"
     :state="formState"
     :schema="zodSchema"
     class="space-y-6"
     @submit="onSubmit"
+    @error="onFormError"
   >
     <!-- Single group: render directly -->
     <template v-if="groups.length <= 1">
@@ -217,11 +260,11 @@ const loading = computed(() => schemaLoading.value || initialLoading.value)
     </template>
 
     <!-- Multiple groups: use tabs -->
-    <UTabs 
-      v-else 
-      :items="tabItems" 
-      :default-value="groups[0]" 
-      orientation="vertical" 
+    <UTabs
+      v-else
+      v-model="activeTab"
+      :items="tabItems"
+      orientation="vertical"
       class="w-full"
       :ui="{
         root: 'flex flex-col md:flex-row items-start gap-6',
