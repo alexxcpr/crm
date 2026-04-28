@@ -83,6 +83,7 @@ const state = reactive({
   validation_min: (props.field?.validation_rules?.min as number) ?? undefined as number | undefined,
   validation_max: (props.field?.validation_rules?.max as number) ?? undefined as number | undefined,
   validation_pattern: (props.field?.validation_rules?.pattern as string) ?? '',
+  validation_error_message: (props.field?.validation_rules?.error_message as string) ?? '',
   group_name: props.field?.group_name ?? 'general',
   rank: props.field?.rank ?? 1,
   grid_col: props.field?.grid_col ?? 1,
@@ -209,6 +210,9 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
     }
     if (state.validation_pattern) {
       validationRules.pattern = state.validation_pattern
+    }
+    if (state.validation_error_message) {
+      validationRules.error_message = state.validation_error_message
     }
 
     let result: Field | null
@@ -466,6 +470,10 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
 
       <UFormField label="Pattern (regex)" name="validation_pattern">
         <UInput v-model="state.validation_pattern" placeholder="^[a-zA-Z]+$" class="w-full" />
+      </UFormField>
+
+      <UFormField label="Mesaj de eroare (optional)" description="Afisat cand regulile de validare 'Pattern (regex)' nu sunt indeplinite">
+        <UInput v-model="state.validation_error_message" placeholder="Ex: Numarul de telefon trebuie sa fie in format +40 XXX XXX XXX" class="w-full" />
       </UFormField>
     </div>
 

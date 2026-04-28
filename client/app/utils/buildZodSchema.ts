@@ -65,8 +65,10 @@ function buildStringRule(field: Field): z.ZodString {
 
   if (v?.min_length != null) rule = rule.min(v.min_length)
   if (v?.max_length != null) rule = rule.max(v.max_length)
-  if (v?.pattern) rule = rule.regex(new RegExp(v.pattern))
-
+  if (v?.pattern) {
+    const message = v?.error_message || `"${field.name}" nu are formatul corect`
+    rule = rule.regex(new RegExp(v.pattern), { message })
+  }
   return rule
 }
 
