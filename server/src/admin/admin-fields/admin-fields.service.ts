@@ -97,6 +97,18 @@ export class AdminFieldsService {
         await this.validateLayoutForCreate(entityId, dto);
 
         const columnName = `cf_${dto.slug}`;
+        const groupName = dto.group_name ?? 'general';
+
+        const maxRankResult = await this.prisma.field.aggregate({
+            where: {
+                id_entity: entityId,
+                group_name: groupName,
+            },
+            _max: {
+                rank: true,
+            },
+        });
+        const nextRank = (maxRankResult._max.rank ?? 0) + 1;
 
         const field = await this.prisma.field.create({
             data: {
@@ -120,8 +132,8 @@ export class AdminFieldsService {
                 validation_rules: dto.validation_rules ?? undefined,
                 id_relation_entity: dto.id_relation_entity ?? null,
                 relation_display_field: dto.relation_display_field ?? null,
-                group_name: dto.group_name ?? 'general',
-                rank: dto.rank ?? 1,
+                group_name: groupName,
+                rank: dto.rank ?? nextRank,
                 grid_col: dto.grid_col ?? 1,
                 col_span: dto.col_span ?? 1,
             },
