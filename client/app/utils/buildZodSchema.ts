@@ -90,22 +90,32 @@ function buildStringRule(field: Field): z.ZodString {
 
 function buildIntegerRule(field: Field) {
   const requiredMessage = `"${field.name}" este obligatoriu`
-  let rule = z.coerce.number({ message: requiredMessage }).int({ message: 'Valoare trebuie să fie un număr întreg' })
+  let rule = z.number({ message: requiredMessage }).int({ message: 'Valoare trebuie să fie un număr întreg' })
   const v = field.validation_rules
 
   if (v?.min != null) rule = rule.min(v.min, { message: `Valoarea minimă este ${v.min}` })
   if (v?.max != null) rule = rule.max(v.max, { message: `Valoarea maximă este ${v.max}` })
 
-  return rule
+  return buildNumberRule(field, rule)
 }
 
 function buildNumericRule(field: Field) {
   const requiredMessage = `"${field.name}" este obligatoriu`
-  let rule = z.coerce.number({ message: requiredMessage })
+  let rule = z.number({ message: requiredMessage })
   const v = field.validation_rules
 
   if (v?.min != null) rule = rule.min(v.min, { message: `Valoarea minimă este ${v.min}` })
   if (v?.max != null) rule = rule.max(v.max, { message: `Valoarea maximă este ${v.max}` })
 
-  return rule
+  return buildNumberRule(field, rule)
+}
+
+function buildNumberRule(field: Field, rule: z.ZodNumber) {
+  const preprocessNumber = (value: unknown) => {
+    if (value === undefined || value === null || value === '') return undefined
+    if (typeof value === 'string' && value.trim() === '') return undefined
+    return Number(value)
+  }
+
+  return z.preprocess(preprocessNumber, field.is_required ? rule : rule.optional())
 }

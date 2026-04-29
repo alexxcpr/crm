@@ -7,6 +7,6 @@ import { DynamicValidationService } from './dynamic-validation.service';
 @Module({
   controllers: [DynamicDataController],
   providers: [DynamicDataService, FilterParserService, DynamicValidationService],
-  exports: [DynamicDataService]
+  exports: [DynamicDataService],
 })
 export class DynamicDataModule {}

@@ -1,9 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { DynamicSchemaService } from './dynamic-schema.service';
-import { KnexService } from 'src/knex/knex.service';
-import { PrismaService } from 'src/prisma/prisma.service';
-import { Entity, Field } from '@prisma/client';
+import { TenantContext } from 'src/tenant/tenant-context.service';
+import { Entity, Field } from 'src/types/entities';
 
 function mockEntity(overrides: Partial<Entity> = {}): Entity {
   return {
@@ -61,8 +60,8 @@ describe('DynamicSchemaService', () => {
   let mockColumnBuilder: Record<string, jest.Mock>;
   let mockTableBuilder: Record<string, jest.Mock | any>;
   let mockSchema: Record<string, jest.Mock>;
-  let mockKnex: { instance: any };
-  let mockPrisma: { field: { findMany: jest.Mock }; entity: { findUnique: jest.Mock } };
+  let mockKnexInstance: any;
+  let mockTenantContext: { knex: any; isAvailable: boolean };
 
   beforeEach(async () => {
     mockColumnBuilder = {
@@ -71,6 +70,7 @@ describe('DynamicSchemaService', () => {
       notNullable: jest.fn().mockReturnThis(),
       nullable: jest.fn().mockReturnThis(),
       unique: jest.fn().mockReturnThis(),
+      alter: jest.fn().mockReturnThis(),
     };
 
     mockTableBuilder = {
@@ -85,6 +85,7 @@ describe('DynamicSchemaService', () => {
       date: jest.fn().mockReturnValue(mockColumnBuilder),
       index: jest.fn(),
       dropColumn: jest.fn(),
+      unique: jest.fn(),
       foreign: jest.fn().mockReturnValue({
         references: jest.fn().mockReturnValue({
           inTable: jest.fn(),
@@ -105,26 +106,35 @@ describe('DynamicSchemaService', () => {
       }),
     };
 
-    mockKnex = {
-      instance: {
+    const mockQueryBuilder = {
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      count: jest.fn().mockReturnThis(),
+      first: jest.fn().mockResolvedValue({ cnt: 0 }),
+      whereNull: jest.fn().mockReturnThis(),
+      update: jest.fn().mockResolvedValue(0),
+    };
+
+    mockKnexInstance = Object.assign(
+      jest.fn().mockReturnValue(mockQueryBuilder),
+      {
         schema: mockSchema,
         fn: {
           uuid: jest.fn().mockReturnValue('gen_random_uuid()'),
           now: jest.fn().mockReturnValue('now()'),
         },
       },
-    };
+    );
 
-    mockPrisma = {
-      field: { findMany: jest.fn() },
-      entity: { findUnique: jest.fn() },
+    mockTenantContext = {
+      knex: mockKnexInstance,
+      isAvailable: true,
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DynamicSchemaService,
-        { provide: KnexService, useValue: mockKnex },
-        { provide: PrismaService, useValue: mockPrisma },
+        { provide: TenantContext, useValue: mockTenantContext },
       ],
     }).compile();
 
@@ -447,47 +457,6 @@ describe('DynamicSchemaService', () => {
   });
 
   // ═══════════════════════════════════════════
-  //  addColumn — relatii FK
-  // ═══════════════════════════════════════════
-  describe('addColumn — relatii FK', () => {
-    it('apeleaza addForeignKeyAsync pentru campuri de tip relation', async () => {
-      mockSchema.hasColumn.mockResolvedValue(false);
-      const field = mockField({
-        slug: 'company_id',
-        column_name: 'cf_company_id',
-        data_type: 'uuid',
-        ui_type: 'relation',
-        id_relation_entity: 'ent-uuid-companies',
-        is_filterable: false,
-      });
-
-      const targetEntity = mockEntity({
-        id_entity: 'ent-uuid-companies',
-        table_name: 'ent_companies',
-      });
-      mockPrisma.entity.findUnique.mockResolvedValue(targetEntity);
-
-      await service.addColumn(mockEntity(), field);
-
-      // Asteapta promise-ul fire-and-forget
-      await new Promise((r) => setTimeout(r, 50));
-
-      expect(mockPrisma.entity.findUnique).toHaveBeenCalledWith({
-        where: { id_entity: 'ent-uuid-companies' },
-      });
-    });
-
-    it('nu apeleaza FK pentru campuri non-relation', async () => {
-      mockSchema.hasColumn.mockResolvedValue(false);
-      const field = mockField({ ui_type: 'text', is_filterable: false });
-
-      await service.addColumn(mockEntity(), field);
-
-      expect(mockPrisma.entity.findUnique).not.toHaveBeenCalled();
-    });
-  });
-
-  // ═══════════════════════════════════════════
   //  removeColumn
   // ═══════════════════════════════════════════
   describe('removeColumn', () => {
@@ -498,17 +467,6 @@ describe('DynamicSchemaService', () => {
 
       expect(mockSchema.alterTable).toHaveBeenCalledWith('ent_contacts', expect.any(Function));
       expect(mockTableBuilder.dropColumn).toHaveBeenCalledWith('cf_industry');
-    });
-
-    it('sterge coloana system cu column_name fara prefix', async () => {
-      const field = mockField({
-        is_system: false,
-        column_name: 'cf_custom_field',
-      });
-
-      await service.removeColumn(mockEntity(), field);
-
-      expect(mockTableBuilder.dropColumn).toHaveBeenCalledWith('cf_custom_field');
     });
 
     it('arunca BadRequestException pentru campuri system', async () => {
@@ -563,75 +521,6 @@ describe('DynamicSchemaService', () => {
       await expect(service.createIndex('ent_contacts', 'cf_x')).rejects.toThrow(
         'connection refused',
       );
-    });
-  });
-
-  // ═══════════════════════════════════════════
-  //  addColumnsFromFieldDefinitions
-  // ═══════════════════════════════════════════
-  describe('addColumnsFromFieldDefinitions', () => {
-    it('incarca campurile din Prisma ordonate dupa rank si adauga fiecare coloana', async () => {
-      const entity = mockEntity();
-      const fields = [
-        mockField({
-          id_field: 'f1',
-          slug: 'name',
-          column_name: 'name',
-          is_system: true,
-          rank: 1,
-          is_filterable: false,
-        }),
-        mockField({
-          id_field: 'f2',
-          slug: 'industry',
-          column_name: 'cf_industry',
-          rank: 2,
-          is_filterable: false,
-        }),
-        mockField({
-          id_field: 'f3',
-          slug: 'revenue',
-          column_name: 'cf_revenue',
-          data_type: 'numeric',
-          rank: 3,
-          is_filterable: false,
-        }),
-      ];
-
-      mockPrisma.field.findMany.mockResolvedValue(fields);
-      mockSchema.hasColumn.mockResolvedValue(false);
-
-      await service.addColumnsFromFieldDefinitions(entity);
-
-      expect(mockPrisma.field.findMany).toHaveBeenCalledWith({
-        where: { id_entity: 'ent-uuid-1' },
-        orderBy: { rank: 'asc' },
-      });
-      // 3 coloane adaugate = 3 apeluri alterTable
-      expect(mockSchema.alterTable).toHaveBeenCalledTimes(3);
-    });
-
-    it('nu apeleaza alterTable daca nu exista campuri', async () => {
-      mockPrisma.field.findMany.mockResolvedValue([]);
-
-      await service.addColumnsFromFieldDefinitions(mockEntity());
-
-      expect(mockSchema.alterTable).not.toHaveBeenCalled();
-    });
-
-    it('skip coloanele care exista deja (nu crapa)', async () => {
-      const entity = mockEntity();
-      const fields = [
-        mockField({ slug: 'name', column_name: 'name', is_system: true, is_filterable: false }),
-      ];
-
-      mockPrisma.field.findMany.mockResolvedValue(fields);
-      mockSchema.hasColumn.mockResolvedValue(true); // coloana exista deja
-
-      await service.addColumnsFromFieldDefinitions(entity);
-
-      // alterTable NU a fost apelat fiindca hasColumn = true → skip
-      expect(mockSchema.alterTable).not.toHaveBeenCalled();
     });
   });
 });

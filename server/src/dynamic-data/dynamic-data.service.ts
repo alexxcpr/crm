@@ -1,135 +1,114 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Entity, Prisma } from '@prisma/client';
-import { KnexService } from 'src/knex/knex.service';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { TenantContext } from 'src/tenant/tenant-context.service';
+import { Entity, FieldWithRelation } from 'src/types/entities';
 import { FilterParserService } from './filter-parser.service';
 import { DynamicValidationService } from './dynamic-validation.service';
 import { PaginatedResponse } from './dto/query.dto';
 
-export type FieldWithRelation = Prisma.FieldGetPayload<{
-    include: { relation_entity: true }
-}>;
-
 @Injectable()
 export class DynamicDataService {
-    private readonly logger = new Logger(DynamicDataService.name);
+  private readonly logger = new Logger(DynamicDataService.name);
 
-    constructor (
-        private readonly prisma: PrismaService,
-        private readonly knex: KnexService,
-        private readonly filterParser: FilterParserService,
-        private readonly validation: DynamicValidationService
-    ) {}
+  constructor(
+    private readonly tenantContext: TenantContext,
+    private readonly filterParser: FilterParserService,
+    private readonly validation: DynamicValidationService,
+  ) {}
 
-    // ─── Helper: incarca entity + fields din Prisma ───
-    private async resolveEntity(entitySlug: string): Promise<{ entity: Entity; fields: FieldWithRelation[] }> {
-        //cauta entitatea(metadata din Prisma)
-        const entity = await this.prisma.entity.findUnique({
-            where: {
-                slug: entitySlug
-            },
-        })
+  private get knex() { return this.tenantContext.knex; }
 
-        if (!entity){
-            throw new NotFoundException(`Entitatea "${entitySlug}" nu exista.`);
-        }
-
-        //cauta campurile entitatii (metadata din Prisma)
-        const fields = await this.prisma.field.findMany({
-            where:{
-                id_entity: entity.id_entity
-            },
-            include: {
-                relation_entity: true
-            },
-            orderBy: {
-                rank: 'asc'
-            },
-        });
-
-        return {entity, fields};
+  private async resolveEntity(entitySlug: string): Promise<{ entity: Entity; fields: FieldWithRelation[] }> {
+    const entity = await this.knex('entity').where('slug', entitySlug).first();
+    if (!entity) {
+      throw new NotFoundException(`Entitatea "${entitySlug}" nu exista.`);
     }
 
+    const rawFields = await this.knex('field')
+      .where('id_entity', entity.id_entity)
+      .orderBy('rank', 'asc');
 
-    // ─── GET lista cu paginare + filtre + sortare ───
-    async findAll(entitySlug: string, query: Record<string, any>): Promise<PaginatedResponse<Record<string,any>>> {
-        // console.log('QUERY RAW:', JSON.stringify(query, null, 2));
-        const { entity, fields } = await this.resolveEntity(entitySlug);
-        const tableName = entity.table_name;
+    const fields: FieldWithRelation[] = [];
+    for (const f of rawFields) {
+      const relationEntity = f.id_relation_entity
+        ? await this.knex('entity').where('id_entity', f.id_relation_entity).first()
+        : null;
+      fields.push({ ...f, relation_entity: relationEntity });
+    }
 
-        //Paginarea
-        const page = Math.max(1, parseInt(query.page) || 1);
-        const limit = Math.min(100, Math.max(25, parseInt(query.limit) || 25));
-        const offset = (page - 1) * limit;
+    return { entity, fields };
+  }
 
-        // Coloane selectate: sistem + din field_definitions
-        const systemColumns = ['id', 'date_created', 'date_updated', 'id_owner'];
-        const selectColumns: any[] = [
-            ...systemColumns.map(c => `${tableName}.${c}`),
-            ...fields.filter(f => f.visible_in_table).map(f => `${tableName}.${f.column_name}`)
-        ];
+  async findAll(entitySlug: string, query: Record<string, any>): Promise<PaginatedResponse<Record<string, any>>> {
+    const { entity, fields } = await this.resolveEntity(entitySlug);
+    const tableName = entity.table_name;
 
-        // Query principal
-        let dataQuery = this.knex.instance(tableName);
+    const page = Math.max(1, parseInt(query.page) || 1);
+    const limit = Math.min(100, Math.max(25, parseInt(query.limit) || 25));
+    const offset = (page - 1) * limit;
 
-        // Adaugam join-uri pentru campurile relationale pentru a aduce display field-ul
-        const relationFields = fields.filter(f => f.ui_type === 'relation' && f.visible_in_table && f.relation_entity);
-        for (const field of relationFields) {
-            if (!field.relation_entity) continue;
-            const relTableName = field.relation_entity.table_name;
-            const alias = `rel_${field.column_name}`;
-            
-            dataQuery = dataQuery.leftJoin(
-                `${relTableName} as ${alias}`,
-                `${tableName}.${field.column_name}`,
-                `${alias}.id`
-            );
-            
-            if (field.relation_display_field) {
-                selectColumns.push(`${alias}.${field.relation_display_field} as ${field.column_name}_display`);
-            }
-        }
+    const systemColumns = ['id', 'date_created', 'date_updated', 'id_owner'];
+    const selectColumns: any[] = [
+      ...systemColumns.map(c => `${tableName}.${c}`),
+      ...fields.filter(f => f.visible_in_table).map(f => `${tableName}.${f.column_name}`),
+    ];
 
-        dataQuery = dataQuery.select(selectColumns);
+    let dataQuery = this.knex(tableName);
 
-        // Aplica filtre
-        const filters = this.filterParser.parse(query, fields, tableName);
-        for (const filter of filters) {
-            dataQuery = this.filterParser.apply(dataQuery, filter);
-        }
+    const relationFields = fields.filter(f => f.ui_type === 'relation' && f.visible_in_table && f.relation_entity);
+    for (const field of relationFields) {
+      if (!field.relation_entity) continue;
+      const relTableName = field.relation_entity.table_name;
+      const alias = `rel_${field.column_name}`;
 
-        // Aplica sortare
-        if (query.sort) {
-            const sortFields = (query.sort as string).split(',');
-            const orderBy = sortFields.map(s => {
-                const desc = s.startsWith('-');
-                const column = desc ? s.substring(1) : s;
-                // Verifica ca coloana exista (securitate)
-                const valid = fields.some(f => f.column_name === column || f.slug === column)
-                    || systemColumns.includes(column);
-                if (!valid) return null;
-                //Daca e slug, translateaza in column_name
-                const field = fields.find(f => f.slug === column);
-                const realColumn = field ? field.column_name : column;
-                return { column: `${tableName}.${realColumn}`, order: desc ? 'desc' : 'asc'};
-            }).filter(Boolean);
+      dataQuery = dataQuery.leftJoin(
+        `${relTableName} as ${alias}`,
+        `${tableName}.${field.column_name}`,
+        `${alias}.id`,
+      );
 
-            if (orderBy.length > 0) {
-                dataQuery = dataQuery.orderBy(orderBy as any);
-            }
-        }
-        else {
-            dataQuery = dataQuery.orderBy(`${tableName}.date_created`, 'desc');
-        }
+      if (field.relation_display_field) {
+        selectColumns.push(`${alias}.${field.relation_display_field} as ${field.column_name}_display`);
+      }
+    }
 
-        // Count total (inainte de limit/offset)
-        let countQuery = this.knex.instance(tableName).count(`${tableName}.id as total`);
-        for (const filter of filters) {
-            countQuery = this.filterParser.apply(countQuery, filter);
-        }
+    dataQuery = dataQuery.select(selectColumns);
 
-        // Aplica paginare
-        dataQuery = dataQuery.limit(limit).offset(offset);
+    const filters = this.filterParser.parse(query, fields, tableName);
+    for (const filter of filters) {
+      dataQuery = this.filterParser.apply(dataQuery, filter);
+    }
+
+    // Aplica sortare
+    if (query.sort) {
+      const sortFields = (query.sort as string).split(',');
+      const orderBy = sortFields.map(s => {
+        const desc = s.startsWith('-');
+        const column = desc ? s.substring(1) : s;
+        // Verifica ca coloana exista (securitate)
+        const valid = fields.some(f => f.column_name === column || f.slug === column)
+          || systemColumns.includes(column);
+        if (!valid) return null;
+        //Daca e slug, translateaza in column_name
+        const field = fields.find(f => f.slug === column);
+        const realColumn = field ? field.column_name : column;
+        return { column: `${tableName}.${realColumn}`, order: desc ? 'desc' : 'asc' };
+      }).filter(Boolean);
+
+      if (orderBy.length > 0) {
+        dataQuery = dataQuery.orderBy(orderBy as any);
+      }
+    } else {
+      dataQuery = dataQuery.orderBy(`${tableName}.date_created`, 'desc');
+    }
+
+    // Count total (inainte de limit/offset)
+    let countQuery = this.knex(tableName).count(`${tableName}.id as total`);
+    for (const filter of filters) {
+      countQuery = this.filterParser.apply(countQuery, filter);
+    }
+
+    // Aplica paginare
+    dataQuery = dataQuery.limit(limit).offset(offset);
 
         // Executa ambele query-uri
         const [data, [{ total }]] = await Promise.all([
@@ -137,61 +116,61 @@ export class DynamicDataService {
             countQuery,
         ]);
 
-        const totalNum = Number(total);
+    const totalNum = Number(total);
 
-        return {
-            data,
-            meta: {
-                total: totalNum,
-                page,
-                limit,
-                totalPages: Math.ceil(totalNum / limit),
-            },
-        };
-    }
+    return {
+      data,
+      meta: {
+        total: totalNum,
+        page,
+        limit,
+        totalPages: Math.ceil(totalNum / limit),
+      },
+    };
+  }
 
     // ─── GET un singur record ───
     async findOne(entitySlug: string, id: string) {
         const { entity, fields } = await this.resolveEntity(entitySlug);
         const tableName = entity.table_name;
 
-        const systemColumns = ['id', 'date_created', 'date_updated', 'id_owner'];
-        const selectColumns: any[] = [
-            ...systemColumns.map(c => `${tableName}.${c}`),
-            ...fields.map(f => `${tableName}.${f.column_name}`)
-        ];
+    const systemColumns = ['id', 'date_created', 'date_updated', 'id_owner'];
+    const selectColumns: any[] = [
+      ...systemColumns.map(c => `${tableName}.${c}`),
+      ...fields.map(f => `${tableName}.${f.column_name}`),
+    ];
 
-        let dataQuery = this.knex.instance(tableName);
+    let dataQuery = this.knex(tableName);
 
-        const relationFields = fields.filter(f => f.ui_type === 'relation' && f.relation_entity);
-        for (const field of relationFields) {
-            if (!field.relation_entity) continue;
-            const relTableName = field.relation_entity.table_name;
-            const alias = `rel_${field.column_name}`;
-            
-            dataQuery = dataQuery.leftJoin(
-                `${relTableName} as ${alias}`,
-                `${tableName}.${field.column_name}`,
-                `${alias}.id`
-            );
-            
-            if (field.relation_display_field) {
-                selectColumns.push(`${alias}.${field.relation_display_field} as ${field.column_name}_display`);
-            }
-        }
+    const relationFields = fields.filter(f => f.ui_type === 'relation' && f.relation_entity);
+    for (const field of relationFields) {
+      if (!field.relation_entity) continue;
+      const relTableName = field.relation_entity.table_name;
+      const alias = `rel_${field.column_name}`;
 
-        const record = await dataQuery
-            .select(selectColumns)
-            .where(`${tableName}.id`, id)
-            .first();
+      dataQuery = dataQuery.leftJoin(
+        `${relTableName} as ${alias}`,
+        `${tableName}.${field.column_name}`,
+        `${alias}.id`,
+      );
 
-        if (!record) {
-            throw new NotFoundException(`Inregistrarea cu id "${id}}" nu a fost gasita in "${entitySlug}".`);
-        }
+      if (field.relation_display_field) {
+        selectColumns.push(`${alias}.${field.relation_display_field} as ${field.column_name}_display`);
+      }
+    }
+
+    const record = await dataQuery
+      .select(selectColumns)
+      .where(`${tableName}.id`, id)
+      .first();
+
+    if (!record) {
+      throw new NotFoundException(`Inregistrarea cu id "${id}" nu a fost gasita in "${entitySlug}".`);
+    }
 
         // După ce obții record-ul
         if (record.id_owner) {
-            const owner = await this.knex.instance('user')
+            const owner = await this.knex('user')
             .select('email', 'first_name', 'last_name')
             .where('id', record.id_owner)
             .first();
@@ -212,9 +191,9 @@ export class DynamicDataService {
         );
 
         const insertData: Record<string, any> = {
-            ...sanitized,
-            date_created: new Date(),
-            date_updated: new Date(),
+          ...sanitized,
+          date_created: new Date(),
+          date_updated: new Date(),
         };
 
         // Seteaza id_owner daca este furnizat
@@ -222,19 +201,19 @@ export class DynamicDataService {
             insertData.id_owner = userId;
         }
 
-        const [record] = await this.knex.instance(entity.table_name)
-            .insert(insertData)
-            .returning('*');
+        const [record] = await this.knex(entity.table_name)
+          .insert(insertData)
+          .returning('*');
 
         return { data: record };
-    }
+  }
 
     // ─── PUT update record ───
     async update(entitySlug: string, id: string, body: Record<string, any>) {
         const { entity, fields } = await this.resolveEntity(entitySlug);
 
         // Verifica ca exista
-        const exists = await this.knex.instance(entity.table_name)
+        const exists = await this.knex(entity.table_name)
             .where('id', id)
             .first();
 
@@ -247,7 +226,7 @@ export class DynamicDataService {
             body, fields, entity.table_name, 'update', id
         );
 
-        const [record] = await this.knex.instance(entity.table_name)
+        const [record] = await this.knex(entity.table_name)
             .where('id', id)
             .update({
                 ...sanitized,
@@ -255,14 +234,14 @@ export class DynamicDataService {
             })
             .returning('*');
 
-        return { data: record };
-    }
+    return { data: record };
+  }
 
     // ─── DELETE sterge record ───
     async remove(entitySlug: string, id: string) {
         const { entity } = await this.resolveEntity(entitySlug);
 
-        const deleted = await this.knex.instance(entity.table_name)
+        const deleted = await this.knex(entity.table_name)
             .where('id', id)
             .del();
 

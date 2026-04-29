@@ -9,21 +9,21 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:4000/api'
+      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:4000/api',
+      defaultTenantSlug: process.env.NUXT_PUBLIC_DEFAULT_TENANT_SLUG || 'dev'
     }
   },
 
   auth: {
     isEnabled: true,
     globalAppMiddleware: true,
-    // baseURL: process.env.BACKEND_API, //url backend /api (setat automat in .env => NUXT_PUBLIC_AUTH_BASE_URL)
     provider: {
       type: 'local',
       endpoints: {
         signIn: { path: '/auth/signin', method: 'post' },
         signOut: { path: '/auth/signout', method: 'post' },
-        signUp: { path: '/auth/signup', method: 'post'},
-        getSession: { path: '/user/me', method: 'get'} // Ruta din NestJS care returneaza datele userului curent bazat pe token
+        signUp: { path: '/auth/signup', method: 'post' },
+        getSession: { path: '/user/me', method: 'get' }
       },
 
       token: {
