@@ -1,313 +1,280 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { DynamicSchemaService } from 'src/dynamic-schema/dynamic-schema.service';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { TenantContext } from 'src/tenant/tenant-context.service';
 import { CreateFieldDto, UpdateFieldDto } from '../dto/field.dto';
-import { Prisma } from '@prisma/client';
 import { validateGroupFieldLayout } from './field-layout.util';
 
 @Injectable()
 export class AdminFieldsService {
-    constructor(
-        private readonly prisma: PrismaService,
-        private readonly dynamicSchema: DynamicSchemaService,
-    ){}
+  constructor(
+    private readonly tenantContext: TenantContext,
+    private readonly dynamicSchema: DynamicSchemaService,
+  ) {}
 
-    async findAllByEntity(entityId: string){
-        await this.ensureEntityExists(entityId);
+  private get knex() { return this.tenantContext.knex; }
 
-        return this.prisma.field.findMany({
-            where: {
-                id_entity: entityId
-            },
-            orderBy: [
-                { group_name: 'asc' },
-                { rank: 'asc' }
-            ],
-            include: {
-                relation_entity: {
-                    select: {
-                        id_entity: true,
-                        slug: true,
-                        name: true,
-                    },
-                },
-            },
-        });
+  async findAllByEntity(entityId: string) {
+    await this.ensureEntityExists(entityId);
+
+    const fields = await this.knex('field')
+      .where('field.id_entity', entityId)
+      .orderBy([
+        { column: 'group_name', order: 'asc' },
+        { column: 'rank', order: 'asc' },
+      ]);
+
+    const result: any[] = [];
+    for (const f of fields) {
+      const relationEntity = f.id_relation_entity
+        ? await this.knex('entity')
+            .select('id_entity', 'slug', 'name')
+            .where('id_entity', f.id_relation_entity)
+            .first()
+        : null;
+
+      result.push({ ...f, relation_entity: relationEntity });
     }
 
-    async findOne(entityId: string, fieldId: string) {
-        await this.ensureEntityExists(entityId);
+    return result;
+  }
 
-        const field = await this.prisma.field.findFirst({
-            where: {
-                id_field: fieldId,
-                id_entity: entityId,
-            },
-            include: {
-                relation_entity: {
-                    select: {
-                        id_entity: true,
-                        slug: true,
-                        name: true,
-                    },
-                },
-            },
-        });
+  async findOne(entityId: string, fieldId: string) {
+    await this.ensureEntityExists(entityId);
 
-        if (!field) {
-            throw new NotFoundException(
-                `Campul cu id "${fieldId}" nu exista in entitatea "${entityId}".`,
-            );
-        }
+    const field = await this.knex('field')
+      .where({ id_field: fieldId, id_entity: entityId })
+      .first();
 
-        return field;
+    if (!field) {
+      throw new NotFoundException(
+        `Campul cu id "${fieldId}" nu exista in entitatea "${entityId}".`,
+      );
     }
 
-    async create(entityId: string, dto: CreateFieldDto){
-        const entity = await this.ensureEntityExists(entityId);
+    const relationEntity = field.id_relation_entity
+      ? await this.knex('entity')
+          .select('id_entity', 'slug', 'name')
+          .where('id_entity', field.id_relation_entity)
+          .first()
+      : null;
 
-        const existingSlug = await this.prisma.field.findUnique({
-            where: {
-                id_entity_slug: {
-                    id_entity: entityId,
-                    slug: dto.slug
-                },
-            },
-        });
+    return { ...field, relation_entity: relationEntity };
+  }
 
-        if (existingSlug) {
-            throw new ConflictException(
-                `Slug-ul "${dto.slug}" este deja folosit in aceasta entitate.`,
-            );
-        }
+  async create(entityId: string, dto: CreateFieldDto) {
+    const entity = await this.ensureEntityExists(entityId);
 
-        if (dto.ui_type === 'relation' && dto.id_relation_entity) {
-            const targetEntity = await this.prisma.entity.findUnique({
-                where: {
-                    id_entity: dto.id_relation_entity
-                },
-            });
-            if (!targetEntity) {
-                throw new NotFoundException(
-                    `Entitatea tinta pentru relatie cu id "${dto.id_relation_entity}" nu exista.`,
-                );
-            }
-        }
+    const existingSlug = await this.knex('field')
+      .where({ id_entity: entityId, slug: dto.slug })
+      .first();
 
-        await this.validateLayoutForCreate(entityId, dto);
-
-        const columnName = `cf_${dto.slug}`;
-        const groupName = dto.group_name ?? 'general';
-
-        const maxRankResult = await this.prisma.field.aggregate({
-            where: {
-                id_entity: entityId,
-                group_name: groupName,
-            },
-            _max: {
-                rank: true,
-            },
-        });
-        const nextRank = (maxRankResult._max.rank ?? 0) + 1;
-
-        const field = await this.prisma.field.create({
-            data: {
-                id_entity: entityId,
-                name: dto.name,
-                slug: dto.slug,
-                column_name: columnName,
-                data_type: dto.data_type,
-                ui_type: dto.ui_type,
-                default_value: dto.default_value ?? null,
-                placeholder: dto.placeholder ?? null,
-                help_text: dto.help_text ?? null,
-                options: dto.options ?? undefined,
-                is_required: dto.is_required ?? false,
-                is_unique: dto.is_unique ?? false,
-                is_filterable: dto.is_filterable ?? false,
-                is_sortable: dto.is_sortable ?? true,
-                visible_in_table: dto.visible_in_table ?? true,
-                visible_in_form: dto.visible_in_form ?? true,
-                is_system: false,
-                validation_rules: dto.validation_rules ?? undefined,
-                id_relation_entity: dto.id_relation_entity ?? null,
-                relation_display_field: dto.relation_display_field ?? null,
-                group_name: groupName,
-                rank: dto.rank ?? nextRank,
-                grid_col: dto.grid_col ?? 1,
-                col_span: dto.col_span ?? 1,
-            },
-        });
-
-        try {
-            await this.dynamicSchema.addColumn(entity, field);
-        } catch (error) {
-            await this.prisma.field.delete({ where: { id_field: field.id_field } });
-            throw error;
-        }
-
-        return field;
+    if (existingSlug) {
+      throw new ConflictException(
+        `Slug-ul "${dto.slug}" este deja folosit in aceasta entitate.`,
+      );
     }
 
-    async update(entityId: string, fieldId: string, dto: UpdateFieldDto) {
-        await this.ensureEntityExists(entityId);
-
-        const field = await this.prisma.field.findFirst({
-            where: {
-                id_field: fieldId,
-                id_entity: entityId,
-            },
-        });
-
-        if (!field){
-            throw new NotFoundException(
-                `Campul cu id "${fieldId}" nu exista in entitatea "${entityId}".`,
-            );
-        }
-
-        await this.validateLayoutForUpdate(entityId, field, dto);
-
-        return this.prisma.field.update({
-            where: {
-                id_field: fieldId,
-            },
-            data: {
-                name: dto.name ?? field.name,
-                ui_type: dto.ui_type ?? field.ui_type,
-                placeholder: dto.placeholder !== undefined ? dto.placeholder : field.placeholder,
-                help_text: dto.help_text !== undefined ? dto.help_text : field.help_text,
-                options: dto.options !== undefined ? dto.options : (field.options ?? Prisma.JsonNull),
-                id_relation_entity: dto.id_relation_entity !== undefined ? dto.id_relation_entity : field.id_relation_entity,
-                relation_display_field: dto.relation_display_field !== undefined ? dto.relation_display_field : field.relation_display_field,
-                is_required: dto.is_required ?? field.is_required,
-                is_unique: dto.is_unique ?? field.is_unique,
-                is_filterable: dto.is_filterable ?? field.is_filterable,
-                is_sortable: dto.is_sortable ?? field.is_sortable,
-                visible_in_table: dto.visible_in_table ?? field.visible_in_table,
-                visible_in_form: dto.visible_in_form ?? field.visible_in_form,
-                validation_rules: dto.validation_rules !== undefined ? dto.validation_rules : (field.validation_rules ?? Prisma.JsonNull),
-                group_name: dto.group_name ?? field.group_name,
-                rank: dto.rank ?? field.rank,
-                grid_col: dto.grid_col ?? field.grid_col,
-                col_span: dto.col_span ?? field.col_span,
-                default_value: dto.default_value !== undefined ? dto.default_value : field.default_value,
-            },
-        });
+    if (dto.ui_type === 'relation' && dto.id_relation_entity) {
+      const targetEntity = await this.knex('entity')
+        .where('id_entity', dto.id_relation_entity)
+        .first();
+      if (!targetEntity) {
+        throw new NotFoundException(
+          `Entitatea tinta pentru relatie cu id "${dto.id_relation_entity}" nu exista.`,
+        );
+      }
     }
 
-    async remove(entityId: string, fieldId: string){
-        const entity = await this.ensureEntityExists(entityId);
+    await this.validateLayoutForCreate(entityId, dto);
 
-        const field = await this.prisma.field.findFirst({
-            where: {
-                id_field: fieldId,
-                id_entity: entityId,
-            },
-        });
+    const columnName = `cf_${dto.slug}`;
+    const groupName = dto.group_name ?? 'general';
 
-        if (!field){
-            throw new NotFoundException(
-                `Campul cu id "${fieldId}" nu exista in entitatea "${entityId}".`,
-            );
-        }
+    const maxRankResult = await this.knex('field')
+      .where({ id_entity: entityId, group_name: groupName })
+      .max('rank as max_rank')
+      .first();
 
-        if (field.is_system) {
-            throw new BadRequestException(
-                `Campul "${field.name}" este un camp de sistem si nu poate fi sters.`,
-            );
-        }
+    const nextRank = ((maxRankResult?.max_rank as number) ?? 0) + 1;
 
-        await this.dynamicSchema.removeColumn(entity, field);
+    const [field] = await this.knex('field')
+      .insert({
+        id_entity: entityId,
+        name: dto.name,
+        slug: dto.slug,
+        column_name: columnName,
+        data_type: dto.data_type,
+        ui_type: dto.ui_type,
+        default_value: dto.default_value ?? null,
+        placeholder: dto.placeholder ?? null,
+        help_text: dto.help_text ?? null,
+        options: dto.options ? JSON.stringify(dto.options) : null,
+        is_required: dto.is_required ?? false,
+        is_unique: dto.is_unique ?? false,
+        is_filterable: dto.is_filterable ?? false,
+        is_sortable: dto.is_sortable ?? true,
+        visible_in_table: dto.visible_in_table ?? true,
+        visible_in_form: dto.visible_in_form ?? true,
+        is_system: false,
+        validation_rules: dto.validation_rules ? JSON.stringify(dto.validation_rules) : null,
+        id_relation_entity: dto.id_relation_entity ?? null,
+        relation_display_field: dto.relation_display_field ?? null,
+        group_name: groupName,
+        rank: dto.rank ?? nextRank,
+        grid_col: dto.grid_col ?? 1,
+        col_span: dto.col_span ?? 1,
+      })
+      .returning('*');
 
-        await this.prisma.field.delete({
-            where: {
-                id_field: fieldId
-            },
-        });
-
-        return {
-            message: `Campul "${field.name}" a fost sters.`
-        };
+    try {
+      await this.dynamicSchema.addColumn(entity, field);
+    } catch (error) {
+      await this.knex('field').where('id_field', field.id_field).del();
+      throw error;
     }
 
-    private async ensureEntityExists(entityId: string) {
-        const entity = await this.prisma.entity.findUnique({
-            where: { id_entity: entityId },
-        });
-        if (!entity) {
-            throw new NotFoundException(`Entitatea cu id "${entityId}" nu exista.`);
-        }
-        return entity;
+    return field;
+  }
+
+  async update(entityId: string, fieldId: string, dto: UpdateFieldDto) {
+    await this.ensureEntityExists(entityId);
+
+    const field = await this.knex('field')
+      .where({ id_field: fieldId, id_entity: entityId })
+      .first();
+
+    if (!field) {
+      throw new NotFoundException(
+        `Campul cu id "${fieldId}" nu exista in entitatea "${entityId}".`,
+      );
     }
 
-    private async validateLayoutForCreate(entityId: string, dto: CreateFieldDto) {
-        const groupName = dto.group_name ?? 'general';
+    await this.validateLayoutForUpdate(entityId, field, dto);
 
-        const existingFields = await this.getGroupLayoutFields(entityId, groupName);
+    const updateData: Record<string, any> = {
+      name: dto.name ?? field.name,
+      ui_type: dto.ui_type ?? field.ui_type,
+      placeholder: dto.placeholder !== undefined ? dto.placeholder : field.placeholder,
+      help_text: dto.help_text !== undefined ? dto.help_text : field.help_text,
+      id_relation_entity: dto.id_relation_entity !== undefined ? dto.id_relation_entity : field.id_relation_entity,
+      relation_display_field: dto.relation_display_field !== undefined ? dto.relation_display_field : field.relation_display_field,
+      is_required: dto.is_required ?? field.is_required,
+      is_unique: dto.is_unique ?? field.is_unique,
+      is_filterable: dto.is_filterable ?? field.is_filterable,
+      is_sortable: dto.is_sortable ?? field.is_sortable,
+      visible_in_table: dto.visible_in_table ?? field.visible_in_table,
+      visible_in_form: dto.visible_in_form ?? field.visible_in_form,
+      group_name: dto.group_name ?? field.group_name,
+      rank: dto.rank ?? field.rank,
+      grid_col: dto.grid_col ?? field.grid_col,
+      col_span: dto.col_span ?? field.col_span,
+      default_value: dto.default_value !== undefined ? dto.default_value : field.default_value,
+      date_updated: new Date(),
+    };
 
-        validateGroupFieldLayout([
-            ...existingFields,
-            {
-                id_field: `new:${dto.slug}`,
-                name: dto.name,
-                slug: dto.slug,
-                group_name: groupName,
-                rank: dto.rank ?? 1,
-                grid_col: dto.grid_col ?? 1,
-                col_span: dto.col_span ?? 1,
-            },
-        ]);
+    if (dto.options !== undefined) {
+      updateData.options = dto.options ? JSON.stringify(dto.options) : null;
+    } else {
+      updateData.options = field.options;
     }
 
-    private async validateLayoutForUpdate(entityId: string, field: {
-        id_field: string;
-        name: string;
-        slug: string;
-        group_name: string;
-        rank: number;
-        grid_col: number;
-        col_span: number;
-    }, dto: UpdateFieldDto) {
-        const groupName = dto.group_name ?? field.group_name ?? 'general';
-
-        const existingFields = await this.getGroupLayoutFields(entityId, groupName, field.id_field);
-
-        validateGroupFieldLayout([
-            ...existingFields,
-            {
-                id_field: field.id_field,
-                name: dto.name ?? field.name,
-                slug: field.slug,
-                group_name: groupName,
-                rank: dto.rank ?? field.rank,
-                grid_col: dto.grid_col ?? field.grid_col,
-                col_span: dto.col_span ?? field.col_span,
-            },
-        ]);
+    if (dto.validation_rules !== undefined) {
+      updateData.validation_rules = dto.validation_rules ? JSON.stringify(dto.validation_rules) : null;
+    } else {
+      updateData.validation_rules = field.validation_rules;
     }
 
-    private async getGroupLayoutFields(entityId: string, groupName: string, excludeFieldId?: string) {
-        return this.prisma.field.findMany({
-            where: {
-                id_entity: entityId,
-                group_name: groupName,
-                ...(excludeFieldId
-                    ? {
-                        NOT: {
-                            id_field: excludeFieldId,
-                        },
-                    }
-                    : {}),
-            },
-            select: {
-                id_field: true,
-                name: true,
-                slug: true,
-                group_name: true,
-                rank: true,
-                grid_col: true,
-                col_span: true,
-            },
-        });
+    const [updated] = await this.knex('field')
+      .where('id_field', fieldId)
+      .update(updateData)
+      .returning('*');
+
+    return updated;
+  }
+
+  async remove(entityId: string, fieldId: string) {
+    const entity = await this.ensureEntityExists(entityId);
+
+    const field = await this.knex('field')
+      .where({ id_field: fieldId, id_entity: entityId })
+      .first();
+
+    if (!field) {
+      throw new NotFoundException(
+        `Campul cu id "${fieldId}" nu exista in entitatea "${entityId}".`,
+      );
     }
+
+    if (field.is_system) {
+      throw new BadRequestException(
+        `Campul "${field.name}" este un camp de sistem si nu poate fi sters.`,
+      );
+    }
+
+    await this.dynamicSchema.removeColumn(entity, field);
+
+    await this.knex('field').where('id_field', fieldId).del();
+
+    return { message: `Campul "${field.name}" a fost sters.` };
+  }
+
+  private async ensureEntityExists(entityId: string) {
+    const entity = await this.knex('entity').where('id_entity', entityId).first();
+    if (!entity) {
+      throw new NotFoundException(`Entitatea cu id "${entityId}" nu exista.`);
+    }
+    return entity;
+  }
+
+  private async validateLayoutForCreate(entityId: string, dto: CreateFieldDto) {
+    const groupName = dto.group_name ?? 'general';
+    const existingFields = await this.getGroupLayoutFields(entityId, groupName);
+
+    validateGroupFieldLayout([
+      ...existingFields,
+      {
+        id_field: `new:${dto.slug}`,
+        name: dto.name,
+        slug: dto.slug,
+        group_name: groupName,
+        rank: dto.rank ?? 1,
+        grid_col: dto.grid_col ?? 1,
+        col_span: dto.col_span ?? 1,
+      },
+    ]);
+  }
+
+  private async validateLayoutForUpdate(
+    entityId: string,
+    field: Record<string, any>,
+    dto: UpdateFieldDto,
+  ) {
+    const groupName = dto.group_name ?? field.group_name ?? 'general';
+    const existingFields = await this.getGroupLayoutFields(entityId, groupName, field.id_field);
+
+    validateGroupFieldLayout([
+      ...existingFields,
+      {
+        id_field: field.id_field,
+        name: dto.name ?? field.name,
+        slug: field.slug,
+        group_name: groupName,
+        rank: dto.rank ?? field.rank,
+        grid_col: dto.grid_col ?? field.grid_col,
+        col_span: dto.col_span ?? field.col_span,
+      },
+    ]);
+  }
+
+  private async getGroupLayoutFields(entityId: string, groupName: string, excludeFieldId?: string) {
+    let query = this.knex('field')
+      .select('id_field', 'name', 'slug', 'group_name', 'rank', 'grid_col', 'col_span')
+      .where({ id_entity: entityId, group_name: groupName });
+
+    if (excludeFieldId) {
+      query = query.whereNot('id_field', excludeFieldId);
+    }
+
+    return query;
+  }
 }

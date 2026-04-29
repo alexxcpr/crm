@@ -4,15 +4,15 @@ services:
     container_name: crm-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: crm_user
+      POSTGRES_USER: base_user
       POSTGRES_PASSWORD: 1234
-      POSTGRES_DB: crm_db
+      POSTGRES_DB: devdb
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - crm_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U crm_user -d crm_db"]
+      test: ["CMD-SHELL", "pg_isready -U base_user -d devdb"]
       interval: 5s
       timeout: 5s
       retries: 10

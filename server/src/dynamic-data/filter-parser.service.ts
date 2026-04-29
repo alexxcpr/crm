@@ -1,84 +1,84 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import { Knex } from 'knex';
-import { FieldWithRelation } from "./dynamic-data.service";
+import { FieldWithRelation } from 'src/types/entities';
 
 export interface ParsedFilter {
-    column: string;
-    operator: string;
-    value: any;
+  column: string;
+  operator: string;
+  value: any;
 }
 
 @Injectable()
 export class FilterParserService {
-    
-    parse(query: Record<string, any>, fields: FieldWithRelation[], tableName?: string): ParsedFilter[] {
-        const filters: ParsedFilter[] = [];
-        const filterObj = query.filter;
-        if (!filterObj || typeof filterObj !== 'object') return filters;
 
-        const allowedColumns = new Set([
-            ...fields.filter(f => f.is_filterable).map(f => f.slug),
-            ...fields.filter(f => f.is_filterable).map(f => f.column_name),
-            'id', 'date_created', 'date_updated',
-        ]);
+  parse(query: Record<string, any>, fields: FieldWithRelation[], tableName?: string): ParsedFilter[] {
+    const filters: ParsedFilter[] = [];
+    const filterObj = query.filter;
+    if (!filterObj || typeof filterObj !== 'object') return filters;
 
-        for (const key of Object.keys(filterObj)) {
-            if (!allowedColumns.has(key)) continue;
+    const allowedColumns = new Set([
+      ...fields.filter(f => f.is_filterable).map(f => f.slug),
+      ...fields.filter(f => f.is_filterable).map(f => f.column_name),
+      'id', 'date_created', 'date_updated',
+    ]);
 
-            //Gaseste column_name real
-            const field = fields.find(f => f.slug === key || f.column_name === key);
-            let column = field ? field.column_name : key;
-            if (tableName) {
-                column = `${tableName}.${column}`;
-            }
+    for (const key of Object.keys(filterObj)) {
+      if (!allowedColumns.has(key)) continue;
 
-            const val = filterObj[key];
+      //Gaseste column_name real
+      const field = fields.find(f => f.slug === key || f.column_name === key);
+      let column = field ? field.column_name : key;
+      if (tableName) {
+          column = `${tableName}.${column}`;
+      }
 
-            if (typeof val === 'object' && val !== null) {
-                // ?filter[name][contains]=Alex
-                for (const op of Object.keys(val)) {
-                    filters.push({ column, operator: op, value: val[op] });
-                }
-            }
-            else {
-                // ?filter[name]=Alex (equality)
-                filters.push({ column, operator: 'eq', value: val });
-            }
-        }
+      const val = filterObj[key];
 
-        return filters;
+      if (typeof val === 'object' && val !== null) {
+          // ?filter[name][contains]=Alex
+          for (const op of Object.keys(val)) {
+              filters.push({ column, operator: op, value: val[op] });
+          }
+      }
+      else {
+          // ?filter[name]=Alex (equality)
+          filters.push({ column, operator: 'eq', value: val });
+      }
     }
 
-    apply<T extends Knex.QueryBuilder>(query: T, filter: ParsedFilter): T {
-        const { column, operator, value } = filter;
+    return filters;
+  }
 
-        switch (operator) {
-            case 'eq':
-                return query.where(column, value) as T;
-            case 'contains':
-                return query.whereILike(column, `%${value}%`) as T;
-            case 'starts_with':
-                return query.whereILike(column, `${value}%`) as T;
-            case 'gt':
-                return query.where(column, '>', value) as T;
-            case 'gte':
-                return query.where(column, '>=', value) as T;
-            case 'lt':
-                return query.where(column, '<', value) as T;
-            case 'lte':
-                return query.where(column, '<=', value) as T;
-            case 'in':
-                return query.whereIn(column, String(value).split(',')) as T;
-            case 'is_null':
-                return value === 'true'
-                    ? query.whereNull(column) as T
-                    : query.whereNotNull(column) as T;
-            case 'between': {
-                const [min, max] = String(value).split(',');
-                return query.whereBetween(column, [min, max]) as T;
-            }
-            default:
-                return query;
-        }
+  apply<T extends Knex.QueryBuilder>(query: T, filter: ParsedFilter): T {
+    const { column, operator, value } = filter;
+
+    switch (operator) {
+      case 'eq':
+        return query.where(column, value) as T;
+      case 'contains':
+        return query.whereILike(column, `%${value}%`) as T;
+      case 'starts_with':
+        return query.whereILike(column, `${value}%`) as T;
+      case 'gt':
+        return query.where(column, '>', value) as T;
+      case 'gte':
+        return query.where(column, '>=', value) as T;
+      case 'lt':
+        return query.where(column, '<', value) as T;
+      case 'lte':
+        return query.where(column, '<=', value) as T;
+      case 'in':
+        return query.whereIn(column, String(value).split(',')) as T;
+      case 'is_null':
+        return value === 'true'
+          ? query.whereNull(column) as T
+          : query.whereNotNull(column) as T;
+      case 'between': {
+        const [min, max] = String(value).split(',');
+        return query.whereBetween(column, [min, max]) as T;
+      }
+      default:
+        return query;
     }
+  }
 }

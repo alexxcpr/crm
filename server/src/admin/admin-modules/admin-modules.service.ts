@@ -1,158 +1,120 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { TenantContext } from 'src/tenant/tenant-context.service';
 import { ModuleDto } from '../dto/module.dto';
 
 @Injectable()
 export class AdminModulesService {
-    constructor(private readonly prisma:PrismaService){}
+  constructor(private readonly tenantContext: TenantContext) {}
 
-    async findAll() {
-        return this.prisma.module.findMany({
-            orderBy: {
-                rank: 'asc'
-            },
-            include: {
-                entities: {
-                    orderBy: { rank: 'asc' },
-                    select: {
-                        id_entity: true,
-                        name: true,
-                        slug: true,
-                        icon: true,
-                        label_plural: true,
-                        rank: true,
-                    },
-                },
-                _count: {
-                    select: {
-                        entities: true
-                    }
-                },
-            },
-        });
+  private get knex() { return this.tenantContext.knex; }
+
+  async findAll() {
+    const modules = await this.knex('module')
+      .select('*')
+      .orderBy('rank', 'asc');
+
+    const result: any[] = [];
+    for (const mod of modules) {
+      const entities = await this.knex('entity')
+        .select('id_entity', 'name', 'slug', 'icon', 'label_plural', 'rank')
+        .where('id_module', mod.id_module)
+        .orderBy('rank', 'asc');
+
+      const [{ count }] = await this.knex('entity')
+        .where('id_module', mod.id_module)
+        .count('* as count');
+
+      result.push({
+        ...mod,
+        entities,
+        _count: { entities: Number(count) },
+      });
     }
 
-    async findOne(id: string) {
-        const mod = await this.prisma.module.findUnique({
-            where: {
-                id_module: id
-            },
-            include: {
-                entities: {
-                    orderBy: {
-                        rank: 'asc'
-                    },
-                    select: {
-                        id_entity: true,
-                        name: true,
-                        slug: true,
-                        icon: true,
-                        is_system: true,
-                        rank: true,
-                    },
-                },
-            },
-        });
+    return result;
+  }
 
-        if (!mod) {
-            throw new NotFoundException(`Modului cu id "${id}" nu exista.`);
-        }
-
-        return mod;
+  async findOne(id: string) {
+    const mod = await this.knex('module').where('id_module', id).first();
+    if (!mod) {
+      throw new NotFoundException(`Modului cu id "${id}" nu exista.`);
     }
 
-    async create(dto: ModuleDto) {
-        const existing = await this.prisma.module.findUnique({
-            where: {
-                slug: dto.slug,
-            }
-        });
+    const entities = await this.knex('entity')
+      .select('id_entity', 'name', 'slug', 'icon', 'is_system', 'rank')
+      .where('id_module', id)
+      .orderBy('rank', 'asc');
 
-        if (existing){
-            throw new ConflictException(`Slug-ul "${dto.slug}" este deja folosit.`);
-        }
+    return { ...mod, entities };
+  }
 
-        return this.prisma.module.create({
-            data: {
-                name: dto.name,
-                slug: dto.slug,
-                icon: dto.icon ?? null,
-                rank: dto.rank ?? 0,
-                is_active: dto.is_active ?? true,
-            },
-        });
+  async create(dto: ModuleDto) {
+    const existing = await this.knex('module').where('slug', dto.slug).first();
+    if (existing) {
+      throw new ConflictException(`Slug-ul "${dto.slug}" este deja folosit.`);
     }
 
-    async update(id: string, dto: ModuleDto) {
-        const mod = await this.prisma.module.findUnique({
-            where: {
-                id_module: id
-            },
-        });
+    const [mod] = await this.knex('module')
+      .insert({
+        name: dto.name,
+        slug: dto.slug,
+        icon: dto.icon ?? null,
+        rank: dto.rank ?? 0,
+        is_active: dto.is_active ?? true,
+      })
+      .returning('*');
 
-        if (!mod) {
-            throw new NotFoundException(`Modulul cu id "${id}" nu exista.`);
-        }
+    return mod;
+  }
 
-        const slugConflict = await this.prisma.module.findFirst({
-            where: {
-                slug: dto.slug,
-                id_module: {
-                    not: id
-                },
-            },
-        });
-
-        if (slugConflict) {
-            throw new ConflictException(`Slug-ul "${dto.slug}" este deja folosit de alt modul.`);
-        }
-
-        return this.prisma.module.update({
-            where: {
-                id_module: id
-            },
-            data: {
-                name: dto.name,
-                slug: dto.slug,
-                icon: dto.icon ?? null,
-                rank: dto.rank ?? 0,
-                is_active: dto.is_active ?? true,
-            },
-        });
+  async update(id: string, dto: ModuleDto) {
+    const mod = await this.knex('module').where('id_module', id).first();
+    if (!mod) {
+      throw new NotFoundException(`Modulul cu id "${id}" nu exista.`);
     }
 
-    async remove(id: string) {
-        const mod = await this.prisma.module.findUnique({
-            where: {
-                id_module: id
-            },
-            include: {
-                _count: {
-                    select: {
-                        entities: true
-                    }
-                },
-            },
-        });
+    const slugConflict = await this.knex('module')
+      .where('slug', dto.slug)
+      .whereNot('id_module', id)
+      .first();
 
-        if (!mod) {
-            throw new NotFoundException(`Modulul cu id "${id}" nu exista.`);
-        }
-
-        if (mod._count.entities > 0){
-            throw new BadRequestException(
-                `Modulul "${mod.name}" contine ${mod._count.entities} entitati. Muta sau sterge entitatile inainte.`,
-            );
-        }
-
-        await this.prisma.module.delete({
-            where: {
-                id_module: id
-            }
-        });
-
-        return {
-            message: `Modulul "${mod.name}" a fost sters.`
-        };
+    if (slugConflict) {
+      throw new ConflictException(`Slug-ul "${dto.slug}" este deja folosit de alt modul.`);
     }
+
+    const [updated] = await this.knex('module')
+      .where('id_module', id)
+      .update({
+        name: dto.name,
+        slug: dto.slug,
+        icon: dto.icon ?? null,
+        rank: dto.rank ?? 0,
+        is_active: dto.is_active ?? true,
+        date_updated: new Date(),
+      })
+      .returning('*');
+
+    return updated;
+  }
+
+  async remove(id: string) {
+    const mod = await this.knex('module').where('id_module', id).first();
+    if (!mod) {
+      throw new NotFoundException(`Modulul cu id "${id}" nu exista.`);
+    }
+
+    const [{ count }] = await this.knex('entity')
+      .where('id_module', id)
+      .count('* as count');
+
+    if (Number(count) > 0) {
+      throw new BadRequestException(
+        `Modulul "${mod.name}" contine ${count} entitati. Muta sau sterge entitatile inainte.`,
+      );
+    }
+
+    await this.knex('module').where('id_module', id).del();
+
+    return { message: `Modulul "${mod.name}" a fost sters.` };
+  }
 }

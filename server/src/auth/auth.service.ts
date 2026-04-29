@@ -1,83 +1,57 @@
-import { ForbiddenException, Injectable } from "@nestjs/common";
-import { AuthDto } from "./dto";
-import { PrismaService } from "src/prisma/prisma.service";
-import * as argon from 'argon2'
-import { Prisma } from "@prisma/client";
-import { JwtService } from "@nestjs/jwt";
+import { ForbiddenException, Injectable } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import * as argon from 'argon2';
+import { TenantContext } from 'src/tenant/tenant-context.service';
+import { AuthDto } from './dto';
 
-@Injectable ()
+@Injectable()
 export class AuthService {
-    constructor (
-        private prisma: PrismaService,
-        private jwt: JwtService
-    ) {}
+  constructor(
+    private readonly tenantContext: TenantContext,
+    private readonly jwt: JwtService,
+  ) {}
 
-    async signup (dto: AuthDto) {
-        //generate the password hash
-        const hash = await argon.hash(dto.password);
-        
-        //save the new user in the db
-        try {
-            const user = await this.prisma.user.create({
-                data:{
-                    email: dto.email,
-                    hash: hash,
-                }
-            })
-    
-            // const { hash: _, ...userWithoutHash } = user;
-            // // return the saved user
-            // return userWithoutHash;
-            //return the token
-            return this.signToken(user.id, user.email);
-        }
-        catch (error){
-            if (error instanceof Prisma.PrismaClientKnownRequestError) {
-                if (error.code === 'P2002'){
-                    throw new ForbiddenException('Credentials taken (It already exists a user with these credentials)')
-                }
-            }
-            throw error;
-        }
-    }
-    
-    async signin (dto: AuthDto) {
-        //primeste email si parola (parametru)
-        //cautam userul dupa email
-        const user = await this.prisma.user.findUnique({
-            where: {
-                email: dto.email,
-            },
-        });
-            
-        //verificam daca exista un user cu acelasi email
-        if (!user){
-            throw new ForbiddenException('Credentials incorrect');
-        }
+  async signup(dto: AuthDto) {
+    const knex = this.tenantContext.knex;
+    const hash = await argon.hash(dto.password);
 
-        //verificam match parola        
-        const pwMatches = await argon.verify(user.hash, dto.password);
-        if (!pwMatches){
-            throw new ForbiddenException('Credentials incorrect');
-        }
-        
-        // //excludem hash-ul si returnam userul
-        // const { hash: _, ...userWithoutHash } = user;
-        //     // return the saved user
-        //     return userWithoutHash;
-        return this.signToken(user.id, user.email);
+    const existing = await knex('user').where('email', dto.email).first();
+    if (existing) {
+      throw new ForbiddenException('Credentials taken (It already exists a user with these credentials)');
     }
 
-    private async signToken (userId: string, email: string): Promise<{ accessToken: string }> {
-        const payload = {
-            sub: userId,
-            email: email,
-        };
+    const [user] = await knex('user')
+      .insert({ email: dto.email, hash })
+      .returning(['id', 'email']);
 
-        const token = await this.jwt.signAsync(payload);
+    return this.signToken(user.id, user.email);
+  }
 
-        return {
-            accessToken: token,
-        };
+  async signin(dto: AuthDto) {
+    const knex = this.tenantContext.knex;
+
+    const user = await knex('user').where('email', dto.email).first();
+    if (!user) {
+      throw new ForbiddenException('Credentials incorrect');
     }
+
+    const pwMatches = await argon.verify(user.hash, dto.password);
+    if (!pwMatches) {
+      throw new ForbiddenException('Credentials incorrect');
+    }
+
+    return this.signToken(user.id, user.email);
+  }
+
+  private async signToken(userId: string, email: string): Promise<{ accessToken: string }> {
+    const payload = {
+      sub: userId,
+      email,
+      tenant: this.tenantContext.slug,
+      dbName: this.tenantContext.dbName,
+    };
+
+    const token = await this.jwt.signAsync(payload);
+    return { accessToken: token };
+  }
 }
