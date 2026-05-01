@@ -1,9 +1,7 @@
-import { defineNitroConfig } from 'nitropack/config'
-
-export default defineNitroConfig({
+export default {
   routeRules: {
     '/api/**': {
       cors: true
     }
   }
-})
+}

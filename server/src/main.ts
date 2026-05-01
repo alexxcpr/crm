@@ -4,6 +4,23 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { GlobalExceptionFilter } from './filters/http-exception.filter';
 
+function isAllowedOrigin(origin?: string): boolean {
+  if (!origin) {
+    return true;
+  }
+
+  if (origin === process.env.FRONTEND_URL) {
+    return true;
+  }
+
+  try {
+    const url = new URL(origin);
+    return url.protocol === 'https:' && url.hostname.endsWith('.stanciulescu.xyz');
+  } catch {
+    return false;
+  }
+}
+
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
@@ -21,7 +38,9 @@ async function bootstrap() {
 
   //CORS
   app.enableCors({
-    origin: process.env.FRONTEND_URL,
+    origin: (origin, callback) => {
+      callback(null, isAllowedOrigin(origin));
+    },
     credentials: true
   })
   

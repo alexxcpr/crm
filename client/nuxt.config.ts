@@ -16,6 +16,7 @@ export default defineNuxtConfig({
 
   auth: {
     isEnabled: true,
+    baseURL: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:4000/api',
     globalAppMiddleware: true,
     provider: {
       type: 'local',
@@ -30,7 +31,11 @@ export default defineNuxtConfig({
         signInResponseTokenPointer: '/accessToken',
         type: 'Bearer',
         headerName: 'Authorization',
-        maxAgeInSeconds: 1800
+        cookieName: 'auth.token',
+        maxAgeInSeconds: 1800,
+        sameSiteAttribute: 'lax',
+        secureCookieAttribute: false,
+        httpOnlyCookieAttribute: false
       },
     },
     sessionRefresh: {
