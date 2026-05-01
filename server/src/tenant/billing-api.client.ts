@@ -14,7 +14,7 @@ export class BillingApiClient {
 
   constructor(private readonly config: ConfigService) {
     this.defaultSlug = config.get<string>('DEFAULT_TENANT_SLUG', 'dev');
-    this.defaultDbName = config.get<string>('DEFAULT_TENANT_DB', 'crm_devdb');
+    this.defaultDbName = config.get<string>('DEFAULT_TENANT_DB', 'devdb');
   }
 
   async getCompanyBySlug(slug: string): Promise<TenantInfo | null> {
