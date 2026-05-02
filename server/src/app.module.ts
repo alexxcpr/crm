@@ -9,6 +9,7 @@ import { DynamicDataModule } from './dynamic-data/dynamic-data.module';
 import { SchemaModule } from './schema/schema.module';
 import { AdminModule } from './admin/admin.module';
 import { EventsModule } from './events/events.module';
+import { ActionsModule } from './actions/actions.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { EventsModule } from './events/events.module';
     DynamicDataModule,
     SchemaModule,
     AdminModule,
+    ActionsModule,
   ],
 })
 export class AppModule {}
