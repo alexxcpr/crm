@@ -4,6 +4,8 @@ import { Entity, FieldWithRelation } from 'src/types/entities';
 import { FilterParserService } from './filter-parser.service';
 import { DynamicValidationService } from './dynamic-validation.service';
 import { PaginatedResponse } from './dto/query.dto';
+import { EntityEventsService } from 'src/events/entity-events.service';
+import { EntityEvent } from 'src/events/entity-event.enum';
 
 @Injectable()
 export class DynamicDataService {
@@ -13,6 +15,7 @@ export class DynamicDataService {
     private readonly tenantContext: TenantContext,
     private readonly filterParser: FilterParserService,
     private readonly validation: DynamicValidationService,
+    private readonly entityEvents: EntityEventsService,
   ) {}
 
   private get knex() { return this.tenantContext.knex; }
@@ -201,23 +204,40 @@ export class DynamicDataService {
             insertData.id_owner = userId;
         }
 
+        const eventCtx = {
+          entitySlug,
+          tableName: entity.table_name,
+          entityId: entity.id_entity,
+          recordId: null,
+          data: insertData,
+          userId: userId ?? null,
+        };
+
+        await this.entityEvents.emit(EntityEvent.BeforeInsert, eventCtx);
+
         const [record] = await this.knex(entity.table_name)
           .insert(insertData)
           .returning('*');
+
+        await this.entityEvents.emit(EntityEvent.AfterInsert, {
+          ...eventCtx,
+          recordId: record.id,
+          data: record,
+        });
 
         return { data: record };
   }
 
     // ─── PUT update record ───
-    async update(entitySlug: string, id: string, body: Record<string, any>) {
+    async update(entitySlug: string, id: string, body: Record<string, any>, userId?: string) {
         const { entity, fields } = await this.resolveEntity(entitySlug);
 
         // Verifica ca exista
-        const exists = await this.knex(entity.table_name)
+        const existing = await this.knex(entity.table_name)
             .where('id', id)
             .first();
 
-        if (!exists) {
+        if (!existing) {
             throw new NotFoundException(`Inregistrarea cu id "${id}" nu a fost gasita in "${entitySlug}".`);
         }
 
@@ -225,6 +245,18 @@ export class DynamicDataService {
         const sanitized = await this.validation.validateAndSanitize(
             body, fields, entity.table_name, 'update', id
         );
+
+        const eventCtx = {
+          entitySlug,
+          tableName: entity.table_name,
+          entityId: entity.id_entity,
+          recordId: id,
+          data: sanitized,
+          previousData: existing,
+          userId: userId ?? null,
+        };
+
+        await this.entityEvents.emit(EntityEvent.BeforeUpdate, eventCtx);
 
         const [record] = await this.knex(entity.table_name)
             .where('id', id)
@@ -234,19 +266,42 @@ export class DynamicDataService {
             })
             .returning('*');
 
+        await this.entityEvents.emit(EntityEvent.AfterUpdate, {
+          ...eventCtx,
+          data: record,
+        });
+
     return { data: record };
   }
 
     // ─── DELETE sterge record ───
-    async remove(entitySlug: string, id: string) {
+    async remove(entitySlug: string, id: string, userId?: string) {
         const { entity } = await this.resolveEntity(entitySlug);
 
-        const deleted = await this.knex(entity.table_name)
+        const existing = await this.knex(entity.table_name)
+            .where('id', id)
+            .first();
+
+        if (!existing) {
+            throw new NotFoundException(`Inregistrarea cu id "${id}" nu a fost gasita in "${entitySlug}".`);
+        }
+
+        const eventCtx = {
+          entitySlug,
+          tableName: entity.table_name,
+          entityId: entity.id_entity,
+          recordId: id,
+          data: existing,
+          previousData: existing,
+          userId: userId ?? null,
+        };
+
+        await this.entityEvents.emit(EntityEvent.BeforeDelete, eventCtx);
+
+        await this.knex(entity.table_name)
             .where('id', id)
             .del();
 
-        if (deleted === 0) {
-            throw new NotFoundException(`Inregistrarea cu id "${id}" nu a fost gasita in "${entitySlug}".`);
-        }
+        await this.entityEvents.emit(EntityEvent.AfterDelete, eventCtx);
     }
 }

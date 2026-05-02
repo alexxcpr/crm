@@ -44,8 +44,9 @@ export class DynamicDataController {
         @Param('entitySlug') entitySlug: string,
         @Param('id') id: string,
         @Body() body: Record<string, any>,
+        @Req() req: RequestWithUser,
     ) {
-        const result = await this.dataService.update(entitySlug, id, body);
+        const result = await this.dataService.update(entitySlug, id, body, req.user.id);
         return returnValidResponse('Inregistrarea a fost actualizata cu succes.', result.data);
     }
 
@@ -53,8 +54,9 @@ export class DynamicDataController {
     async remove(
         @Param('entitySlug') entitySlug: string,
         @Param('id') id: string,
+        @Req() req: RequestWithUser,
     ) {
-        await this.dataService.remove(entitySlug, id);
+        await this.dataService.remove(entitySlug, id, req.user.id);
         return returnValidResponse('Inregistrarea a fost stearsa cu succes.', null);
     }
 }

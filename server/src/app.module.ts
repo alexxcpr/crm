@@ -8,10 +8,12 @@ import { DynamicSchemaModule } from './dynamic-schema/dynamic-schema.module';
 import { DynamicDataModule } from './dynamic-data/dynamic-data.module';
 import { SchemaModule } from './schema/schema.module';
 import { AdminModule } from './admin/admin.module';
+import { EventsModule } from './events/events.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    EventsModule,
     TenantModule,
     AuthModule,
     UserModule,
