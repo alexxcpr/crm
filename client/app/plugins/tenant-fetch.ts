@@ -10,7 +10,7 @@ export default defineNuxtPlugin(() => {
   globalThis.$fetch = $fetch.create({
     onRequest({ options, request }) {
       const url = typeof request === 'string' ? request : request?.url ?? ''
-      const isApiCall = url.startsWith(apiBase) || url.startsWith('/') 
+      const isApiCall = url.startsWith(apiBase) || url.startsWith('/')
 
       if (isApiCall && slug.value) {
         const headers = options.headers ??= new Headers()

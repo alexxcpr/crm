@@ -69,7 +69,7 @@ const state = reactive({
   placeholder: props.field?.placeholder ?? '',
   help_text: props.field?.help_text ?? '',
   default_value: props.field?.default_value ?? '',
-  options: props.field?.options ?? [] as { label: string; value: string }[],
+  options: props.field?.options ?? [] as { label: string, value: string }[],
   id_relation_entity: props.field?.id_relation_entity ?? '',
   relation_display_field: props.field?.relation_display_field ?? '',
   is_required: props.field?.is_required ?? false,
@@ -179,7 +179,7 @@ const formSchema = z.object({
     .regex(/^[a-z][a-z0-9_]{1,50}$/, 'Doar litere mici, cifre si _ (incepe cu litera)'),
   rank: z.coerce.number().int().min(1, 'Ordinea trebuie sa fie cel putin 1'),
   grid_col: z.coerce.number().int().min(1, 'Coloana grid trebuie sa fie intre 1 si 3').max(3, 'Coloana grid trebuie sa fie intre 1 si 3'),
-  col_span: z.coerce.number().int().min(1, 'Col span trebuie sa fie intre 1 si 3').max(3, 'Col span trebuie sa fie intre 1 si 3'),
+  col_span: z.coerce.number().int().min(1, 'Col span trebuie sa fie intre 1 si 3').max(3, 'Col span trebuie sa fie intre 1 si 3')
 }).superRefine((data, context) => {
   const endCol = data.grid_col + data.col_span - 1
 
@@ -240,7 +240,7 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
         col_span: state.col_span
       }
       result = await updateField(props.field.id_field, payload)
-    }
+    } 
     else {
       const payload: FieldPayload = {
         name: state.name,
@@ -274,7 +274,7 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
         color: 'success'
       })
       emit('saved', result)
-    }
+    } 
     else {
       toast.add({
         title: 'Eroare',
@@ -282,7 +282,7 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
         color: 'error'
       })
     }
-  }
+  } 
   finally {
     submitting.value = false
   }
@@ -290,10 +290,17 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
 </script>
 
 <template>
-  <UForm :schema="formSchema" :state="state" class="space-y-6" @submit="onSubmit">
+  <UForm
+    :schema="formSchema"
+    :state="state"
+    class="space-y-6"
+    @submit="onSubmit"
+  >
     <!-- Section 1: Identification -->
     <div class="space-y-4">
-      <h4 class="text-sm font-semibold text-muted uppercase tracking-wider">Identificare</h4>
+      <h4 class="text-sm font-semibold text-muted uppercase tracking-wider">
+        Identificare
+      </h4>
 
       <UFormField label="Nume" name="name" required>
         <UInput v-model="state.name" placeholder="ex: Industrie" class="w-full" />
@@ -337,7 +344,9 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
 
     <!-- Section 2: UI Config -->
     <div class="space-y-4">
-      <h4 class="text-sm font-semibold text-muted uppercase tracking-wider">Configurare UI</h4>
+      <h4 class="text-sm font-semibold text-muted uppercase tracking-wider">
+        Configurare UI
+      </h4>
 
       <UFormField label="Placeholder" name="placeholder">
         <UInput v-model="state.placeholder" placeholder="Text afisat cand campul e gol" class="w-full" />
@@ -355,7 +364,9 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
     <!-- Section 2b: Options editor -->
     <div v-if="showOptionsEditor" class="space-y-4">
       <USeparator />
-      <h4 class="text-sm font-semibold text-muted uppercase tracking-wider">Optiuni</h4>
+      <h4 class="text-sm font-semibold text-muted uppercase tracking-wider">
+        Optiuni
+      </h4>
 
       <div
         v-for="(opt, idx) in state.options"
@@ -395,7 +406,9 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
     <!-- Section 3: Relation -->
     <div v-if="showRelationFields" class="space-y-4">
       <USeparator />
-      <h4 class="text-sm font-semibold text-muted uppercase tracking-wider">Relatie</h4>
+      <h4 class="text-sm font-semibold text-muted uppercase tracking-wider">
+        Relatie
+      </h4>
 
       <UFormField label="Entitate tinta" name="id_relation_entity" required>
         <USelect
@@ -407,7 +420,12 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
         />
       </UFormField>
 
-      <UFormField label="Camp de afisat" name="relation_display_field" required description="Slug-ul campului din entitatea tinta (ex: name)">
+      <UFormField
+        label="Camp de afisat"
+        name="relation_display_field"
+        required
+        description="Slug-ul campului din entitatea tinta (ex: name)"
+      >
         <UInput v-model="state.relation_display_field" placeholder="ex: name" class="w-full" />
       </UFormField>
     </div>
@@ -416,7 +434,9 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
 
     <!-- Section 4: Rules -->
     <div class="space-y-4">
-      <h4 class="text-sm font-semibold text-muted uppercase tracking-wider">Reguli</h4>
+      <h4 class="text-sm font-semibold text-muted uppercase tracking-wider">
+        Reguli
+      </h4>
 
       <div class="grid grid-cols-2 gap-x-6 gap-y-3">
         <UFormField label="Obligatoriu" name="is_required">
@@ -448,14 +468,26 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
     <!-- Section 5: Validation -->
     <div v-if="showStringValidation || showNumericValidation" class="space-y-4">
       <USeparator />
-      <h4 class="text-sm font-semibold text-muted uppercase tracking-wider">Validare</h4>
+      <h4 class="text-sm font-semibold text-muted uppercase tracking-wider">
+        Validare
+      </h4>
 
       <div v-if="showStringValidation" class="grid grid-cols-2 gap-4">
         <UFormField label="Lungime minima" name="validation_min_length">
-          <UInput v-model.number="state.validation_min_length" type="number" :min="0" class="w-full" />
+          <UInput
+            v-model.number="state.validation_min_length"
+            type="number"
+            :min="0"
+            class="w-full"
+          />
         </UFormField>
         <UFormField label="Lungime maxima" name="validation_max_length">
-          <UInput v-model.number="state.validation_max_length" type="number" :min="0" class="w-full" />
+          <UInput
+            v-model.number="state.validation_max_length"
+            type="number"
+            :min="0"
+            class="w-full"
+          />
         </UFormField>
       </div>
 
@@ -481,7 +513,9 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
 
     <!-- Section 6: Layout -->
     <div class="space-y-4">
-      <h4 class="text-sm font-semibold text-muted uppercase tracking-wider">Layout</h4>
+      <h4 class="text-sm font-semibold text-muted uppercase tracking-wider">
+        Layout
+      </h4>
 
       <UFormField label="Grup" name="group_name" description="Sectiunea/tab-ul in formular">
         <UInput v-model="state.group_name" placeholder="general" class="w-full" />
@@ -489,15 +523,32 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
 
       <div class="grid grid-cols-3 gap-4">
         <UFormField label="Ordine" name="rank" description="in afisare">
-          <UInput v-model.number="state.rank" type="number" :min="1" class="w-full" />
+          <UInput
+            v-model.number="state.rank"
+            type="number"
+            :min="1"
+            class="w-full"
+          />
         </UFormField>
 
         <UFormField label="Coloana grid" name="grid_col" description="1-3">
-          <UInput v-model.number="state.grid_col" type="number" :min="1" :max="3" class="w-full" />
+          <UInput
+            v-model.number="state.grid_col"
+            type="number"
+            :min="1"
+            :max="3"
+            class="w-full"
+          />
         </UFormField>
 
         <UFormField label="Col span" name="col_span" description="1-3">
-          <UInput v-model.number="state.col_span" type="number" :min="1" :max="3" class="w-full" />
+          <UInput
+            v-model.number="state.col_span"
+            type="number"
+            :min="1"
+            :max="3"
+            class="w-full"
+          />
         </UFormField>
       </div>
     </div>

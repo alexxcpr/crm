@@ -115,8 +115,12 @@ function getDropdownItems(entity: AdminEntity) {
   <div>
     <div class="flex items-center justify-between mb-4">
       <div>
-        <h2 class="text-lg font-semibold">Entitati</h2>
-        <p class="text-sm text-muted">Gestioneaza entitatile si campurile lor</p>
+        <h2 class="text-lg font-semibold">
+          Entitati
+        </h2>
+        <p class="text-sm text-muted">
+          Gestioneaza entitatile si campurile lor
+        </p>
       </div>
       <div class="flex items-center gap-3">
         <USelect

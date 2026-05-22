@@ -17,9 +17,9 @@ const columns: TableColumn<Field>[] = [
   { id: 'edit', header: '', meta: { class: { th: 'w-10', td: 'w-10' } } },
 
   { accessorKey: 'rank', header: 'Ordine', meta: { class: { th: 'w-20', td: 'w-20' } } },
-  { accessorKey: 'name', header: 'Nume' , meta: { class: { th: 'w-48', td: 'w-48' } } },
-  { accessorKey: 'slug', header: 'Slug' , meta: { class: { th: 'w-48', td: 'w-48' } } },
-  { accessorKey: 'column_name', header: 'Coloana' , meta: { class: { th: 'w-48', td: 'w-48' } } },
+  { accessorKey: 'name', header: 'Nume', meta: { class: { th: 'w-48', td: 'w-48' } } },
+  { accessorKey: 'slug', header: 'Slug', meta: { class: { th: 'w-48', td: 'w-48' } } },
+  { accessorKey: 'column_name', header: 'Coloana', meta: { class: { th: 'w-48', td: 'w-48' } } },
 
   { accessorKey: 'data_type', header: 'Tip date', meta: { class: { th: 'w-32', td: 'w-32' } } },
   { accessorKey: 'ui_type', header: 'Tip UI', meta: { class: { th: 'w-32', td: 'w-32' } } },
@@ -27,8 +27,8 @@ const columns: TableColumn<Field>[] = [
   { accessorKey: 'col_span', header: 'Col span', meta: { class: { th: 'w-24', td: 'w-24' } } },
   { id: 'flags', header: 'Proprietati', meta: { class: { th: 'w-48', td: 'w-48' } } },
   { id: 'visibility', header: 'Vizibilitate', meta: { class: { th: 'w-32', td: 'w-32' } } },
-  
-  { id: 'actions', header: '', meta: { class: { th: 'w-16', td: 'w-16' } } },
+
+  { id: 'actions', header: '', meta: { class: { th: 'w-16', td: 'w-16' } } }
 ]
 
 const fieldsByGroup = computed(() => {
@@ -72,7 +72,9 @@ function getDropdownItems(field: Field) {
 <template>
   <div>
     <div class="flex items-center justify-between mb-4">
-      <h3 class="text-base font-semibold">Campuri</h3>
+      <h3 class="text-base font-semibold">
+        Campuri
+      </h3>
       <UButton
         label="Adauga camp"
         icon="i-lucide-plus"
@@ -145,11 +147,21 @@ function getDropdownItems(field: Field) {
           </template>
 
           <template #data_type-cell="{ row }">
-            <UBadge :label="row.original.data_type" color="neutral" variant="subtle" size="md" />
+            <UBadge
+              :label="row.original.data_type"
+              color="neutral"
+              variant="subtle"
+              size="md"
+            />
           </template>
 
           <template #ui_type-cell="{ row }">
-            <UBadge :label="row.original.ui_type" color="info" variant="subtle" size="md" />
+            <UBadge
+              :label="row.original.ui_type"
+              color="info"
+              variant="subtle"
+              size="md"
+            />
           </template>
 
           <template #flags-cell="{ row }">
@@ -199,7 +211,12 @@ function getDropdownItems(field: Field) {
 
           <template #actions-cell="{ row }">
             <UDropdownMenu :items="getDropdownItems(row.original)">
-              <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" size="xs" />
+              <UButton
+                icon="i-lucide-ellipsis"
+                color="neutral"
+                variant="ghost"
+                size="xs"
+              />
             </UDropdownMenu>
           </template>
         </UTable>
@@ -213,7 +230,12 @@ function getDropdownItems(field: Field) {
         description="Adauga campuri pentru aceasta entitate."
       >
         <template #actions>
-          <UButton label="Adauga camp" icon="i-lucide-plus" size="sm" @click="emit('add')" />
+          <UButton
+            label="Adauga camp"
+            icon="i-lucide-plus"
+            size="sm"
+            @click="emit('add')"
+          />
         </template>
       </UEmpty>
     </div>

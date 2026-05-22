@@ -10,6 +10,14 @@ const links = [[{
   label: 'Entitati',
   icon: 'i-lucide-database',
   to: '/admin/entities'
+}, {
+  label: 'Workflow-uri',
+  icon: 'i-lucide-workflow',
+  to: '/admin/workflows'
+}, {
+  label: 'Actiuni',
+  icon: 'i-lucide-zap',
+  to: '/admin/actions'
 }]] satisfies NavigationMenuItem[][]
 </script>
 

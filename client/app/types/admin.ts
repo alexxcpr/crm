@@ -70,7 +70,7 @@ export interface FieldPayload {
   default_value?: string
   placeholder?: string
   help_text?: string
-  options?: { label: string; value: string }[]
+  options?: { label: string, value: string }[]
   is_required?: boolean
   is_unique?: boolean
   is_filterable?: boolean
@@ -92,7 +92,7 @@ export interface UpdateFieldPayload {
   placeholder?: string
   help_text?: string
   default_value?: string
-  options?: { label: string; value: string }[]
+  options?: { label: string, value: string }[]
   id_relation_entity?: string
   relation_display_field?: string
   is_required?: boolean

@@ -12,7 +12,7 @@ const emit = defineEmits<{
 
 const { apiFetch } = useApi()
 
-const items = ref<{ label: string; value: string }[]>([])
+const items = ref<{ label: string, value: string }[]>([])
 const loading = ref(false)
 const searchQuery = ref('')
 const open = ref(false)
@@ -36,15 +36,15 @@ async function fetchSelectedValue() {
   loading.value = true
   try {
     const response = await apiFetch<{ data: Record<string, any> }>(`/v1/data/${entitySlug.value}/${props.modelValue}`)
-    
+
     if (response.data) {
-      // Daca items avea deja ceva, putem sa il adaugam in loc sa suprascriem, sau suprascriem 
+      // Daca items avea deja ceva, putem sa il adaugam in loc sa suprascriem, sau suprascriem
       // pentru ca fetchOptions va suprascrie la deschiderea dropdown-ului
       const newItem = {
         label: String(response.data[displayField.value] ?? response.data.id),
         value: response.data.id
       }
-      
+
       const exists = items.value.findIndex(i => i.value === newItem.value)
       if (exists !== -1) {
         items.value[exists] = newItem
@@ -52,10 +52,10 @@ async function fetchSelectedValue() {
         items.value.push(newItem)
       }
     }
-  }
+  } 
   catch (err) {
     console.error('[RelationSelect] Eroare la incarcarea valorii selectate:', err)
-  }
+  } 
   finally {
     loading.value = false
   }
@@ -88,11 +88,11 @@ async function fetchOptions(search?: string) {
       value: record.id
     }))
     hasFetchedOptions.value = true
-  }
+  } 
   catch (err) {
     console.error('[RelationSelect] Eroare la incarcarea optiunilor:', err)
     items.value = []
-  }
+  } 
   finally {
     loading.value = false
   }
@@ -108,7 +108,7 @@ function onSearch(query: string) {
 function onUpdate(val: string | string[] | undefined) {
   if (Array.isArray(val)) {
     emit('update:modelValue', val[0] ?? null)
-  }
+  } 
   else {
     emit('update:modelValue', val ?? null)
   }
@@ -118,6 +118,7 @@ function onUpdate(val: string | string[] | undefined) {
 <template>
   <div class="w-full min-w-0">
     <USelectMenu
+      v-model:open="open"
       :model-value="modelValue ?? undefined"
       :items="items"
       value-key="value"
@@ -128,7 +129,6 @@ function onUpdate(val: string | string[] | undefined) {
       clear
       @update:model-value="onUpdate"
       @update:search-term="onSearch"
-      v-model:open="open"
     />
   </div>
 </template>

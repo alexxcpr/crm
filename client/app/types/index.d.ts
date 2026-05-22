@@ -31,38 +31,38 @@ export interface Contact {
 }
 
 export interface SursaDto {
-  //TODO
+  // TODO
 }
 export interface Sursa {
-  //TODO
+  // TODO
 }
 
 export interface FazaDto {
-  //TODO
+  // TODO
 }
 export interface Faza {
-  //TODO
+  // TODO
 }
 
 export interface ProiectTipDto {
-  //TODO
+  // TODO
 }
 export interface ProiectTip {
-  //TODO
+  // TODO
 }
 
 export interface CompanieDto {
-  //TODO
+  // TODO
 }
 export interface Companie {
-  //TODO
+  // TODO
 }
 
 export interface PipelineStareDto {
-  //TODO
+  // TODO
 }
 export interface PipelineStare {
-  //TODO
+  // TODO
 }
 
 export interface UserDto {
@@ -74,7 +74,7 @@ export interface User {
   id: number
   name: string
   email: string
-  
+
   avatar?: AvatarProps
   status: UserStatus
 }
@@ -103,7 +103,7 @@ export interface LeadDto {
 }
 
 export interface Lead {
-  id: number,
+  id: number
   denumire: string | null
   isActiv: boolean | null
   isExpertTehnicIdentificat: boolean | null
@@ -124,7 +124,7 @@ export interface Lead {
 }
 
 // Ce am adaugat eu nou (sus)
-//----------------------------
+// ----------------------------
 // Ce era inainte (jos)
 
 export interface Mail {

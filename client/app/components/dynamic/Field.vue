@@ -14,7 +14,7 @@ const emit = defineEmits<{
 
 const value = computed({
   get: () => props.modelValue,
-  set: (val) => emit('update:modelValue', val)
+  set: val => emit('update:modelValue', val)
 })
 
 const selectItems = computed(() => {
@@ -65,7 +65,7 @@ watch(calendarDate, (newValue) => {
 
 // ==================== DATETIME PICKER ====================
 const calendarDateTime = ref<DateValue | undefined>(undefined)
-const selectedTime = ref<{ hour: number; minute: number }>({ hour: 12, minute: 0 })
+const selectedTime = ref<{ hour: number, minute: number }>({ hour: 12, minute: 0 })
 const popoverOpen = ref(false)
 
 // Convertește ISO string la CalendarDateTime
@@ -114,7 +114,7 @@ const applyDateTime = () => {
   // Construim ISO string cu offset de timezone local
   // Format: YYYY-MM-DDTHH:mm:ss+HH:mm (cu offset local, nu UTC)
   const now = new Date()
-  const offset = -now.getTimezoneOffset()  // în minute, inversat pentru semn corect
+  const offset = -now.getTimezoneOffset() // în minute, inversat pentru semn corect
   const offsetHours = Math.abs(Math.floor(offset / 60))
   const offsetMinutes = Math.abs(offset % 60)
   const offsetSign = offset >= 0 ? '+' : '-'
@@ -261,7 +261,7 @@ const displayDateTime = computed(() => {
 
         <template #content>
           <div class="p-2">
-            <UCalendar :model-value="(calendarDate as any)" @update:model-value="calendarDate = $event as DateValue" class="p-2" />
+            <UCalendar :model-value="(calendarDate as any)" class="p-2" @update:model-value="calendarDate = $event as DateValue" />
           </div>
         </template>
       </UPopover>
@@ -303,7 +303,7 @@ const displayDateTime = computed(() => {
         <template #content>
           <div class="p-3 space-y-3">
             <!-- Calendar -->
-            <UCalendar :model-value="(calendarDateTime as any)" @update:model-value="calendarDateTime = $event as DateValue" class="p-2" />
+            <UCalendar :model-value="(calendarDateTime as any)" class="p-2" @update:model-value="calendarDateTime = $event as DateValue" />
 
             <!-- Time Selection -->
             <div class="flex items-center gap-3 pt-2 border-t border-default">

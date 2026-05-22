@@ -3,8 +3,10 @@ import {
   Logger,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { TenantContext } from 'src/tenant/tenant-context.service';
+import { WorkflowSyncService } from 'src/n8n/workflow-sync.service';
 import { CreateWorkflowDto, UpdateWorkflowDto } from './dto';
 
 @Injectable()
@@ -12,7 +14,10 @@ export class WorkflowService {
   private readonly logger = new Logger(WorkflowService.name);
   private readonly TABLE = 'workflow_definition';
 
-  constructor(private readonly tenantContext: TenantContext) {}
+  constructor(
+    private readonly tenantContext: TenantContext,
+    private readonly syncService: WorkflowSyncService,
+  ) {}
 
   private get knex() {
     return this.tenantContext.knex;
@@ -81,6 +86,10 @@ export class WorkflowService {
       .update(patch)
       .returning('*');
 
+    if (existing.n8n_workflow_id && (dto.nodes || dto.connections)) {
+      await this.syncService.syncWorkflow(id);
+    }
+
     this.logger.log(`Workflow actualizat: ${row.slug} v${row.version}`);
     return { data: row };
   }
@@ -93,7 +102,60 @@ export class WorkflowService {
       throw new NotFoundException(`Workflow-ul "${id}" nu a fost gasit.`);
     }
 
+    await this.syncService.deleteWorkflow(id);
     await this.knex(this.TABLE).where('id_workflow', id).del();
     this.logger.log(`Workflow sters: ${existing.slug}`);
+  }
+
+  async activate(id: string) {
+    const existing = await this.knex(this.TABLE)
+      .where('id_workflow', id)
+      .first();
+    if (!existing) {
+      throw new NotFoundException(`Workflow-ul "${id}" nu a fost gasit.`);
+    }
+
+    const nodes =
+      typeof existing.nodes === 'string'
+        ? JSON.parse(existing.nodes)
+        : existing.nodes;
+    if (!nodes || nodes.length === 0) {
+      throw new BadRequestException(
+        'Workflow-ul nu are noduri definite. Adauga cel putin un nod inainte de activare.',
+      );
+    }
+
+    await this.syncService.activateWorkflow(id);
+    const row = await this.knex(this.TABLE).where('id_workflow', id).first();
+    this.logger.log(`Workflow activat: ${existing.slug}`);
+    return { data: row };
+  }
+
+  async deactivate(id: string) {
+    const existing = await this.knex(this.TABLE)
+      .where('id_workflow', id)
+      .first();
+    if (!existing) {
+      throw new NotFoundException(`Workflow-ul "${id}" nu a fost gasit.`);
+    }
+
+    await this.syncService.deactivateWorkflow(id);
+    const row = await this.knex(this.TABLE).where('id_workflow', id).first();
+    this.logger.log(`Workflow dezactivat: ${existing.slug}`);
+    return { data: row };
+  }
+
+  async sync(id: string) {
+    const existing = await this.knex(this.TABLE)
+      .where('id_workflow', id)
+      .first();
+    if (!existing) {
+      throw new NotFoundException(`Workflow-ul "${id}" nu a fost gasit.`);
+    }
+
+    const n8nId = await this.syncService.syncWorkflow(id);
+    const row = await this.knex(this.TABLE).where('id_workflow', id).first();
+    this.logger.log(`Workflow sincronizat: ${existing.slug} → n8n:${n8nId}`);
+    return { data: row };
   }
 }

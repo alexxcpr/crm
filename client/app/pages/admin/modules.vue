@@ -79,8 +79,12 @@ function getDropdownItems(mod: AdminModule) {
   <div>
     <div class="flex items-center justify-between mb-4">
       <div>
-        <h2 class="text-lg font-semibold">Module</h2>
-        <p class="text-sm text-muted">Grupeaza entitatile in module logice (CRM, ERP, etc.)</p>
+        <h2 class="text-lg font-semibold">
+          Module
+        </h2>
+        <p class="text-sm text-muted">
+          Grupeaza entitatile in module logice (CRM, ERP, etc.)
+        </p>
       </div>
       <UButton
         label="Adauga modul"

@@ -284,7 +284,12 @@ const selectedCount = computed(() => Object.keys(rowSelection.value).length)
           "
           :content="{ align: 'end' }"
         >
-          <UButton label="Coloane" color="neutral" variant="outline" trailing-icon="i-lucide-settings-2" />
+          <UButton
+            label="Coloane"
+            color="neutral"
+            variant="outline"
+            trailing-icon="i-lucide-settings-2"
+          />
         </UDropdownMenu>
 
         <UButton

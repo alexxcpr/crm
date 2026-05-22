@@ -40,7 +40,7 @@ const systemData = reactive({
   date_updated: null as string | null,
   id_owner: null as string | null,
   owner_email: null as string | null,
-  owner_name: null as string | null,
+  owner_name: null as string | null
 })
 const submitting = ref(false)
 const initialLoading = ref(false)
@@ -69,7 +69,7 @@ function findGroupWithErrors(errorFields: string[]): string | null {
 }
 
 // ─── Handler for form validation errors ───
-function onFormError(event: { errors: Array<{ name?: string; message?: string }> }) {
+function onFormError(event: { errors: Array<{ name?: string, message?: string }> }) {
   const errorFieldNames = event.errors
     .map(e => e.name)
     .filter((name): name is string => !!name)
@@ -101,8 +101,8 @@ const isMobile = computed(() => {
 // ─── Grupuri campuri pentru layout ───
 function getFieldsByGroup(groupName: string): Field[] {
   return formFields.value
-    .filter((f: { group_name: string; }) => f.group_name === groupName)
-    .sort((a: { rank: number; }, b: { rank: number; }) => a.rank - b.rank)
+    .filter((f: { group_name: string }) => f.group_name === groupName)
+    .sort((a: { rank: number }, b: { rank: number }) => a.rank - b.rank)
 }
 
 // ─── Tab-uri (doar daca > 1 grup) ───
@@ -128,13 +128,13 @@ function initFormState(record?: Record<string, any> | null) {
   for (const field of formFields.value) {
     if (record && record[field.column_name] !== undefined) {
       formState[field.slug] = record[field.column_name]
-    }
+    } 
     else if (field.default_value != null) {
       formState[field.slug] = castDefault(field)
-    }
+    } 
     else if (field.data_type === 'boolean') {
       formState[field.slug] = false
-    }
+    } 
     else {
       formState[field.slug] = null
     }
@@ -162,11 +162,11 @@ watch(() => schema.value, async (sch) => {
       systemData.date_created = record.date_created || null
       systemData.date_updated = record.date_updated || null
       systemData.id_owner = record.id_owner || null
-      systemData.owner_email = record.owner_email || null  // NOU
+      systemData.owner_email = record.owner_email || null // NOU
       systemData.owner_name = record.owner_name || null
     }
     initialLoading.value = false
-  }
+  } 
   else {
     initFormState()
   }
@@ -182,7 +182,7 @@ async function onSubmit() {
 
     if (isEditMode.value && props.recordId) {
       result = await update(props.recordId, payload)
-    }
+    } 
     else {
       result = await create(payload)
     }
@@ -198,7 +198,7 @@ async function onSubmit() {
         color: 'success'
       })
       emit('saved', result)
-    }
+    } 
     else {
       toast.add({
         title: 'Eroare la salvare',
@@ -206,7 +206,7 @@ async function onSubmit() {
         color: 'error'
       })
     }
-  }
+  } 
   finally {
     submitting.value = false
   }
@@ -271,7 +271,8 @@ const loading = computed(() => schemaLoading.value || initialLoading.value)
         list: 'w-full md:w-56 shrink-0 max-h-[20vh] md:max-h-[70vh] overflow-y-auto',
         trigger: 'justify-start w-full text-left snap-center shrink-0',
         content: 'w-full flex-1 min-w-0'
-      }">
+      }"
+    >
       <template v-for="group in groups" :key="group" #[group]>
         <div class="pt-2 md:pt-0">
           <DynamicFormGrid :fields="getFieldsByGroup(group)" :form-state="formState" />
@@ -307,15 +308,25 @@ const loading = computed(() => schemaLoading.value || initialLoading.value)
         <template #content>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 text-sm">
             <div class="bg-elevated/50 rounded-lg p-3 text-center sm:text-left">
-              <div class="text-xs text-muted uppercase mb-1">Creat</div>
-              <div class="font-medium">{{ formatDate(systemData.date_created) }}</div>
+              <div class="text-xs text-muted uppercase mb-1">
+                Creat
+              </div>
+              <div class="font-medium">
+                {{ formatDate(systemData.date_created) }}
+              </div>
             </div>
             <div class="bg-elevated/50 rounded-lg p-3 text-center sm:text-left">
-              <div class="text-xs text-muted uppercase mb-1">Modificat</div>
-              <div class="font-medium">{{ formatDate(systemData.date_updated) }}</div>
+              <div class="text-xs text-muted uppercase mb-1">
+                Modificat
+              </div>
+              <div class="font-medium">
+                {{ formatDate(systemData.date_updated) }}
+              </div>
             </div>
             <div class="bg-elevated/50 rounded-lg p-3 text-center sm:text-left">
-              <div class="text-xs text-muted uppercase mb-1">Deținător</div>
+              <div class="text-xs text-muted uppercase mb-1">
+                Deținător
+              </div>
               <div class="flex items-center justify-center sm:justify-start gap-2">
                 <UIcon name="i-lucide-user" class="text-muted" />
                 <span v-if="systemData.owner_email" class="font-medium">

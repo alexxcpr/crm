@@ -48,4 +48,22 @@ export class AdminWorkflowController {
     await this.workflowService.remove(id);
     return returnValidResponse('Workflow-ul a fost sters cu succes.', null);
   }
+
+  @Post(':id/activate')
+  async activate(@Param('id') id: string) {
+    const result = await this.workflowService.activate(id);
+    return returnValidResponse('Workflow-ul a fost activat cu succes.', result.data);
+  }
+
+  @Post(':id/deactivate')
+  async deactivate(@Param('id') id: string) {
+    const result = await this.workflowService.deactivate(id);
+    return returnValidResponse('Workflow-ul a fost dezactivat cu succes.', result.data);
+  }
+
+  @Post(':id/sync')
+  async sync(@Param('id') id: string) {
+    const result = await this.workflowService.sync(id);
+    return returnValidResponse('Workflow-ul a fost sincronizat cu n8n.', result.data);
+  }
 }

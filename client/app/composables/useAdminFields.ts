@@ -25,11 +25,11 @@ export function useAdminFields(entityId: MaybeRef<string>) {
     try {
       const response = await apiFetch<ApiResponse<Field[]>>(basePath())
       fields.value = response.data
-    }
+    } 
     catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la incarcarea campurilor'
       console.error('[useAdminFields] fetchFields:', err)
-    }
+    } 
     finally {
       loading.value = false
     }
@@ -39,7 +39,7 @@ export function useAdminFields(entityId: MaybeRef<string>) {
     try {
       const response = await apiFetch<ApiResponse<Field>>(`${basePath()}/${fieldId}`)
       return response.data
-    }
+    } 
     catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la incarcarea campului'
       console.error('[useAdminFields] fetchField:', err)
@@ -58,12 +58,12 @@ export function useAdminFields(entityId: MaybeRef<string>) {
       })
       await fetchFields()
       return response.data
-    }
+    } 
     catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la crearea campului'
       console.error('[useAdminFields] createField:', err)
       return null
-    }
+    } 
     finally {
       loading.value = false
     }
@@ -80,12 +80,12 @@ export function useAdminFields(entityId: MaybeRef<string>) {
       })
       await fetchFields()
       return response.data
-    }
+    } 
     catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la actualizarea campului'
       console.error('[useAdminFields] updateField:', err)
       return null
-    }
+    } 
     finally {
       loading.value = false
     }
@@ -99,12 +99,12 @@ export function useAdminFields(entityId: MaybeRef<string>) {
       await apiFetch(`${basePath()}/${fieldId}`, { method: 'DELETE' })
       await fetchFields()
       return true
-    }
+    } 
     catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la stergerea campului'
       console.error('[useAdminFields] deleteField:', err)
       return false
-    }
+    } 
     finally {
       loading.value = false
     }

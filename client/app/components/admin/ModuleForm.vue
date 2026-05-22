@@ -68,7 +68,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
 
     if (isEdit.value && props.module) {
       result = await updateModule(props.module.id_module, payload)
-    }
+    } 
     else {
       result = await createModule(payload)
     }
@@ -87,7 +87,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         color: 'error'
       })
     }
-  }
+  } 
   finally {
     submitting.value = false
   }
@@ -95,7 +95,12 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
 </script>
 
 <template>
-  <UForm :schema="schema" :state="state" class="space-y-4" @submit="onSubmit">
+  <UForm
+    :schema="schema"
+    :state="state"
+    class="space-y-4"
+    @submit="onSubmit"
+  >
     <UFormField label="Nume" name="name" required>
       <UInput v-model="state.name" placeholder="ex: CRM" class="w-full" />
     </UFormField>
@@ -117,7 +122,12 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
 
     <div class="grid grid-cols-2 gap-4">
       <UFormField label="Ordine (rank)" name="rank">
-        <UInput v-model.number="state.rank" type="number" :min="0" class="w-full" />
+        <UInput
+          v-model.number="state.rank"
+          type="number"
+          :min="0"
+          class="w-full"
+        />
       </UFormField>
 
       <UFormField label="Activ" name="is_active">

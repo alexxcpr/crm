@@ -80,7 +80,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         rank: event.data.rank
       }
       result = await updateEntity(props.entity.id_entity, payload)
-    }
+    } 
     else {
       const payload: CreateEntityPayload = {
         name: event.data.name,
@@ -100,7 +100,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         color: 'success'
       })
       emit('saved', result)
-    }
+    } 
     else {
       toast.add({
         title: 'Eroare',
@@ -108,7 +108,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         color: 'error'
       })
     }
-  }
+  } 
   finally {
     submitting.value = false
   }
@@ -116,7 +116,12 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
 </script>
 
 <template>
-  <UForm :schema="schema" :state="state" class="space-y-4" @submit="onSubmit">
+  <UForm
+    :schema="schema"
+    :state="state"
+    class="space-y-4"
+    @submit="onSubmit"
+  >
     <UFormField label="Nume" name="name" required>
       <UInput v-model="state.name" placeholder="ex: Contacte" class="w-full" />
     </UFormField>
@@ -158,7 +163,12 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       </UFormField>
 
       <UFormField label="Ordine (rank)" name="rank">
-        <UInput v-model.number="state.rank" type="number" :min="0" class="w-full" />
+        <UInput
+          v-model.number="state.rank"
+          type="number"
+          :min="0"
+          class="w-full"
+        />
       </UFormField>
     </div>
 

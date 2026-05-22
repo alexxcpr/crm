@@ -120,124 +120,148 @@ function getModuleName(moduleId: string | null): string {
     </div>
 
     <div v-else class="space-y-6">
-    <!-- Back button + title -->
-    <div class="flex items-center gap-3">
-      <UButton
-        icon="i-lucide-arrow-left"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        @click="router.push('/admin/entities')"
-      />
-      <div class="flex-1">
-        <h2 class="text-lg font-semibold flex items-center gap-2">
-          <UIcon v-if="entity.icon" :name="entity.icon" class="size-5" />
-          {{ entity.name }}
-          <UBadge v-if="entity.is_system" label="System" color="warning" variant="subtle" size="sm" />
-        </h2>
-        <p class="text-sm text-muted">{{ entity.slug }} &middot; {{ entity.table_name }}</p>
-      </div>
-      <UButton
-        label="Editeaza entitate"
-        icon="i-lucide-pencil"
-        variant="outline"
-        color="neutral"
-        size="sm"
-        @click="showEntityModal = true"
-      />
-    </div>
-
-    <!-- Entity info card -->
-    <UPageCard variant="subtle">
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-        <div>
-          <div class="text-xs text-muted uppercase mb-1">Modul</div>
-          <div class="font-medium">{{ getModuleName(entity.id_module) }}</div>
-        </div>
-        <div>
-          <div class="text-xs text-muted uppercase mb-1">Label singular</div>
-          <div class="font-medium">{{ entity.label_singular || '-' }}</div>
-        </div>
-        <div>
-          <div class="text-xs text-muted uppercase mb-1">Label plural</div>
-          <div class="font-medium">{{ entity.label_plural || '-' }}</div>
-        </div>
-        <div>
-          <div class="text-xs text-muted uppercase mb-1">Ordine</div>
-          <div class="font-medium">{{ entity.rank }}</div>
-        </div>
-      </div>
-    </UPageCard>
-
-    <!-- Fields table -->
-    <AdminFieldsTable
-      :fields="fields"
-      :loading="fieldsLoading"
-      @add="openAddField"
-      @edit="openEditField"
-      @delete="confirmDeleteField"
-    />
-
-    <!-- Entity Edit Modal -->
-    <UModal v-model:open="showEntityModal" title="Editeaza entitate">
-      <template #body>
-        <AdminEntityForm
-          :entity="entity"
-          :modules="modules"
-          @saved="onEntitySaved"
-          @cancel="showEntityModal = false"
+      <!-- Back button + title -->
+      <div class="flex items-center gap-3">
+        <UButton
+          icon="i-lucide-arrow-left"
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          @click="router.push('/admin/entities')"
         />
-      </template>
-    </UModal>
-
-    <!-- Field Slideover -->
-    <USlideover
-      v-model:open="showFieldSlideover"
-      :title="editingField ? 'Editeaza camp' : 'Camp nou'"
-      :ui="{ content: 'max-w-lg' }"
-    >
-      <template #body>
-        <AdminFieldForm
-          :entity-id="entityId"
-          :field="editingField"
-          :entities="entities"
-          @saved="onFieldSaved"
-          @cancel="showFieldSlideover = false"
-        />
-      </template>
-    </USlideover>
-
-    <!-- Delete Field Confirm -->
-    <UModal
-      v-model:open="showDeleteConfirm"
-      title="Confirmare stergere camp"
-      description="Datele existente din aceasta coloana vor fi pierdute."
-    >
-      <template #body>
-        <p>
-          Esti sigur ca vrei sa stergi campul
-          <strong>{{ deletingField?.name }}</strong>?
-        </p>
-        <p class="text-sm text-muted mt-1">
-          Coloana <code class="text-xs bg-elevated px-1 py-0.5 rounded">{{ deletingField?.column_name }}</code> va fi stearsa din tabela SQL.
-        </p>
-        <div class="flex items-center gap-3 justify-end mt-4">
-          <UButton
-            label="Anuleaza"
-            color="neutral"
-            variant="outline"
-            @click="showDeleteConfirm = false"
-          />
-          <UButton
-            label="Sterge"
-            color="error"
-            icon="i-lucide-trash-2"
-            :loading="fieldsLoading"
-            @click="onConfirmDeleteField"
-          />
+        <div class="flex-1">
+          <h2 class="text-lg font-semibold flex items-center gap-2">
+            <UIcon v-if="entity.icon" :name="entity.icon" class="size-5" />
+            {{ entity.name }}
+            <UBadge
+              v-if="entity.is_system"
+              label="System"
+              color="warning"
+              variant="subtle"
+              size="sm"
+            />
+          </h2>
+          <p class="text-sm text-muted">
+            {{ entity.slug }} &middot; {{ entity.table_name }}
+          </p>
         </div>
-      </template>
-    </UModal>
+        <UButton
+          label="Editeaza entitate"
+          icon="i-lucide-pencil"
+          variant="outline"
+          color="neutral"
+          size="sm"
+          @click="showEntityModal = true"
+        />
+      </div>
+
+      <!-- Entity info card -->
+      <UPageCard variant="subtle">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+          <div>
+            <div class="text-xs text-muted uppercase mb-1">
+              Modul
+            </div>
+            <div class="font-medium">
+              {{ getModuleName(entity.id_module) }}
+            </div>
+          </div>
+          <div>
+            <div class="text-xs text-muted uppercase mb-1">
+              Label singular
+            </div>
+            <div class="font-medium">
+              {{ entity.label_singular || '-' }}
+            </div>
+          </div>
+          <div>
+            <div class="text-xs text-muted uppercase mb-1">
+              Label plural
+            </div>
+            <div class="font-medium">
+              {{ entity.label_plural || '-' }}
+            </div>
+          </div>
+          <div>
+            <div class="text-xs text-muted uppercase mb-1">
+              Ordine
+            </div>
+            <div class="font-medium">
+              {{ entity.rank }}
+            </div>
+          </div>
+        </div>
+      </UPageCard>
+
+      <!-- Fields table -->
+      <AdminFieldsTable
+        :fields="fields"
+        :loading="fieldsLoading"
+        @add="openAddField"
+        @edit="openEditField"
+        @delete="confirmDeleteField"
+      />
+
+      <!-- Entity Edit Modal -->
+      <UModal v-model:open="showEntityModal" title="Editeaza entitate">
+        <template #body>
+          <AdminEntityForm
+            :entity="entity"
+            :modules="modules"
+            @saved="onEntitySaved"
+            @cancel="showEntityModal = false"
+          />
+        </template>
+      </UModal>
+
+      <!-- Field Slideover -->
+      <USlideover
+        v-model:open="showFieldSlideover"
+        :title="editingField ? 'Editeaza camp' : 'Camp nou'"
+        :ui="{ content: 'max-w-lg' }"
+      >
+        <template #body>
+          <AdminFieldForm
+            :entity-id="entityId"
+            :field="editingField"
+            :entities="entities"
+            @saved="onFieldSaved"
+            @cancel="showFieldSlideover = false"
+          />
+        </template>
+      </USlideover>
+
+      <!-- Delete Field Confirm -->
+      <UModal
+        v-model:open="showDeleteConfirm"
+        title="Confirmare stergere camp"
+        description="Datele existente din aceasta coloana vor fi pierdute."
+      >
+        <template #body>
+          <p>
+            Esti sigur ca vrei sa stergi campul
+            <strong>{{ deletingField?.name }}</strong>?
+          </p>
+          <p class="text-sm text-muted mt-1">
+            Coloana <code class="text-xs bg-elevated px-1 py-0.5 rounded">{{ deletingField?.column_name }}</code> va fi stearsa din tabela SQL.
+          </p>
+          <div class="flex items-center gap-3 justify-end mt-4">
+            <UButton
+              label="Anuleaza"
+              color="neutral"
+              variant="outline"
+              @click="showDeleteConfirm = false"
+            />
+            <UButton
+              label="Sterge"
+              color="error"
+              icon="i-lucide-trash-2"
+              :loading="fieldsLoading"
+              @click="onConfirmDeleteField"
+            />
+          </div>
+        </template>
+      </UModal>
     </div>
   </div>
 </template>

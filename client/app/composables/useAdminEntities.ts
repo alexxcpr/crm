@@ -23,11 +23,11 @@ export function useAdminEntities() {
 
       const response = await apiFetch<ApiResponse<AdminEntity[]>>('/v1/admin/entities', { query })
       entities.value = response.data
-    }
+    } 
     catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la incarcarea entitatilor'
       console.error('[useAdminEntities] fetchEntities:', err)
-    }
+    } 
     finally {
       loading.value = false
     }
@@ -37,7 +37,7 @@ export function useAdminEntities() {
     try {
       const response = await apiFetch<ApiResponse<AdminEntity>>(`/v1/admin/entities/${id}`)
       return response.data
-    }
+    } 
     catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la incarcarea entitatii'
       console.error('[useAdminEntities] fetchEntity:', err)
@@ -56,12 +56,12 @@ export function useAdminEntities() {
       })
       await fetchEntities()
       return response.data
-    }
+    } 
     catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la crearea entitatii'
       console.error('[useAdminEntities] createEntity:', err)
       return null
-    }
+    } 
     finally {
       loading.value = false
     }
@@ -78,12 +78,12 @@ export function useAdminEntities() {
       })
       await fetchEntities()
       return response.data
-    }
+    } 
     catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la actualizarea entitatii'
       console.error('[useAdminEntities] updateEntity:', err)
       return null
-    }
+    } 
     finally {
       loading.value = false
     }
@@ -97,12 +97,12 @@ export function useAdminEntities() {
       await apiFetch(`/v1/admin/entities/${id}`, { method: 'DELETE' })
       await fetchEntities()
       return true
-    }
+    } 
     catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la stergerea entitatii'
       console.error('[useAdminEntities] deleteEntity:', err)
       return false
-    }
+    } 
     finally {
       loading.value = false
     }

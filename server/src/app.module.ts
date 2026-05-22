@@ -10,6 +10,7 @@ import { SchemaModule } from './schema/schema.module';
 import { AdminModule } from './admin/admin.module';
 import { EventsModule } from './events/events.module';
 import { ActionsModule } from './actions/actions.module';
+import { N8nModule } from './n8n/n8n.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { ActionsModule } from './actions/actions.module';
     SchemaModule,
     AdminModule,
     ActionsModule,
+    N8nModule,
   ],
 })
 export class AppModule {}

@@ -27,7 +27,7 @@ function formatTimestamp(val: string): string {
   }
 }
 
-function getOptionLabel(options: { label: string; value: string }[] | null, val: string): string {
+function getOptionLabel(options: { label: string, value: string }[] | null, val: string): string {
   return options?.find(o => o.value === val)?.label ?? val
 }
 </script>

@@ -10,12 +10,41 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - crm_postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-n8n-db.sql:/docker-entrypoint-initdb.d/init-n8n-db.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U base_user -d devdb"]
       interval: 5s
       timeout: 5s
       retries: 10
 
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n-engine
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_API_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_API_PASSWORD:-changeme}
+      - WEBHOOK_URL=http://n8n:5678/
+      - N8N_HOST=n8n
+      - N8N_PROTOCOL=http
+      - N8N_RUNNERS_ENABLED=true
+      - EXECUTIONS_MODE=regular
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n_db
+      - DB_POSTGRESDB_USER=base_user
+      - DB_POSTGRESDB_PASSWORD=1234
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
-  crm_postgres_data:
+  postgres_data:
+  n8n_data:

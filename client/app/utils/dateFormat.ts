@@ -5,9 +5,9 @@ import type { DateValue } from '@internationalized/date'
 export const dateFormatter = new DateFormatter('ro-RO', { dateStyle: 'medium' })
 
 // Formatter pentru afișare dată și timp
-export const dateTimeFormatter = new DateFormatter('ro-RO', { 
-  dateStyle: 'medium', 
-  timeStyle: 'short' 
+export const dateTimeFormatter = new DateFormatter('ro-RO', {
+  dateStyle: 'medium',
+  timeStyle: 'short'
 })
 
 /**
@@ -51,7 +51,7 @@ export function formatDate(
  */
 export function formatDateTime(
   value: string | Date | DateValue | null | undefined,
-  time?: { hour: number; minute: number },
+  time?: { hour: number, minute: number },
   placeholder: string = 'Selectează data și ora'
 ): string {
   if (!value) return placeholder

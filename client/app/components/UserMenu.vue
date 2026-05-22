@@ -13,7 +13,7 @@ const neutrals = ['slate', 'gray', 'zinc', 'neutral', 'stone']
 
 const { data: session, signOut } = useAuth()
 
-type SessionUser = { id?: number; email?: string; name?: string } | null
+type SessionUser = { id?: number, email?: string, name?: string } | null
 
 const user = computed(() => {
   const u = session.value as SessionUser
@@ -111,7 +111,7 @@ const items = computed<DropdownMenuItem[][]>(() => ([[{
       e.preventDefault()
     }
   }]
-}], 
+}],
 [{
   label: 'Documentation',
   icon: 'i-lucide-book-open',
@@ -126,7 +126,7 @@ const items = computed<DropdownMenuItem[][]>(() => ([[{
   label: 'Log out',
   icon: 'i-lucide-log-out',
   onSelect: async () => {
-    await signOut ({ callbackUrl: '/login'})
+    await signOut ({ callbackUrl: '/login' })
   }
 }]]))
 </script>

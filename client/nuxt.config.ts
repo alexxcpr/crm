@@ -7,12 +7,20 @@ export default defineNuxtConfig({
     '@sidebase/nuxt-auth'
   ],
 
+  devtools: {
+    enabled: true
+  },
+
+  css: ['~/assets/css/main.css'],
+
   runtimeConfig: {
     public: {
       apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:4000/api',
       defaultTenantSlug: process.env.NUXT_PUBLIC_DEFAULT_TENANT_SLUG || 'dev'
     }
   },
+
+  compatibilityDate: '2024-07-11',
 
   auth: {
     isEnabled: true,
@@ -36,21 +44,13 @@ export default defineNuxtConfig({
         sameSiteAttribute: 'lax',
         secureCookieAttribute: false,
         httpOnlyCookieAttribute: false
-      },
+      }
     },
     sessionRefresh: {
       enablePeriodically: false,
-      enableOnWindowFocus: true,
+      enableOnWindowFocus: true
     }
   },
-
-  devtools: {
-    enabled: true
-  },
-
-  css: ['~/assets/css/main.css'],
-
-  compatibilityDate: '2024-07-11',
 
   eslint: {
     config: {

@@ -327,7 +327,6 @@ export class ActionService {
       userId: string | null;
     },
   ) {
-    // TODO: Faza 3 — trigger workflow via n8n API
     await this.eventEmitter.emitAsync('action.executed', {
       actionId: action.id_action,
       actionSlug: action.slug,
