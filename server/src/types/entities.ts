@@ -97,6 +97,8 @@ export interface FieldWithRelation extends Field {
 
 export interface TenantInfo {
   dbName: string;
+  dbUser?: string | null;
+  dbPassword?: string | null;
   plan: string;
   isActive: boolean;
   maxUsers: number;

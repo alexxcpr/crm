@@ -14,8 +14,9 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
 
   runtimeConfig: {
+    apiBaseInternal: process.env.NUXT_API_BASE_INTERNAL || 'http://localhost:4000/api',
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:4000/api',
+      apiBase: process.env.NUXT_PUBLIC_API_BASE || '/api',
       defaultTenantSlug: process.env.NUXT_PUBLIC_DEFAULT_TENANT_SLUG || 'dev'
     }
   },
@@ -24,7 +25,7 @@ export default defineNuxtConfig({
 
   auth: {
     isEnabled: true,
-    baseURL: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:4000/api',
+    baseURL: process.env.NUXT_PUBLIC_API_BASE || '/api',
     globalAppMiddleware: true,
     provider: {
       type: 'local',
@@ -42,8 +43,8 @@ export default defineNuxtConfig({
         cookieName: 'auth.token',
         maxAgeInSeconds: 1800,
         sameSiteAttribute: 'lax',
-        secureCookieAttribute: false,
-        httpOnlyCookieAttribute: false
+        secureCookieAttribute: process.env.NODE_ENV === 'production',
+        httpOnlyCookieAttribute: process.env.NODE_ENV === 'production'
       }
     },
     sessionRefresh: {

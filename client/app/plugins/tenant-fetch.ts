@@ -5,12 +5,13 @@
 export default defineNuxtPlugin(() => {
   const config = useRuntimeConfig()
   const { slug } = useTenant()
-  const apiBase = config.public.apiBase as string
+  const publicApiBase = config.public.apiBase as string
+  const apiBase = import.meta.server ? (config.apiBaseInternal as string) : publicApiBase
 
   globalThis.$fetch = $fetch.create({
     onRequest({ options, request }) {
       const url = typeof request === 'string' ? request : request?.url ?? ''
-      const isApiCall = url.startsWith(apiBase) || url.startsWith('/')
+      const isApiCall = url.startsWith(apiBase) || url.startsWith(publicApiBase) || url.startsWith('/')
 
       if (isApiCall && slug.value) {
         const headers = options.headers ??= new Headers()

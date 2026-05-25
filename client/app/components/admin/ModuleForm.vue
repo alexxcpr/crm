@@ -102,13 +102,13 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
     @submit="onSubmit"
   >
     <UFormField label="Nume" name="name" required>
-      <UInput v-model="state.name" placeholder="ex: CRM" class="w-full" />
+      <UInput v-model="state.name" placeholder="ex: Vanzari" class="w-full" />
     </UFormField>
 
     <UFormField label="Slug" name="slug" required>
       <UInput
         v-model="state.slug"
-        placeholder="ex: crm"
+        placeholder="ex: vanzari"
         :readonly="isEdit"
         :class="{ 'opacity-60': isEdit }"
         class="w-full"

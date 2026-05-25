@@ -1,4 +1,4 @@
-## 🚀 Roadmap Implementare CRM
+## 🚀 Roadmap Implementare Moduvis
 
 cum va functiona in end
     user alege oferta: CRMini / CRMedium / CRMax / CRMega
@@ -52,7 +52,7 @@ cum va functiona in end
   - [ ] Filtrare contacte după funcție (`pozitie`), decizionali (`isDecisionMaker`), etc.
 
 ## De luat in calcul
-- import date din excel -> contacte, companii   (sa se faca mai usor tranzitia catre CRM meu din alte CRM)
+- import date din excel -> contacte, companii   (sa se faca mai usor tranzitia catre Moduvis din alte CRM-uri)
 
 
 ## Ghid start

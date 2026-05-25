@@ -2,16 +2,21 @@ export function useApi() {
   const config = useRuntimeConfig()
   const { token } = useAuth()
   const { slug } = useTenant()
+  const baseURL = import.meta.server
+    ? (config.apiBaseInternal as string)
+    : (config.public.apiBase as string)
 
   const apiFetch = $fetch.create({
-    baseURL: config.public.apiBase as string,
+    baseURL,
     onRequest({ options }) {
+      const headers = new Headers(options.headers)
       if (token.value) {
-        options.headers.set('Authorization', token.value)
+        headers.set('Authorization', token.value)
       }
       if (slug.value) {
-        options.headers.set('X-Tenant', slug.value)
+        headers.set('X-Tenant', slug.value)
       }
+      options.headers = headers
     }
   })
 

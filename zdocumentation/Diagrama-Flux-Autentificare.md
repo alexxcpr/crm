@@ -1,6 +1,6 @@
 # Diagrama flux de autentificare (Auth)
 
-Acest document descrie fluxul de autentificare din backend-ul CRM: înregistrare, autentificare, validare JWT și protecția rutelor.
+Acest document descrie fluxul de autentificare din backend-ul Moduvis: înregistrare, autentificare, validare JWT și protecția rutelor.
 
 ---
 

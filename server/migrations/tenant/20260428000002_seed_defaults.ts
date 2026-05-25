@@ -1,4 +1,4 @@
-import { Knex } from 'knex';
+import type { Knex } from 'knex';
 import * as argon from 'argon2';
 
 export async function up(knex: Knex): Promise<void> {
@@ -20,10 +20,10 @@ export async function up(knex: Knex): Promise<void> {
   // Seed default admin user (password: admin123 — change in production!)
   const hash = await argon.hash('admin123');
   const [adminUser] = await knex('user').insert({
-    email: 'admin@crm.local',
+    email: 'admin@moduvis.local',
     hash,
     first_name: 'Admin',
-    last_name: 'CRM',
+    last_name: 'Admin',
   }).returning('*');
 
   // Assign admin role

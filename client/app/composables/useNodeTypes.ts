@@ -192,7 +192,7 @@ export function useNodeTypes() {
 
   const categories = [
     { key: 'trigger', label: 'Triggers', icon: 'i-lucide-play' },
-    { key: 'action', label: 'Actiuni CRM', icon: 'i-lucide-database' },
+    { key: 'action', label: 'Actiuni', icon: 'i-lucide-database' },
     { key: 'logic', label: 'Logica', icon: 'i-lucide-git-branch' },
     { key: 'integration', label: 'Integratii', icon: 'i-lucide-plug' }
   ]

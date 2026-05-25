@@ -1,50 +1,163 @@
 services:
-  postgres:
-    image: postgres:16
-    container_name: crm-postgres
+  traefik:
+    image: traefik:v3.2
+    container_name: moduvis-traefik
+    restart: unless-stopped
+    command:
+      - --configFile=/etc/traefik/traefik.yml
+    environment:
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN:-}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - traefik_letsencrypt:/letsencrypt
+    networks:
+      - web
+
+  frontend:
+    build:
+      context: ../client
+      args:
+        NUXT_PUBLIC_API_BASE: ${NUXT_PUBLIC_API_BASE:-/api}
+        NUXT_API_BASE_INTERNAL: ${NUXT_API_BASE_INTERNAL:-http://backend:4000/api}
+        NUXT_PUBLIC_DEFAULT_TENANT_SLUG: ${DEFAULT_TENANT_SLUG:-dev}
+    container_name: moduvis-frontend
     restart: unless-stopped
     environment:
-      POSTGRES_USER: base_user
-      POSTGRES_PASSWORD: 1234
-      POSTGRES_DB: devdb
+      NODE_ENV: production
+      NUXT_PUBLIC_API_BASE: ${NUXT_PUBLIC_API_BASE:-/api}
+      NUXT_API_BASE_INTERNAL: ${NUXT_API_BASE_INTERNAL:-http://backend:4000/api}
+      NUXT_PUBLIC_DEFAULT_TENANT_SLUG: ${DEFAULT_TENANT_SLUG:-dev}
+      NUXT_AUTH_ORIGIN: https://${DEFAULT_TENANT_SLUG:-dev}.${DOMAIN_BASE}
+    depends_on:
+      backend:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=moduvis-web
+      - traefik.http.routers.moduvis-frontend.rule=HostRegexp(`${TENANT_HOST_REGEXP}`)
+      - traefik.http.routers.moduvis-frontend.entrypoints=${TRAEFIK_ENTRYPOINTS:-web}
+      - traefik.http.routers.moduvis-frontend.priority=10
+      - traefik.http.routers.moduvis-frontend.tls=${TRAEFIK_TLS:-false}
+      - traefik.http.routers.moduvis-frontend.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-}
+      - traefik.http.routers.moduvis-frontend.middlewares=${TRAEFIK_HTTPS_REDIRECT:-}
+      - traefik.http.services.moduvis-frontend.loadbalancer.server.port=3000
+      - traefik.http.services.moduvis-frontend.loadbalancer.healthcheck.path=/
+    networks:
+      - web
+
+  backend:
+    build:
+      context: ../server
+    container_name: moduvis-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      JWT_SECRET: ${JWT_SECRET}
+      FRONTEND_URL: https://${DEFAULT_TENANT_SLUG:-dev}.${DOMAIN_BASE}
+      DOMAIN_BASE: ${DOMAIN_BASE}
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DEFAULT_TENANT_DB:-devdb}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_ADMIN_USER: ${DB_ADMIN_USER:-${DB_USER}}
+      DB_ADMIN_PASSWORD: ${DB_ADMIN_PASSWORD:-${DB_PASSWORD}}
+      META_DB: ${META_DB:-meta}
+      DEFAULT_TENANT_SLUG: ${DEFAULT_TENANT_SLUG:-dev}
+      DEFAULT_TENANT_DB: ${DEFAULT_TENANT_DB:-devdb}
+      N8N_API_URL: http://n8n:5678
+      N8N_API_KEY: ${N8N_API_KEY}
+      N8N_WEBHOOK_SECRET: ${N8N_WEBHOOK_SECRET}
+      APP_WEBHOOK_BASE_URL: https://${DEFAULT_TENANT_SLUG:-dev}.${DOMAIN_BASE}/api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:4000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=moduvis-web
+      - traefik.http.routers.moduvis-backend.rule=HostRegexp(`${TENANT_HOST_REGEXP}`) && PathPrefix(`/api`)
+      - traefik.http.routers.moduvis-backend.entrypoints=${TRAEFIK_ENTRYPOINTS:-web}
+      - traefik.http.routers.moduvis-backend.priority=100
+      - traefik.http.routers.moduvis-backend.tls=${TRAEFIK_TLS:-false}
+      - traefik.http.routers.moduvis-backend.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-}
+      - traefik.http.routers.moduvis-backend.middlewares=${TRAEFIK_HTTPS_REDIRECT:-}
+      - traefik.http.services.moduvis-backend.loadbalancer.server.port=4000
+      - traefik.http.services.moduvis-backend.loadbalancer.healthcheck.path=/api/health
+    networks:
+      - web
+      - internal
+
+  postgres:
+    image: postgres:16
+    container_name: moduvis-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DEFAULT_TENANT_DB:-devdb}
     ports:
-      - "5433:5432"
+      - "7432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-n8n-db.sql:/docker-entrypoint-initdb.d/init-n8n-db.sql
+      - ./init-meta-db.sql:/docker-entrypoint-initdb.d/init-meta-db.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U base_user -d devdb"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DEFAULT_TENANT_DB:-devdb}"]
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - web
+      - internal
 
   n8n:
     image: n8nio/n8n:latest
     container_name: n8n-engine
     restart: unless-stopped
-    ports:
-      - "5678:5678"
     environment:
-      - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=${N8N_API_USER:-admin}
-      - N8N_BASIC_AUTH_PASSWORD=${N8N_API_PASSWORD:-changeme}
-      - WEBHOOK_URL=http://n8n:5678/
-      - N8N_HOST=n8n
-      - N8N_PROTOCOL=http
-      - N8N_RUNNERS_ENABLED=true
-      - EXECUTIONS_MODE=regular
-      - DB_TYPE=postgresdb
-      - DB_POSTGRESDB_HOST=postgres
-      - DB_POSTGRESDB_PORT=5432
-      - DB_POSTGRESDB_DATABASE=n8n_db
-      - DB_POSTGRESDB_USER=base_user
-      - DB_POSTGRESDB_PASSWORD=1234
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER:-admin}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_BASIC_AUTH_PASSWORD}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_HOST: n8n
+      N8N_PROTOCOL: http
+      WEBHOOK_URL: http://n8n:5678/
+      N8N_RUNNERS_ENABLED: "true"
+      EXECUTIONS_MODE: regular
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: ${N8N_DB:-n8n_db}
+      DB_POSTGRESDB_USER: ${DB_USER}
+      DB_POSTGRESDB_PASSWORD: ${DB_PASSWORD}
     volumes:
       - n8n_data:/home/node/.n8n
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - web
+      - internal
+
+networks:
+  web:
+    name: moduvis-web
+  internal:
+    name: moduvis-internal
+    internal: true
 
 volumes:
   postgres_data:
   n8n_data:
+  traefik_letsencrypt:

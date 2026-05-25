@@ -1,31 +1,78 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TenantInfo } from 'src/types/entities';
+import { MetaDbService } from './meta-db.service';
 
-/**
- * Stub BillingApiClient — returns tenant info from env vars.
- * Replace with real HTTP calls when Billing Service exists.
- */
+interface CachedTenant {
+  value: TenantInfo | null;
+  expiresAt: number;
+}
+
 @Injectable()
 export class BillingApiClient {
   private readonly logger = new Logger(BillingApiClient.name);
   private readonly defaultSlug: string;
   private readonly defaultDbName: string;
+  private readonly isProduction: boolean;
+  private readonly cache = new Map<string, CachedTenant>();
+  private readonly cacheTtlMs = 60 * 1000;
 
-  constructor(private readonly config: ConfigService) {
+  constructor(
+    private readonly config: ConfigService,
+    private readonly metaDb: MetaDbService,
+  ) {
     this.defaultSlug = config.get<string>('DEFAULT_TENANT_SLUG', 'dev');
     this.defaultDbName = config.get<string>('DEFAULT_TENANT_DB', 'devdb');
+    this.isProduction = config.get<string>('NODE_ENV') === 'production';
   }
 
   async getCompanyBySlug(slug: string): Promise<TenantInfo | null> {
-    // TODO: Replace with HTTP call to Billing Service
-    // GET ${BILLING_API_URL}/companies/${slug}
-    this.logger.debug(`[STUB] Resolving tenant "${slug}" → db "${this.defaultDbName}"`);
-
-    if (slug !== this.defaultSlug) {
-      this.logger.warn(`[STUB] Unknown tenant slug "${slug}", falling back to default`);
+    const normalizedSlug = slug.toLowerCase();
+    const cached = this.cache.get(normalizedSlug);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.value;
     }
 
+    try {
+      const row = await this.metaDb.knex('tenants')
+        .select('db_name', 'db_user', 'db_password_encrypted', 'plan', 'is_active', 'max_users')
+        .where({ slug: normalizedSlug })
+        .first();
+
+      const tenant = row
+        ? {
+            dbName: row.db_name,
+            dbUser: row.db_user,
+            dbPassword: row.db_password_encrypted,
+            plan: row.plan,
+            isActive: row.is_active,
+            maxUsers: row.max_users,
+          }
+        : null;
+
+      this.cache.set(normalizedSlug, {
+        value: tenant,
+        expiresAt: Date.now() + this.cacheTtlMs,
+      });
+
+      return tenant;
+    } catch (error) {
+      this.logger.error(`Failed to resolve tenant "${normalizedSlug}" from meta DB`, error as Error);
+
+      if (this.isProduction) {
+        throw error;
+      }
+
+      return this.resolveDevFallback(normalizedSlug);
+    }
+  }
+
+  private resolveDevFallback(slug: string): TenantInfo | null {
+    if (slug !== this.defaultSlug) {
+      this.logger.warn(`Unknown tenant slug "${slug}", falling back to default dev tenant`);
+    }
+
+    if (!this.defaultDbName) return null;
     return {
       dbName: this.defaultDbName,
       plan: 'starter',

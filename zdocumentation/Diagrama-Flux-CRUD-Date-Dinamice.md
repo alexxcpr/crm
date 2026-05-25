@@ -1,6 +1,6 @@
 # Diagrama flux CRUD date dinamice
 
-Acest document descrie fluxul datelor din backend-ul CRM: cum ajung datele de la client la baza de date și înapoi, pentru operațiunile CRUD pe entități dinamice (contacts, companies etc.).
+Acest document descrie fluxul datelor din backend-ul Moduvis: cum ajung datele de la client la baza de date și înapoi, pentru operațiunile CRUD pe entități dinamice (contacts, companies etc.).
 
 ---
 

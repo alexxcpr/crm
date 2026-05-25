@@ -17,8 +17,8 @@ useHead({
   }
 })
 
-const title = 'Alex Stanciulescu CRM Platform'
-const description = 'A professional CRM Platform built with Nuxt UI.'
+const title = 'Moduvis Platform'
+const description = 'Platform builder pentru crearea de module personalizate — CRM, ERP, HR, WMS si orice altceva.'
 
 useSeoMeta({
   title,
