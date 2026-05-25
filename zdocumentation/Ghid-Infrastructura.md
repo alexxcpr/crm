@@ -11,40 +11,53 @@ Acest document acoperă pașii necesari pentru a porni infrastructura Moduvis î
 
 # Partea 1 — Testare locală (localhost)
 
-Această variantă pornește fiecare serviciu individual, direct pe mașina ta. Ideal pentru development.
+**Abordare hibridă recomandată:** PostgreSQL și n8n rulează prin Docker (identic cu producția), iar backend-ul și frontend-ul rulează nativ cu hot reload (development rapid).
+
+```
+Postgres ─── Docker  (același container ca în producție)
+n8n ──────── Docker  (același container ca în producție)
+Backend ──── npm run dev  (hot reload, port 4000)
+Frontend ─── pnpm dev      (hot reload, port 3000)
+```
+
+**De ce hibrid și nu full Docker Compose local:**
+
+| Problemă | Impact |
+|----------|--------|
+| **Rebuild la fiecare schimbare** | 30-60 secunde vs 1-2 secunde cu hot reload |
+| **Docker pe Windows e lent** | I/O pe volume mounts e de 3-5x mai slab ca nativ |
+| **Debugging dificil** | Fără source maps directe, fără atașare ușoară de debugger |
+
+**Ce rămâne identic cu producția:**
+
+- PostgreSQL — același container, aceleași baze, aceleași credentiale
+- n8n — același container, aceeași configurare
+- Conexiunile între servicii — backend → Postgres pe `localhost:5433`, backend → n8n pe `localhost:5678`
+
+**Ce diferă față de producție:**
+
+- Nu ai Traefik (nu e nevoie de reverse proxy pe localhost)
+- Nu ai HTTPS (localhost e considerat secure de browser)
+- Backend-ul și frontend-ul rulează cu hot reload, nu build-ul de producție
+
+---
 
 ## 1.1 — Cerințe
-
 
 | Software                               | Versiune minimă | Verificare         |
 | -------------------------------------- | --------------- | ------------------ |
 | **Node.js**                            | 22.x            | `node --version`   |
 | **npm**                                | 10.x            | `npm --version`    |
 | **pnpm**                               | 9.x             | `pnpm --version`   |
-| **PostgreSQL**                         | 16              | `psql --version`   |
 | **Docker Desktop** (sau doar `docker`) | recent          | `docker --version` |
 
-
-Dacă nu ai PostgreSQL instalat local, poți porni unul rapid prin Docker (vezi pasul următor).
-
-n8n-ul rulează doar prin Docker — nu e critic pentru development, dar e necesar pentru workflow-uri.
+> Nu ai nevoie de PostgreSQL instalat local — îl pornim prin Docker.
 
 ---
 
-## 1.2 — Pornește PostgreSQL
+## 1.2 — Pornește PostgreSQL (Docker)
 
-### Varianta A — PostgreSQL instalat local
-
-Asigură-te că PostgreSQL rulează pe portul `5432` (implicit). Creează manual bazele de care ai nevoie:
-
-```sql
-CREATE DATABASE meta;
-CREATE DATABASE devdb;
-```
-
-### Varianta B — PostgreSQL prin Docker (recomandat)
-
-Din folderul `server/`, folosește scripturile npm:
+Din folderul `server/`:
 
 ```powershell
 cd server
@@ -53,9 +66,10 @@ npm run db-dev-up
 
 Aceasta pornește un container `postgres:16` cu:
 
-- Port host: `5433` (ca să nu intre în conflict cu un Postgres local)
+- Port host: `5433` (nu intră în conflict cu un Postgres local)
 - User: `base_user`
 - Parolă: `1234`
+- Baze create automat: `devdb`, `meta`, `n8n_db`
 
 Verifică:
 
@@ -70,34 +84,21 @@ docker ps
 
 ### Backend (`server/.env`)
 
-Fișierul există deja în repo. Verifică doar că variabilele de conectare la DB corespund cu ce rulezi:
+Fișierul există deja în repo, configurat pentru portul `5433`. Dacă ai nevoie de alt port, ajustează:
 
 ```ini
-# Dacă folosești Varianta A (Postgres local, port 5432):
-DATABASE_URL="postgresql://base_user:1234@localhost:5432/devdb?schema=public"
-DB_HOST="localhost"
-DB_PORT=5432
-
-# Dacă folosești Varianta B (Docker, port 5433):
 DATABASE_URL="postgresql://base_user:1234@localhost:5433/devdb?schema=public"
 DB_HOST="localhost"
 DB_PORT=5433
+DB_USER="base_user"
+DB_PASSWORD="1234"
+DEFAULT_TENANT_SLUG="dev"
+DEFAULT_TENANT_DB="devdb"
+META_DB="meta"
+JWT_SECRET="orice-string-lung"
+FRONTEND_URL="http://localhost:3000"
+N8N_API_URL="http://localhost:5678"
 ```
-
-Variabilele esențiale pe care trebuie să le verifici:
-
-
-| Variabilă             | Valoare locală          | Descriere                                  |
-| --------------------- | ----------------------- | ------------------------------------------ |
-| `JWT_SECRET`          | orice string lung       | Secret pentru semnare token JWT            |
-| `DB_USER`             | `base_user`             | User PostgreSQL                            |
-| `DB_PASSWORD`         | `1234`                  | Parolă PostgreSQL                          |
-| `DEFAULT_TENANT_SLUG` | `dev`                   | Slug-ul tenant-ului implicit               |
-| `DEFAULT_TENANT_DB`   | `devdb`                 | Baza de date implicită                     |
-| `META_DB`             | `meta`                  | Baza de date pentru registry-ul de tenanți |
-| `FRONTEND_URL`        | `http://localhost:3000` | URL frontend (CORS)                        |
-| `N8N_API_URL`         | `http://localhost:5678` | URL n8n (dacă rulezi n8n)                  |
-
 
 ### Frontend (`client/.env`)
 
@@ -107,18 +108,16 @@ NUXT_PUBLIC_AUTH_BASE_URL="/api"
 NUXT_API_BASE_INTERNAL="http://localhost:4000/api"
 ```
 
-> `NUXT_API_BASE_INTERNAL` este folosit de server-side rendering (SSR) pentru a apela backend-ul direct.
+> `NUXT_API_BASE_INTERNAL` e folosit de server-side rendering (SSR) pentru a apela backend-ul direct.
 
 ---
 
 ## 1.4 — Instalează dependențe
 
 ```powershell
-# Backend
 cd server
 npm install
 
-# Frontend
 cd ../client
 pnpm install
 ```
@@ -142,7 +141,7 @@ npm run db:migrate
 Ce se întâmplă:
 
 - **Meta migration** creează tabela `tenants` în baza `meta` — aici se înregistrează fiecare tenant
-- **Tenant migration** creează toate tabelele Moduvis (`user`, `role`, `entity`, `field`, `module`, etc.) în baza `devdb`
+- **Tenant migration** creează toate tabelele Moduvis (`user`, `role`, `entity`, `field`, `module`, etc.) în baza `devdb` și seed-uiește adminul default
 
 Dacă ai nevoie de un reset complet:
 
@@ -159,7 +158,7 @@ cd server
 npm run dev
 ```
 
-Backend-ul pornește pe `http://localhost:4000`. Verifică:
+Backend-ul pornește pe `http://localhost:4000` cu hot reload. Verifică:
 
 ```powershell
 curl http://localhost:4000/api/health
@@ -175,29 +174,29 @@ cd client
 pnpm dev
 ```
 
-Frontend-ul pornește pe `http://localhost:3000`.
+Frontend-ul pornește pe `http://localhost:3000` cu hot reload (HMR).
 
 ---
 
 ## 1.8 — (Opțional) Pornește n8n
 
-Dacă ai nevoie de workflow-uri:
+Dacă ai nevoie de workflow-uri. Containerul se conectează la același Postgres:
 
 ```powershell
-docker run -d \
-  --name n8n-dev \
-  -p 5678:5678 \
-  -e N8N_BASIC_AUTH_ACTIVE=true \
-  -e N8N_BASIC_AUTH_USER=admin \
-  -e N8N_BASIC_AUTH_PASSWORD=admin123 \
-  -e N8N_ENCRYPTION_KEY=un-minim-32-de-caractere-aici-ok \
-  -e DB_TYPE=postgresdb \
-  -e DB_POSTGRESDB_HOST=host.docker.internal \
-  -e DB_POSTGRESDB_PORT=5433 \
-  -e DB_POSTGRESDB_DATABASE=n8n_db \
-  -e DB_POSTGRESDB_USER=base_user \
-  -e DB_POSTGRESDB_PASSWORD=1234 \
-  -v n8n_data:/home/node/.n8n \
+docker run -d `
+  --name n8n-dev `
+  -p 5678:5678 `
+  -e N8N_BASIC_AUTH_ACTIVE=true `
+  -e N8N_BASIC_AUTH_USER=admin `
+  -e N8N_BASIC_AUTH_PASSWORD=admin123 `
+  -e N8N_ENCRYPTION_KEY=un-minim-32-de-caractere-aici-ok `
+  -e DB_TYPE=postgresdb `
+  -e DB_POSTGRESDB_HOST=host.docker.internal `
+  -e DB_POSTGRESDB_PORT=5433 `
+  -e DB_POSTGRESDB_DATABASE=n8n_db `
+  -e DB_POSTGRESDB_USER=base_user `
+  -e DB_POSTGRESDB_PASSWORD=1234 `
+  -v n8n_data:/home/node/.n8n `
   n8nio/n8n:latest
 ```
 
