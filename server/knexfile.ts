@@ -1,12 +1,15 @@
 import 'dotenv/config';
 import type { Knex } from 'knex';
-import { existsSync } from 'fs';
+import { existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 
 function migrationDirectory(kind: 'meta' | 'tenant') {
   const compiled = join(__dirname, 'migrations', kind);
-  if (existsSync(compiled)) {
+  if (existsSync(compiled) && readdirSync(compiled).some(f => f.endsWith('.js'))) {
     return { directory: compiled, extension: 'js', loadExtensions: ['.js'] };
+  }
+  if (existsSync(compiled) && readdirSync(compiled).some(f => f.endsWith('.ts'))) {
+    return { directory: compiled, extension: 'ts', loadExtensions: ['.ts'] };
   }
   return { directory: join(__dirname, '..', 'migrations', kind), extension: 'ts', loadExtensions: ['.ts'] };
 }
@@ -49,7 +52,7 @@ const config: Record<string, Knex.Config> = {
     migrations: {
       directory: tenantMigrations.directory,
       extension: tenantMigrations.extension,
-      loadExtensions: ['.js']
+      loadExtensions: ['.js', '.ts']
     },
   },
 
@@ -59,7 +62,7 @@ const config: Record<string, Knex.Config> = {
     migrations: {
       directory: metaMigrations.directory,
       extension: metaMigrations.extension,
-      loadExtensions: ['.js'],
+      loadExtensions: ['.js', '.ts'],
     },
   },
 };

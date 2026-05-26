@@ -17,4 +17,16 @@
   --color-green-800: #016538;
   --color-green-900: #0A5331;
   --color-green-950: #052E16;
+
+  --color-violet-50: #f8f6ff;
+  --color-violet-100: #efe0ff;
+  --color-violet-200: #ddc8fe;
+  --color-violet-300: #c4a5fd;
+  --color-violet-400: #9d6ff7;
+  --color-violet-500: #6d28d9;
+  --color-violet-600: #5b1db5;
+  --color-violet-700: #491494;
+  --color-violet-800: #370d76;
+  --color-violet-900: #26085b;
+  --color-violet-950: #17043d;
 }
