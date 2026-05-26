@@ -100,7 +100,7 @@ const statusLabels: Record<string, string> = {
   <div v-if="workflow" class="flex flex-col h-[calc(100vh-180px)]">
     <!-- Top Bar -->
     <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-3">
         <UButton
           icon="i-lucide-arrow-left"
           variant="ghost"
@@ -110,15 +110,16 @@ const statusLabels: Record<string, string> = {
         />
         <UInput
           v-model="name"
-          placeholder="Nume workflow"
-          size="sm"
-          class="w-52"
+          placeholder="Denumire workflow..."
+          size="md"
+          variant="none"
+          class="w-72 font-semibold text-lg"
         />
         <UBadge
           :label="statusLabels[workflow.status] ?? workflow.status"
           :color="(statusColors[workflow.status] ?? 'neutral') as any"
           variant="subtle"
-          size="xs"
+          size="sm"
         />
         <span class="text-xs text-gray-400">v{{ workflow.version }}</span>
       </div>
@@ -128,8 +129,8 @@ const statusLabels: Record<string, string> = {
           v-if="isDirty"
           label="Nesalvat"
           color="warning"
-          variant="subtle"
-          size="xs"
+          variant="solid"
+          size="md"
         />
 
         <UButton
@@ -138,7 +139,7 @@ const statusLabels: Record<string, string> = {
           icon="i-lucide-play"
           color="success"
           variant="soft"
-          size="xs"
+          size="sm"
           :loading="loading"
           @click="onActivate"
         />
@@ -148,7 +149,7 @@ const statusLabels: Record<string, string> = {
           icon="i-lucide-pause"
           color="warning"
           variant="soft"
-          size="xs"
+          size="sm"
           :loading="loading"
           @click="onDeactivate"
         />
@@ -158,7 +159,7 @@ const statusLabels: Record<string, string> = {
           icon="i-lucide-refresh-cw"
           variant="soft"
           color="neutral"
-          size="xs"
+          size="sm"
           :loading="loading"
           @click="onSync"
         />
