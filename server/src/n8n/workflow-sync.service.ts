@@ -19,10 +19,22 @@ interface ConnectionDefinition {
   targetHandle?: string;
 }
 
+interface FieldMapping {
+  key: string;
+  sourceType: 'static' | 'current_record' | 'previous_node' | 'relation' | 'expression';
+  value: string;
+}
+
+interface RecordIdSource {
+  sourceType: 'static' | 'current_record' | 'previous_node';
+  value: string;
+}
+
 @Injectable()
 export class WorkflowSyncService {
   private readonly logger = new Logger(WorkflowSyncService.name);
   private readonly webhookBaseUrl: string;
+  private readonly webhookSecret: string;
 
   constructor(
     private readonly n8nClient: N8nApiClient,
@@ -33,6 +45,7 @@ export class WorkflowSyncService {
       'APP_WEBHOOK_BASE_URL',
       'http://localhost:4000/api',
     );
+    this.webhookSecret = config.get<string>('N8N_WEBHOOK_SECRET', '');
   }
 
   private get knex() {
@@ -142,7 +155,7 @@ export class WorkflowSyncService {
   async executeWorkflow(
     workflowId: string,
     inputData: Record<string, any>,
-  ): Promise<{ executionId: string }> {
+  ): Promise<{ executionId: string; result: any }> {
     const workflow = await this.knex('workflow_definition')
       .where('id_workflow', workflowId)
       .first();
@@ -151,18 +164,29 @@ export class WorkflowSyncService {
       throw new Error(`Workflow ${workflowId} not found`);
     }
 
-    let n8nId = workflow.n8n_workflow_id;
-    if (!n8nId) {
-      n8nId = await this.syncWorkflow(workflowId);
+    if (!this.workflowHasActivatableTrigger(workflow)) {
+      throw new Error(
+        `Workflow "${workflow.slug}" does not have a webhook trigger. Add an Event Trigger node to enable external execution.`,
+      );
     }
 
-    const execution = await this.n8nClient.executeWorkflow(n8nId, inputData);
+    // Always sync before execution to ensure n8n has the latest node translations
+    const n8nId = await this.syncWorkflow(workflowId);
+
+    // Ensure the workflow is activated in n8n so the webhook URL is live
+    await this.n8nClient.activateWorkflow(n8nId);
+
+    const tenantSlug = this.tenantContext.isAvailable
+      ? this.tenantContext.slug
+      : 'unknown';
+    const webhookPath = `crm-${tenantSlug}-${workflow.slug}`;
+    const result = await this.n8nClient.executeWebhook(webhookPath, inputData);
 
     this.logger.log(
-      `Executed workflow "${workflow.slug}" → execution:${execution.id}`,
+      `Executed workflow "${workflow.slug}" via webhook ${webhookPath}`,
     );
 
-    return { executionId: execution.id };
+    return { executionId: `webhook:${webhookPath}`, result };
   }
 
   @OnEvent('action.executed')
@@ -201,13 +225,47 @@ export class WorkflowSyncService {
     }
   }
 
+  private resolveFieldMappings(mappings: FieldMapping[]): Record<string, string> {
+    const result: Record<string, string> = {};
+    for (const m of mappings) {
+      if (!m.key) continue;
+      switch (m.sourceType) {
+        case 'static':
+          result[m.key] = m.value;
+          break;
+        case 'current_record':
+          result[m.key] = `={{$json.body.record.${m.value}}}`;
+          break;
+        case 'previous_node':
+          result[m.key] = `={{$json.${m.value}}}`;
+          break;
+        case 'expression':
+          result[m.key] = m.value;
+          break;
+        default:
+          result[m.key] = m.value;
+      }
+    }
+    return result;
+  }
+
+  private resolveRecordId(source: RecordIdSource): string {
+    if (source.sourceType === 'current_record') {
+      return `={{$json.body.${source.value}}}`;
+    }
+    if (source.sourceType === 'previous_node') {
+      return `={{$json.${source.value}}}`;
+    }
+    return source.value;
+  }
+
   private workflowHasActivatableTrigger(workflow: { nodes: any }): boolean {
     const nodes: NodeDefinition[] =
       typeof workflow.nodes === 'string'
         ? JSON.parse(workflow.nodes)
         : workflow.nodes ?? [];
 
-    const activatableTypes = ['webhook_trigger'];
+    const activatableTypes = ['start', 'webhook_trigger', 'trigger'];
     return nodes.some((n) => activatableTypes.includes(n.type));
   }
 
@@ -232,8 +290,16 @@ export class WorkflowSyncService {
       : 'unknown';
 
     const n8nNodes = nodes.map((node, index) =>
-      this.translateNode(node, index),
+      this.translateNode(node, index, tenantSlug),
     );
+
+    // Set predictable webhook path so we can call it from the CRM
+    const webhookPath = `crm-${tenantSlug}-${workflow.slug}`;
+    for (const n8nNode of n8nNodes) {
+      if (n8nNode.type === 'n8n-nodes-base.webhook' && n8nNode.parameters) {
+        n8nNode.parameters.path = webhookPath;
+      }
+    }
 
     const n8nConnections = this.translateConnections(connections, nodes);
 
@@ -252,9 +318,12 @@ export class WorkflowSyncService {
   private translateNode(
     node: NodeDefinition,
     index: number,
+    tenantSlug: string,
   ): Record<string, any> {
     const typeMap: Record<string, string> = {
-      trigger: 'n8n-nodes-base.manualTrigger',
+      start: 'n8n-nodes-base.webhook',
+      // backward compat — old node types, treat as start
+      trigger: 'n8n-nodes-base.webhook',
       webhook_trigger: 'n8n-nodes-base.webhook',
       http_request: 'n8n-nodes-base.httpRequest',
       email: 'n8n-nodes-base.emailSend',
@@ -274,9 +343,9 @@ export class WorkflowSyncService {
       id: node.id,
       name,
       type: n8nType,
-      typeVersion: 1,
+      typeVersion: n8nType === 'n8n-nodes-base.httpRequest' ? 4 : 1,
       position: [node.position?.x ?? index * 250, node.position?.y ?? 0],
-      parameters: this.translateParameters(node.type, node.parameters ?? {}),
+      parameters: this.translateParameters(node.type, node.parameters ?? {}, tenantSlug),
     };
 
     return n8nNode;
@@ -285,41 +354,132 @@ export class WorkflowSyncService {
   private translateParameters(
     nodeType: string,
     params: Record<string, any>,
+    tenantSlug: string,
   ): Record<string, any> {
+    const webhookDataBase = `${this.webhookBaseUrl}/v1/webhooks/n8n/${tenantSlug}/data`;
+
+    const webhookHeaders = this.webhookSecret
+      ? {
+          sendHeaders: true,
+          headerParameters: {
+            parameters: [
+              { name: 'x-webhook-secret', value: this.webhookSecret },
+            ],
+          },
+        }
+      : { sendHeaders: false };
+
     switch (nodeType) {
-      case 'app_get_record':
-        return {
-          method: 'GET',
-          url: `${this.webhookBaseUrl}/v1/data/${params.entity ?? ''}/${params.recordId ?? '{{$json.recordId}}'}`,
-          authentication: 'genericCredentialType',
-          options: {},
-        };
+      case 'app_get_record': {
+          const getEntity = !!params.entity;
+          const getRecId = !!params.recordId;
 
-      case 'app_update_record':
-        return {
-          method: 'PUT',
-          url: `${this.webhookBaseUrl}/v1/data/${params.entity ?? ''}/${params.recordId ?? '{{$json.recordId}}'}`,
-          sendBody: true,
-          bodyParameters: {
-            parameters: Object.entries(params.fields ?? {}).map(
-              ([key, value]) => ({ name: key, value }),
-            ),
-          },
-          options: {},
-        };
+          if (getEntity && getRecId) {
+            return {
+              method: 'GET',
+              url: `${webhookDataBase}/${params.entity}/${params.recordId}`,
+              authentication: 'none',
+              ...webhookHeaders,
+              options: {},
+            };
+          }
 
-      case 'app_create_record':
-        return {
-          method: 'POST',
-          url: `${this.webhookBaseUrl}/v1/data/${params.entity ?? ''}`,
-          sendBody: true,
-          bodyParameters: {
-            parameters: Object.entries(params.fields ?? {}).map(
-              ([key, value]) => ({ name: key, value }),
-            ),
-          },
-          options: {},
-        };
+          return {
+            method: 'GET',
+            url: `${webhookDataBase}-resolve`,
+            authentication: 'none',
+            sendQuery: true,
+            queryParameters: {
+              parameters: [
+                { name: 'entity', value: getEntity ? params.entity : '={{ $json.body.entity }}' },
+                { name: 'id', value: getRecId ? params.recordId : '={{ $json.body.recordId }}' },
+              ],
+            },
+            ...webhookHeaders,
+            options: {},
+          };
+        }
+
+      case 'app_update_record': {
+          const updEntity = !!params.entity;
+
+          const resolvedFields =
+            params.fieldMappings?.length
+              ? this.resolveFieldMappings(params.fieldMappings)
+              : (params.fields ?? {});
+
+          const resolvedRecordId = params.recordIdSource
+            ? this.resolveRecordId(params.recordIdSource)
+            : params.recordId;
+
+          const updRecId = !!resolvedRecordId;
+
+          const shared = {
+            method: 'PUT' as const,
+            authentication: 'none' as const,
+            sendBody: true,
+            bodyParameters: {
+              parameters: Object.entries(resolvedFields).map(
+                ([key, value]) => ({ name: key, value }),
+              ),
+            },
+            ...webhookHeaders,
+            options: {},
+          };
+
+          if (updEntity && updRecId) {
+            return { ...shared, url: `${webhookDataBase}/${params.entity}/${resolvedRecordId}` };
+          }
+
+          return {
+            ...shared,
+            url: `${webhookDataBase}-resolve`,
+            sendQuery: true,
+            queryParameters: {
+              parameters: [
+                { name: 'entity', value: updEntity ? params.entity : '={{ $json.body.entity }}' },
+                { name: 'id', value: updRecId ? resolvedRecordId : '={{ $json.body.recordId }}' },
+              ],
+            },
+          };
+        }
+
+      case 'app_create_record': {
+          const createEntity = !!params.entity;
+
+          const resolvedFields =
+            params.fieldMappings?.length
+              ? this.resolveFieldMappings(params.fieldMappings)
+              : (params.fields ?? {});
+
+          const shared = {
+            method: 'POST' as const,
+            authentication: 'none' as const,
+            sendBody: true,
+            bodyParameters: {
+              parameters: Object.entries(resolvedFields).map(
+                ([key, value]) => ({ name: key, value }),
+              ),
+            },
+            ...webhookHeaders,
+            options: {},
+          };
+
+          if (createEntity) {
+            return { ...shared, url: `${webhookDataBase}/${params.entity}` };
+          }
+
+          return {
+            ...shared,
+            url: `${webhookDataBase}-resolve`,
+            sendQuery: true,
+            queryParameters: {
+              parameters: [
+                { name: 'entity', value: '={{ $json.body.entity }}' },
+              ],
+            },
+          };
+        }
 
       case 'email':
         return {
@@ -360,6 +520,16 @@ export class WorkflowSyncService {
       case 'code':
         return {
           jsCode: params.code ?? 'return items;',
+        };
+
+      case 'start':
+      case 'webhook_trigger':
+      case 'trigger':
+        return {
+          httpMethod: 'POST',
+          path: '',
+          responseMode: 'lastNode',
+          options: {},
         };
 
       default:

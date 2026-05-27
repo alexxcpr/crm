@@ -102,6 +102,17 @@ export class WorkflowService {
       throw new NotFoundException(`Workflow-ul "${id}" nu a fost gasit.`);
     }
 
+    const linkedActions = await this.knex('action_definition')
+      .select('name', 'slug')
+      .where('id_workflow', id);
+
+    if (linkedActions.length > 0) {
+      const names = linkedActions.map((a: any) => `"${a.name}"`).join(', ');
+      throw new ConflictException(
+        `Workflow-ul "${existing.name}" nu poate fi sters deoarece este asociat cu ${linkedActions.length > 1 ? 'actiunile' : 'actiunea'}: ${names}. Dezactiveaza sau sterge mai intai actiunile asociate.`,
+      );
+    }
+
     await this.syncService.deleteWorkflow(id);
     await this.knex(this.TABLE).where('id_workflow', id).del();
     this.logger.log(`Workflow sters: ${existing.slug}`);

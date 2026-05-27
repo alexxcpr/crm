@@ -121,6 +121,12 @@ export function useWorkflowBuilder(flowId?: string) {
     isDirty.value = true
   }
 
+  function initStartNode() {
+    if (nodes.value.length > 0) return
+    addNode('start', { x: 250, y: 200 })
+    isDirty.value = false
+  }
+
   function loadWorkflow(workflowNodes: WorkflowNode[], workflowConnections: WorkflowConnection[]) {
     const flowNodes: Node[] = workflowNodes.map((wn) => {
       const nodeDef = getNodeType(wn.type)
@@ -186,6 +192,7 @@ export function useWorkflowBuilder(flowId?: string) {
     deleteSelectedNode,
     deleteEdge,
     loadWorkflow,
+    initStartNode,
     exportWorkflow,
     fitView,
     project

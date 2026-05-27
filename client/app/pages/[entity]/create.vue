@@ -30,7 +30,7 @@ const { entity: entityMeta } = useEntitySchema(entitySlug)
     </template>
 
     <template #body>
-      <div class="max-w-6xl p-6">
+      <div class="max-w-[95%] px-4 py-6">
         <DynamicForm
           :entity="entitySlug"
           @saved="(record) => navigateTo(`/${entitySlug}/${record.id}`, { replace: true })"

@@ -121,16 +121,32 @@ export class N8nApiClient implements OnModuleInit {
     return this.request<N8nWorkflowResponse>('GET', `/workflows/${id}`);
   }
 
-  async executeWorkflow(
-    id: string,
+  async executeWebhook(
+    path: string,
     data: Record<string, any>,
-  ): Promise<N8nExecution> {
-    this.logger.log(`Executing n8n workflow: ${id}`);
-    return this.request<N8nExecution>('POST', `/workflows/${id}/run`, data);
+  ): Promise<any> {
+    const url = `${this.baseUrl}/webhook/${path}`;
+    this.logger.log(`Calling n8n webhook: ${url}`);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      this.logger.error(
+        `n8n webhook ${path} failed (${response.status}): ${errorBody}`,
+      );
+      throw new Error(`n8n webhook error: ${response.status} ${errorBody}`);
+    }
+
+    return response.json();
   }
 
-  async getExecution(executionId: string): Promise<N8nExecution> {
-    return this.request<N8nExecution>('GET', `/executions/${executionId}`);
+  async getExecution(id: string): Promise<N8nExecution> {
+    return this.request<N8nExecution>('GET', `/executions/${id}`);
   }
 
   async isHealthy(): Promise<boolean> {

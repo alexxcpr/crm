@@ -39,7 +39,7 @@ export class BillingApiClient {
         .where({ slug: normalizedSlug })
         .first();
 
-      const tenant = row
+      let tenant: TenantInfo | null = row
         ? {
             dbName: row.db_name,
             dbUser: row.db_user,
@@ -49,6 +49,13 @@ export class BillingApiClient {
             maxUsers: row.max_users,
           }
         : null;
+
+      if (!this.isProduction && !tenant) {
+        this.logger.warn(
+          `Tenant "${normalizedSlug}" not found in meta DB, falling back to dev default`,
+        );
+        tenant = this.resolveDevFallback(normalizedSlug);
+      }
 
       this.cache.set(normalizedSlug, {
         value: tenant,
@@ -63,7 +70,12 @@ export class BillingApiClient {
         throw error;
       }
 
-      return this.resolveDevFallback(normalizedSlug);
+      const fallback = this.resolveDevFallback(normalizedSlug);
+      this.cache.set(normalizedSlug, {
+        value: fallback,
+        expiresAt: Date.now() + this.cacheTtlMs,
+      });
+      return fallback;
     }
   }
 

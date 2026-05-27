@@ -30,7 +30,7 @@ function getDesktopStyle(placedField: PlacedField) {
       />
     </div>
 
-    <div class="hidden md:grid md:grid-cols-3 md:gap-x-8 md:gap-y-6">
+    <div class="hidden md:grid md:grid-cols-3 md:gap-x-4 md:gap-y-6">
       <div
         v-for="placedField in placedFields"
         :key="placedField.field.id_field"

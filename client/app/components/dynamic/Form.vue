@@ -224,6 +224,16 @@ function buildPayload(): Record<string, any> {
 }
 
 const loading = computed(() => schemaLoading.value || initialLoading.value)
+
+const { visibleActions, executeAction: executeEntityAction } = useEntityActions(() => props.entity)
+const executingAction = ref<string | null>(null)
+
+async function handleAction(actionSlug: string, actionName: string) {
+  if (!props.recordId) return
+  executingAction.value = actionSlug
+  await executeEntityAction(actionSlug, props.recordId)
+  executingAction.value = null
+}
 </script>
 
 <template>
@@ -254,107 +264,139 @@ const loading = computed(() => schemaLoading.value || initialLoading.value)
     @submit="onSubmit"
     @error="onFormError"
   >
-    <!-- Single group: render directly -->
-    <template v-if="groups.length <= 1">
-      <DynamicFormGrid :fields="getFieldsByGroup(groups[0] ?? 'general')" :form-state="formState" />
-    </template>
+    <div class="flex gap-6">
+      <!-- Left: form fields + actions -->
+      <div class="flex-1 min-w-0 space-y-6">
+        <!-- Single group: render directly -->
+        <template v-if="groups.length <= 1">
+          <DynamicFormGrid :fields="getFieldsByGroup(groups[0] ?? 'general')" :form-state="formState" />
+        </template>
 
-    <!-- Multiple groups: use tabs -->
-    <UTabs
-      v-else
-      v-model="activeTab"
-      :items="tabItems"
-      orientation="vertical"
-      class="w-full"
-      :ui="{
-        root: 'flex flex-col md:flex-row items-start gap-6',
-        list: 'w-full md:w-56 shrink-0 max-h-[20vh] md:max-h-[70vh] overflow-y-auto',
-        trigger: 'justify-start w-full text-left snap-center shrink-0',
-        content: 'w-full flex-1 min-w-0'
-      }"
-    >
-      <template v-for="group in groups" :key="group" #[group]>
-        <div class="pt-2 md:pt-0">
-          <DynamicFormGrid :fields="getFieldsByGroup(group)" :form-state="formState" />
-        </div>
-      </template>
-    </UTabs>
+        <!-- Multiple groups: use tabs -->
+        <UTabs
+          v-else
+          v-model="activeTab"
+          :items="tabItems"
+          orientation="vertical"
+          class="w-full"
+          :ui="{
+            root: 'flex flex-col md:flex-row items-start gap-6',
+            list: 'w-full md:w-56 shrink-0 max-h-[20vh] md:max-h-[70vh] overflow-y-auto',
+            trigger: 'justify-start w-full text-left snap-center shrink-0',
+            content: 'w-full flex-1 min-w-0'
+          }"
+        >
+          <template v-for="group in groups" :key="group" #[group]>
+            <div class="pt-2 md:pt-0">
+              <DynamicFormGrid :fields="getFieldsByGroup(group)" :form-state="formState" />
+            </div>
+          </template>
+        </UTabs>
 
-    <!-- Metadate - collapsable pe mobil -->
-    <template v-if="isEditMode">
-      <UCollapsible
-        class="flex flex-col gap-2 w-full"
-        :default-open="!isMobile"
-      >
-        <template #default="{ open }">
-          <UButton
-            color="neutral"
-            variant="ghost"
-            class="w-full justify-between"
+        <!-- Metadate - collapsable pe mobil -->
+        <template v-if="isEditMode">
+          <UCollapsible
+            class="flex flex-col gap-2 w-full"
+            :default-open="!isMobile"
           >
-            <USeparator class="w-full">
-              <span class="text-xs text-muted uppercase tracking-wider flex items-center gap-2">
-                <span>Metadate</span>
-                <UIcon
-                  name="i-lucide-chevron-down"
-                  class="size-4 transition-transform duration-200"
-                  :class="{ 'rotate-180': open }"
-                />
-              </span>
-            </USeparator>
-          </UButton>
+            <template #default="{ open }">
+              <UButton
+                color="neutral"
+                variant="ghost"
+                class="w-full justify-between"
+              >
+                <USeparator class="w-full">
+                  <span class="text-xs text-muted uppercase tracking-wider flex items-center gap-2">
+                    <span>Metadate</span>
+                    <UIcon
+                      name="i-lucide-chevron-down"
+                      class="size-4 transition-transform duration-200"
+                      :class="{ 'rotate-180': open }"
+                    />
+                  </span>
+                </USeparator>
+              </UButton>
+            </template>
+
+            <template #content>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 text-sm">
+                <div class="bg-elevated/50 rounded-lg p-3 text-center sm:text-left">
+                  <div class="text-xs text-muted uppercase mb-1">
+                    Creat
+                  </div>
+                  <div class="font-medium">
+                    {{ formatDate(systemData.date_created) }}
+                  </div>
+                </div>
+                <div class="bg-elevated/50 rounded-lg p-3 text-center sm:text-left">
+                  <div class="text-xs text-muted uppercase mb-1">
+                    Modificat
+                  </div>
+                  <div class="font-medium">
+                    {{ formatDate(systemData.date_updated) }}
+                  </div>
+                </div>
+                <div class="bg-elevated/50 rounded-lg p-3 text-center sm:text-left">
+                  <div class="text-xs text-muted uppercase mb-1">
+                    Deținător
+                  </div>
+                  <div class="flex items-center justify-center sm:justify-start gap-2">
+                    <UIcon name="i-lucide-user" class="text-muted" />
+                    <span v-if="systemData.owner_email" class="font-medium">
+                      {{ systemData.owner_email }}
+                    </span>
+                    <span v-else class="text-muted">-</span>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </UCollapsible>
         </template>
 
-        <template #content>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 text-sm">
-            <div class="bg-elevated/50 rounded-lg p-3 text-center sm:text-left">
-              <div class="text-xs text-muted uppercase mb-1">
-                Creat
-              </div>
-              <div class="font-medium">
-                {{ formatDate(systemData.date_created) }}
-              </div>
-            </div>
-            <div class="bg-elevated/50 rounded-lg p-3 text-center sm:text-left">
-              <div class="text-xs text-muted uppercase mb-1">
-                Modificat
-              </div>
-              <div class="font-medium">
-                {{ formatDate(systemData.date_updated) }}
-              </div>
-            </div>
-            <div class="bg-elevated/50 rounded-lg p-3 text-center sm:text-left">
-              <div class="text-xs text-muted uppercase mb-1">
-                Deținător
-              </div>
-              <div class="flex items-center justify-center sm:justify-start gap-2">
-                <UIcon name="i-lucide-user" class="text-muted" />
-                <span v-if="systemData.owner_email" class="font-medium">
-                  {{ systemData.owner_email }}
-                </span>
-                <span v-else class="text-muted">-</span>
-              </div>
-            </div>
+        <!-- Actions -->
+        <div class="flex items-center gap-3 pt-4 border-t border-default">
+          <UButton
+            type="submit"
+            :label="isEditMode ? 'Salveaza' : 'Creeaza'"
+            icon="i-lucide-check"
+            :loading="submitting"
+          />
+          <UButton
+            label="Anuleaza"
+            color="neutral"
+            variant="outline"
+            icon="i-lucide-x"
+            @click="router.back()"
+          />
+        </div>
+      </div>
+
+      <!-- Right: Entity Actions sidebar -->
+      <div
+        v-if="isEditMode && visibleActions.length > 0"
+        class="w-64 shrink-0"
+      >
+        <div class="sticky top-2 border border-gray-200 dark:border-gray-800 rounded-lg p-4 bg-white dark:bg-gray-900 space-y-3">
+          <h3 class="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 tracking-wider">
+            Actiuni workflow
+          </h3>
+          <div class="space-y-2">
+            <UButton
+              v-for="action in visibleActions"
+              :key="action.id_action"
+              :label="action.name"
+              icon="i-lucide-zap"
+              color="primary"
+              variant="soft"
+              size="sm"
+              block
+              class="text-left justify-start"
+              :loading="executingAction === action.slug"
+              @click="handleAction(action.slug, action.name)"
+            />
           </div>
-        </template>
-      </UCollapsible>
-    </template>
-
-    <!-- Actions -->
-    <div class="flex items-center gap-3 pt-4 border-t border-default">
-      <UButton
-        type="submit"
-        :label="isEditMode ? 'Salveaza' : 'Creeaza'"
-        icon="i-lucide-check"
-        :loading="submitting"
-      />
-      <UButton
-        label="Anuleaza"
-        color="neutral"
-        variant="outline"
-        icon="i-lucide-x"
-        @click="router.back()"
-      />
+        </div>
+      </div>
     </div>
   </UForm>
 </template>

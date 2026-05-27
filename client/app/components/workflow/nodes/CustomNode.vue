@@ -14,9 +14,7 @@ const props = defineProps<{
 }>()
 
 const isCondition = computed(() => props.data.nodeType === 'condition')
-const isTrigger = computed(() =>
-  props.data.nodeType === 'trigger' || props.data.nodeType === 'webhook_trigger'
-)
+const isTrigger = computed(() => props.data.nodeType === 'start')
 </script>
 
 <template>

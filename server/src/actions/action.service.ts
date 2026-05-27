@@ -3,12 +3,14 @@ import {
   Logger,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { OnEvent } from '@nestjs/event-emitter';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { EntityEvent } from 'src/events/entity-event.enum';
 import type { EntityEventPayload } from 'src/events/entity-event.payload';
+import { WorkflowSyncService } from 'src/n8n/workflow-sync.service';
 import { CreateActionDto, UpdateActionDto } from './dto';
 
 @Injectable()
@@ -19,6 +21,7 @@ export class ActionService {
   constructor(
     private readonly tenantContext: TenantContext,
     private readonly eventEmitter: EventEmitter2,
+    private readonly workflowSync: WorkflowSyncService,
   ) {}
 
   private get knex() {
@@ -218,19 +221,79 @@ export class ActionService {
       `Executare manuala: ${actionSlug} pe ${entitySlug}#${recordId} de ${userId}`,
     );
 
-    await this.emitActionExecuted(action, {
-      entitySlug,
-      entityId: entity.id_entity,
-      recordId,
-      record,
-      userId,
-    });
+    if (!action.id_workflow) {
+      throw new BadRequestException(
+        `Actiunea "${actionSlug}" nu are un workflow asociat.`,
+      );
+    }
 
-    return {
-      executed: true,
-      action: action.slug,
-      recordId,
-    };
+    try {
+      const { result } = await this.workflowSync.executeWorkflow(
+        action.id_workflow,
+        {
+          trigger: 'action',
+          action: actionSlug,
+          entity: entitySlug,
+          entityId: entity.id_entity,
+          recordId,
+          record,
+          userId,
+          tenant: this.tenantContext.slug,
+          dbName: this.tenantContext.dbName,
+          timestamp: new Date().toISOString(),
+        },
+      );
+
+      // Check n8n response for CRM errors propagated through HTTP Request nodes
+      const errorMessages = this.extractCrmErrors(result);
+      if (errorMessages.length > 0) {
+        throw new BadRequestException(errorMessages);
+      }
+
+      return {
+        executed: true,
+        action: action.slug,
+        recordId,
+      };
+    } catch (err) {
+      if (err instanceof BadRequestException || err instanceof NotFoundException) {
+        throw err;
+      }
+      // If the error message looks like a CRM business error (not an n8n infra error),
+      // pass it through cleanly so the user sees the validation message directly.
+      const msg = err.message ?? '';
+      const isN8nInfra = msg.startsWith('n8n') || msg.includes('workflow');
+      this.logger.error(
+        `Eroare la executia workflow-ului "${action.id_workflow}": ${msg}`,
+      );
+      throw new BadRequestException(
+        isN8nInfra ? `Eroare la executia workflow-ului: ${msg}` : msg,
+      );
+    }
+  }
+
+  /**
+   * Parse n8n webhook response (array of items from last node) looking for
+   * CRM error patterns like { success: false, message: "..." }.
+   */
+  private extractCrmErrors(n8nResult: any): string[] {
+    const messages: string[] = [];
+    const items = Array.isArray(n8nResult) ? n8nResult : [n8nResult];
+
+    for (const item of items) {
+      const json = item?.json ?? item;
+      if (!json || typeof json !== 'object') continue;
+
+      if (json.success === false) {
+        if (Array.isArray(json.message)) {
+          messages.push(...json.message);
+        } else if (typeof json.message === 'string') {
+          messages.push(json.message);
+        }
+      }
+    }
+
+    return messages;
   }
 
   // ─── Auto-trigger listeners ───

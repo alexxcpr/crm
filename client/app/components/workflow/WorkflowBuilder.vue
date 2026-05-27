@@ -27,7 +27,8 @@ const {
   loadWorkflow,
   exportWorkflow,
   fitView,
-  project
+  project,
+  initStartNode
 } = useWorkflowBuilder(flowId.value)
 
 watch(isDirty, val => emit('dirty', val))
@@ -35,6 +36,8 @@ watch(isDirty, val => emit('dirty', val))
 onMounted(() => {
   if (props.initialNodes?.length || props.initialConnections?.length) {
     loadWorkflow(props.initialNodes ?? [], props.initialConnections ?? [])
+  } else {
+    initStartNode()
   }
 })
 

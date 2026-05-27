@@ -1,3 +1,16 @@
+export type FieldValueSource = 'static' | 'current_record' | 'previous_node' | 'relation' | 'expression'
+
+export interface FieldMapping {
+  key: string
+  sourceType: FieldValueSource
+  value: string
+}
+
+export interface RecordIdSource {
+  sourceType: 'static' | 'current_record' | 'previous_node'
+  value: string
+}
+
 export interface NodeTypeDefinition {
   type: string
   label: string
@@ -12,7 +25,7 @@ export interface NodeTypeDefinition {
 export interface NodeConfigField {
   key: string
   label: string
-  type: 'text' | 'textarea' | 'select' | 'number' | 'boolean' | 'entity-select' | 'field-select'
+  type: 'text' | 'textarea' | 'select' | 'number' | 'boolean' | 'entity-select' | 'field-select' | 'field-mappings' | 'record-id-source'
   placeholder?: string
   options?: { label: string, value: string }[]
   required?: boolean
@@ -21,35 +34,35 @@ export interface NodeConfigField {
 export function useNodeTypes() {
   const nodeTypes: NodeTypeDefinition[] = [
     {
-      type: 'trigger',
-      label: 'Manual Trigger',
+      type: 'start',
+      label: 'START',
       icon: 'i-lucide-play',
       category: 'trigger',
       color: '#22c55e',
-      description: 'Porneste workflow-ul la click manual de catre utilizator',
+      description: 'Punct de intrare pentru workflow. Se executa automat la trigger (manual sau pe eveniment).',
+      defaults: {},
+      configFields: []
+    },
+    // backward compat — old node types mapped to START
+    {
+      type: 'trigger',
+      label: 'START',
+      icon: 'i-lucide-play',
+      category: 'trigger',
+      color: '#22c55e',
+      description: '',
       defaults: {},
       configFields: []
     },
     {
       type: 'webhook_trigger',
-      label: 'Event Trigger',
-      icon: 'i-lucide-zap',
+      label: 'START',
+      icon: 'i-lucide-play',
       category: 'trigger',
-      color: '#eab308',
-      description: 'Porneste workflow-ul automat la un eveniment (create, update, delete)',
-      defaults: { event: 'record.created' },
-      configFields: [
-        {
-          key: 'event',
-          label: 'Eveniment',
-          type: 'select',
-          options: [
-            { label: 'Record creat', value: 'record.created' },
-            { label: 'Record actualizat', value: 'record.updated' },
-            { label: 'Record sters', value: 'record.deleted' }
-          ]
-        }
-      ]
+      color: '#22c55e',
+      description: '',
+      defaults: {},
+      configFields: []
     },
     {
       type: 'app_get_record',
@@ -71,9 +84,10 @@ export function useNodeTypes() {
       category: 'action',
       color: '#22c55e',
       description: 'Creeaza o inregistrare noua intr-o entitate',
-      defaults: { entity: '', fields: {} },
+      defaults: { entity: '', fieldMappings: [], fields: {} },
       configFields: [
-        { key: 'entity', label: 'Entitate', type: 'entity-select', required: true }
+        { key: 'entity', label: 'Entitate', type: 'entity-select', required: true },
+        { key: 'fieldMappings', label: 'Valori campuri', type: 'field-mappings' }
       ]
     },
     {
@@ -83,10 +97,11 @@ export function useNodeTypes() {
       category: 'action',
       color: '#f59e0b',
       description: 'Actualizeaza o inregistrare existenta',
-      defaults: { entity: '', recordId: '', fields: {} },
+      defaults: { entity: '', recordId: '', recordIdSource: null as RecordIdSource | null, fieldMappings: [], fields: {} },
       configFields: [
         { key: 'entity', label: 'Entitate', type: 'entity-select', required: true },
-        { key: 'recordId', label: 'Record ID', type: 'text', placeholder: '{{$json.recordId}}' }
+        { key: 'recordIdSource', label: 'Record ID', type: 'record-id-source' },
+        { key: 'fieldMappings', label: 'Valori campuri', type: 'field-mappings' }
       ]
     },
     {
@@ -201,8 +216,10 @@ export function useNodeTypes() {
     return nodeTypes.find(n => n.type === type)
   }
 
+  const legacyTypes = new Set(['trigger', 'webhook_trigger'])
+
   function getNodesByCategory(category: string): NodeTypeDefinition[] {
-    return nodeTypes.filter(n => n.category === category)
+    return nodeTypes.filter(n => n.category === category && !legacyTypes.has(n.type))
   }
 
   return {

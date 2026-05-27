@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Node } from '@vue-flow/core'
+import type { FieldMapping, RecordIdSource } from '~/composables/useNodeTypes'
 
 const props = defineProps<{
   node: Node | null
@@ -13,6 +14,15 @@ const emit = defineEmits<{
 }>()
 
 const { getNodeType } = useNodeTypes()
+const { entities, fetchEntities } = useAdminEntities()
+
+const entityOptions = computed(() =>
+  (entities.value || []).map(e => ({ label: e.name, value: e.slug })),
+)
+
+onMounted(() => {
+  fetchEntities()
+})
 
 const nodeTypeDef = computed(() => {
   if (!props.node) return null
@@ -39,6 +49,15 @@ function onParamChange(key: string, value: any) {
   if (!props.node) return
   emit('updateParameters', props.node.id, { ...localParams.value })
 }
+
+watch(() => localParams.value.entity, (newEntity, oldEntity) => {
+  if (oldEntity && newEntity !== oldEntity) {
+    localParams.value.fieldMappings = []
+    if (props.node) {
+      emit('updateParameters', props.node.id, { ...localParams.value })
+    }
+  }
+})
 </script>
 
 <template>
@@ -119,12 +138,36 @@ function onParamChange(key: string, value: any) {
           @update:model-value="onParamChange(field.key, $event)"
         />
 
+        <USelect
+          v-else-if="field.type === 'entity-select'"
+          :model-value="localParams[field.key] ?? ''"
+          size="sm"
+          :items="entityOptions"
+          value-key="value"
+          label-key="label"
+          placeholder="Selecteaza entitatea..."
+          @update:model-value="onParamChange(field.key, $event)"
+        />
+
         <UInput
           v-else-if="field.type === 'number'"
           :model-value="localParams[field.key] ?? 0"
           type="number"
           size="sm"
           @update:model-value="onParamChange(field.key, Number($event))"
+        />
+
+        <WorkflowPanelsRecordIdSourceEditor
+          v-else-if="field.type === 'record-id-source'"
+          :model-value="(localParams[field.key] as RecordIdSource | null) ?? null"
+          @update:model-value="onParamChange(field.key, $event)"
+        />
+
+        <WorkflowPanelsFieldMappingEditor
+          v-else-if="field.type === 'field-mappings'"
+          :model-value="(localParams[field.key] as FieldMapping[]) ?? []"
+          :entity-slug="localParams.entity ?? ''"
+          @update:model-value="onParamChange(field.key, $event)"
         />
       </div>
     </div>

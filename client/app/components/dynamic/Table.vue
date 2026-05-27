@@ -49,6 +49,8 @@ const rowSelection = ref({})
 const loading = computed(() => schemaLoading.value || dataLoading.value)
 const error = computed(() => schemaError.value || dataError.value)
 
+const { visibleActions, executeAction } = useEntityActions(() => props.entity)
+
 // ─── Data loading (reactiv pe toate dependintele) ───
 async function loadData() {
   await fetchItems({
@@ -195,6 +197,18 @@ const columns = computed<TableColumn<Record<string, any>>[]>(() => {
                 toast.add({ title: 'ID copiat', color: 'success' })
               }
             },
+            ...(visibleActions.value.length > 0
+              ? [
+                  { type: 'separator' as const },
+                  ...visibleActions.value.map(action => ({
+                    label: action.name,
+                    icon: 'i-lucide-zap',
+                    onSelect() {
+                      executeAction(action.slug, record.id)
+                    },
+                  })),
+                ]
+              : []),
             { type: 'separator' },
             {
               label: 'Sterge',
