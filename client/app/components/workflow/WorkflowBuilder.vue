@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { VueFlow } from '@vue-flow/core'
+import { VueFlow, type NodeMouseEvent } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import CustomNode from './nodes/CustomNode.vue'
 
@@ -41,7 +41,7 @@ onMounted(() => {
   }
 })
 
-function onNodeClick(event: { event: MouseEvent, node: any }) {
+function onNodeClick(event: NodeMouseEvent) {
   selectNode(event.node.id)
 }
 

@@ -225,7 +225,7 @@ function buildPayload(): Record<string, any> {
 
 const loading = computed(() => schemaLoading.value || initialLoading.value)
 
-const { visibleActions, executeAction: executeEntityAction } = useEntityActions(() => props.entity)
+const { visibleActions, executeAction: executeEntityAction } = useEntityActions(computed(() => props.entity))
 const executingAction = ref<string | null>(null)
 
 async function handleAction(actionSlug: string, actionName: string) {

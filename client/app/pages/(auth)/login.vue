@@ -11,7 +11,7 @@
       <!-- Logo -->
       <div class="flex justify-center mb-8">
         <div class="relative flex items-center justify-center">
-          <div class="absolute w-[48rem] h-[48rem] rounded-full blur-3xl pointer-events-none" style="background: radial-gradient(circle, rgba(230,215,255,0.9) 0%, rgba(200,175,245,0.65) 25%, rgba(160,135,220,0.4) 50%, transparent 70%);"></div>
+          <div class="absolute w-3xl h-192 rounded-full blur-3xl pointer-events-none" style="background: radial-gradient(circle, rgba(230,215,255,0.9) 0%, rgba(200,175,245,0.65) 25%, rgba(160,135,220,0.4) 50%, transparent 70%);"></div>
           <img
             src="/moduvis_logo_v3_no_bg.png"
             alt="Moduvis Logo"

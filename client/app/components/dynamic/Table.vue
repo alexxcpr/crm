@@ -49,7 +49,7 @@ const rowSelection = ref({})
 const loading = computed(() => schemaLoading.value || dataLoading.value)
 const error = computed(() => schemaError.value || dataError.value)
 
-const { visibleActions, executeAction } = useEntityActions(() => props.entity)
+const { visibleActions, executeAction } = useEntityActions(computed(() => props.entity))
 
 // ─── Data loading (reactiv pe toate dependintele) ───
 async function loadData() {
