@@ -32,7 +32,7 @@ useSeoMeta({
 </script>
 
 <template>
-  <UApp>
+  <UApp :toaster="{ position: 'top-center', duration: 10000}">
     <NuxtLoadingIndicator />
 
     <NuxtLayout>
