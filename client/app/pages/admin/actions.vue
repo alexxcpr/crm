@@ -159,6 +159,7 @@ async function onConfirmDelete() {
 
 // ─── Table ───
 const columns: TableColumn<any>[] = [
+  { id: 'edit', meta: { class: { th: 'w-10', td: 'w-10' } } },
   { accessorKey: 'name', header: 'Nume' },
   { accessorKey: 'slug', header: 'Slug' },
   { accessorKey: 'trigger_events', header: 'Triggers' },
@@ -219,6 +220,17 @@ function getDropdownItems(action: any) {
       :loading="loading"
       class="w-full"
     >
+      <template #edit-cell="{ row }">
+        <UButton
+          icon="i-lucide-pencil"
+          label="Edit"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          @click="openEdit(row.original)"
+        />
+      </template>
+
       <template #trigger_events-cell="{ row }">
         <div class="flex gap-1 flex-wrap">
           <UBadge

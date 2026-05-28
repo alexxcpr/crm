@@ -48,6 +48,7 @@ async function toggleActivation(wf: any) {
 }
 
 const columns: TableColumn<any>[] = [
+  { id: 'edit', meta: { class: { th: 'w-10', td: 'w-10' } } },
   { accessorKey: 'name', header: 'Nume' },
   { accessorKey: 'slug', header: 'Slug' },
   { accessorKey: 'status', header: 'Status' },
@@ -110,6 +111,17 @@ function getDropdownItems(wf: any) {
       :loading="loading"
       class="w-full"
     >
+      <template #edit-cell="{ row }">
+        <UButton
+          icon="i-lucide-pencil"
+          label="Edit"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          @click="router.push(`/admin/workflows/${row.original.id_workflow}`)"
+        />
+      </template>
+
       <template #name-cell="{ row }">
         <NuxtLink
           :to="`/admin/workflows/${row.original.id_workflow}`"
