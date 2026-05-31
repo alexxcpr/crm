@@ -45,6 +45,20 @@ export default defineNuxtConfig({
         sameSiteAttribute: 'lax',
         secureCookieAttribute: process.env.NODE_ENV === 'production',
         httpOnlyCookieAttribute: process.env.NODE_ENV === 'production'
+      },
+      refresh: {
+        isEnabled: true,
+        endpoint: { path: '/auth/refresh', method: 'post' },
+        refreshOnlyToken: false,
+        token: {
+          signInResponseRefreshTokenPointer: '/refreshToken',
+          refreshRequestTokenPointer: '/refreshToken',
+          refreshResponseTokenPointer: '/accessToken',
+          maxAgeInSeconds: 60 * 60 * 24,      // 1 zi
+          sameSiteAttribute: 'lax',
+          secureCookieAttribute: process.env.NODE_ENV === 'production',
+          httpOnlyCookieAttribute: process.env.NODE_ENV === 'production'
+        }
       }
     },
     sessionRefresh: {

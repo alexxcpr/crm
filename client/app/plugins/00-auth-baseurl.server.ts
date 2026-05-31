@@ -41,6 +41,14 @@ export default defineNuxtPlugin(async () => {
     tokenState.value = rawToken
     console.log('[00-auth-baseurl] token seeded, length:', rawToken.length)
 
+    // Seed the refresh token from cookie so the auth module can refresh on SSR
+    const rawRefreshToken = getCookie(event, 'auth.refresh-token')
+    if (rawRefreshToken) {
+      const refreshTokenState = useState<string | null>('auth:raw-refresh-token', () => rawRefreshToken)
+      refreshTokenState.value = rawRefreshToken
+      console.log('[00-auth-baseurl] refresh token seeded, length:', rawRefreshToken.length)
+    }
+
     // Fetch session directly, bypassing @sidebase/nuxt-auth's _fetch()
     // which uses callWithNuxt — broken in Nuxt 4.
     const apiBase = config.apiBaseInternal as string

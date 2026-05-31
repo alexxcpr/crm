@@ -16,8 +16,16 @@ export class AuthController {
     return this.authService.signin(dto);
   }
 
+  @Post('refresh')
+  refresh(@Body('refreshToken') refreshToken: string) {
+    if (!refreshToken) {
+      return { statusCode: 400, message: 'refreshToken is required' };
+    }
+    return this.authService.refreshToken(refreshToken);
+  }
+
   @Post('signout')
-  signout() {
-    return { message: 'Logged out successfully' };
+  signout(@Body('refreshToken') refreshToken: string) {
+    return this.authService.signout(refreshToken);
   }
 }

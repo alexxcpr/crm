@@ -24,9 +24,23 @@ model User {
   first_name   String?
   last_name    String?
 
-  roles UserRole[]
+  roles         UserRole[]
+  refreshTokens RefreshToken[]
 
   @@map("user")
+}
+
+model RefreshToken {
+  id           String   @id @default(uuid())
+  jti          String   @unique
+  user_id      String
+  expires_at   DateTime
+  is_revoked   Boolean  @default(false)
+  date_created DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("refresh_token")
 }
 
 // model Contact {
