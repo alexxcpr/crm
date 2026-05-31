@@ -138,7 +138,7 @@ export function useAdminActions() {
         body: { ids }
       })
       await fetchActions()
-      return (res as any).message ?? null
+      return (res as any).mesaj ?? null
     } catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la stergerea actiunilor'
       return null
