@@ -38,11 +38,12 @@ const rowSelection = ref({})
 const selectedCount = computed(() => Object.keys(rowSelection.value).length)
 
 async function bulkDelete() {
-  const ids = Object.keys(rowSelection.value)
+  const selectedIndices = Object.keys(rowSelection.value).map(Number)
+  const ids = selectedIndices.map(i => workflows.value[i]?.id_workflow).filter((id): id is string => !!id)
   const msg = await deleteWorkflows(ids)
+  rowSelection.value = {}
   if (msg) {
     toast.add({ title: msg, color: 'success' })
-    rowSelection.value = {}
   } else {
     toast.add({ title: 'Eroare la stergere', description: error.value ?? '', color: 'error' })
   }

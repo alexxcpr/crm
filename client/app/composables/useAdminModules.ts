@@ -115,7 +115,7 @@ export function useAdminModules() {
         body: { ids }
       })
       await fetchModules()
-      return (res as any).message ?? null
+      return (res as any).mesaj ?? null
     }
     catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la stergerea modulelor'
