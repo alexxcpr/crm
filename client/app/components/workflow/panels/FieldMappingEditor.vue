@@ -7,6 +7,7 @@ const props = defineProps<{
   modelValue: FieldMapping[]
   dataSources: DataSource[]
   targetEntityFields?: Field[]
+  fetchSourceFields?: (nodeId: string) => Promise<Field[]>
 }>()
 
 const emit = defineEmits<{
@@ -61,6 +62,9 @@ function updateSourceNode(index: number, nodeId: string) {
   mappings.value[index].sourceNodeId = nodeId || undefined
   mappings.value[index].sourceFieldSlug = undefined
   emitUpdate()
+  if (nodeId && props.fetchSourceFields) {
+    props.fetchSourceFields(nodeId)
+  }
 }
 
 function updateSourceField(index: number, fieldSlug: string) {

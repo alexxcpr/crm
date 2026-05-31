@@ -15,6 +15,20 @@ const props = defineProps<{
 
 const isCondition = computed(() => props.data.nodeType === 'condition')
 const isTrigger = computed(() => props.data.nodeType === 'start')
+
+// Resolve entity display info from node parameters
+const entityDisplay = computed(() => {
+  const params = props.data.parameters ?? {}
+  // Direct entity param (start, app_get_record, app_create_record, app_update_record)
+  if (params.entity) {
+    return params.entityName ?? params.entity
+  }
+  // app_get_related: show target entity once resolved
+  if (params.relationEntitySlug) {
+    return params.relationEntityName ?? params.relationEntitySlug
+  }
+  return null
+})
 </script>
 
 <template>
@@ -36,9 +50,15 @@ const isTrigger = computed(() => props.data.nodeType === 'start')
     </div>
 
     <!-- Body -->
-    <div class="px-3 py-2">
+    <div class="px-3 py-2 space-y-0.5">
       <p class="text-[10px] text-gray-500 dark:text-gray-400 truncate">
         {{ data.nodeType }}
+      </p>
+      <p
+        v-if="entityDisplay"
+        class="text-[10px] text-gray-600 dark:text-gray-300 truncate font-medium"
+      >
+        Entitate: {{ entityDisplay }}
       </p>
     </div>
 

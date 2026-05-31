@@ -40,10 +40,42 @@ const startEntitySlug = computed(() => {
   return (startNode?.data?.parameters?.entity ?? '') as string
 })
 
-const { dataSources } = useWorkflowDataRegistry(nodes, startEntitySlug)
+const { dataSources, fetchEntitySchema, fetchSourceFields, getEntityName } = useWorkflowDataRegistry(nodes, startEntitySlug)
+
+// ─── Resolve entity names for all nodes that have entity params but no name ───
+async function resolveEntityNames() {
+  for (const node of nodes.value) {
+    const params = (node.data?.parameters ?? {}) as Record<string, any>
+    if (params.entity && !params.entityName) {
+      await fetchEntitySchema(params.entity)
+      const name = getEntityName(params.entity)
+      if (name && node.data) {
+        node.data = {
+          ...node.data,
+          parameters: { ...node.data.parameters, entityName: name },
+        }
+      }
+    }
+    if (params.relationEntitySlug && !params.relationEntityName) {
+      await fetchEntitySchema(params.relationEntitySlug)
+      const name = getEntityName(params.relationEntitySlug)
+      if (name && node.data) {
+        node.data = {
+          ...node.data,
+          parameters: { ...node.data.parameters, relationEntityName: name },
+        }
+      }
+    }
+  }
+}
 
 // ─── Enrich app_get_related nodes before save ───
-function enrichBeforeSave(exported: { nodes: any[], connections: any[] }): { nodes: any[], connections: any[] } {
+async function enrichBeforeSave(exported: { nodes: any[], connections: any[] }): Promise<{ nodes: any[], connections: any[] }> {
+  // Fetch schemas for all data sources so relation fields can be resolved.
+  // This is the ONLY place that may fetch multiple schemas — and only at save time.
+  const fetchPromises = dataSources.value.map(ds => fetchEntitySchema(ds.entitySlug))
+  await Promise.all(fetchPromises)
+
   const enrichedNodes = exported.nodes.map(node => {
     if (node.type !== 'app_get_related') return node
     if (!node.parameters) return node
@@ -82,9 +114,10 @@ function enrichBeforeSave(exported: { nodes: any[], connections: any[] }): { nod
 
 watch(isDirty, val => emit('dirty', val))
 
-onMounted(() => {
+onMounted(async () => {
   if (props.initialNodes?.length || props.initialConnections?.length) {
     loadWorkflow(props.initialNodes ?? [], props.initialConnections ?? [])
+    await resolveEntityNames()
   } else {
     initStartNode()
   }
@@ -116,9 +149,9 @@ function onDragOver(event: DragEvent) {
   event.dataTransfer!.dropEffect = 'move'
 }
 
-function save() {
+async function save() {
   const data = exportWorkflow()
-  const enriched = enrichBeforeSave(data)
+  const enriched = await enrichBeforeSave(data)
   emit('save', enriched)
   isDirty.value = false
 }
@@ -169,6 +202,8 @@ defineExpose({ save, exportWorkflow, fitView })
     <WorkflowPanelsNodeConfigPanel
       :node="selectedNode"
       :data-sources="dataSources"
+      :fetch-entity-schema="fetchEntitySchema"
+      :fetch-source-fields="fetchSourceFields"
       @update-parameters="updateNodeParameters"
       @update-label="updateNodeLabel"
       @delete-node="deleteSelectedNode"

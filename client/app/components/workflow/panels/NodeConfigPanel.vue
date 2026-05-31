@@ -7,6 +7,8 @@ import type { Field } from '~/types/schema'
 const props = defineProps<{
   node: Node | null
   dataSources?: DataSource[]
+  fetchEntitySchema?: (slug: string) => Promise<Field[]>
+  fetchSourceFields?: (nodeId: string) => Promise<Field[]>
 }>()
 
 const emit = defineEmits<{
@@ -18,7 +20,6 @@ const emit = defineEmits<{
 
 const { getNodeType } = useNodeTypes()
 const { entities, fetchEntities } = useAdminEntities()
-const { apiFetch } = useApi()
 
 // ─── Target entity fields (for field-mappings in create/update nodes) ───
 const targetEntityFields = ref<Field[]>([])
@@ -28,11 +29,8 @@ async function fetchTargetEntityFields(entitySlug: string) {
     targetEntityFields.value = []
     return
   }
-  try {
-    const schema = await apiFetch<{ fields: Field[] }>(`/v1/schema/${entitySlug}`)
-    targetEntityFields.value = schema.fields ?? []
-  } catch {
-    targetEntityFields.value = []
+  if (props.fetchEntitySchema) {
+    targetEntityFields.value = await props.fetchEntitySchema(entitySlug)
   }
 }
 
@@ -104,6 +102,16 @@ watch(() => localParams.value.entity, (newEntity, oldEntity) => {
 // Fetch target entity schema for field-mappings autocomplete
 watch(() => localParams.value.entity, (entitySlug) => {
   fetchTargetEntityFields(entitySlug ?? '')
+  // Also store the entity name for node display
+  if (entitySlug) {
+    const opt = entityOptions.value.find(e => e.value === entitySlug)
+    if (opt && localParams.value.entityName !== opt.label) {
+      localParams.value.entityName = opt.label
+      if (props.node) {
+        emit('updateParameters', props.node.id, { ...localParams.value })
+      }
+    }
+  }
 })
 
 watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
@@ -112,6 +120,10 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
     if (props.node) {
       emit('updateParameters', props.node.id, { ...localParams.value })
     }
+  }
+  // Fetch source entity schema so relation field options are populated
+  if (newVal && props.fetchSourceFields) {
+    props.fetchSourceFields(newVal)
   }
 })
 </script>
@@ -246,6 +258,7 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
           :model-value="(localParams[field.key] as FieldMapping[]) ?? []"
           :data-sources="dataSources ?? []"
           :target-entity-fields="targetEntityFields"
+          :fetch-source-fields="fetchSourceFields"
           @update:model-value="onParamChange(field.key, $event)"
         />
       </div>

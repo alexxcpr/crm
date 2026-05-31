@@ -18,6 +18,7 @@ const emit = defineEmits<{
 const isEdit = computed(() => !!props.field)
 const toast = useToast()
 const { createField, updateField, error } = useAdminFields(props.entityId)
+const { apiFetch } = useApi()
 
 // ─── data_type → ui_type mapping ───
 const dataTypeUiTypeMap: Record<string, string[]> = {
@@ -169,6 +170,37 @@ const entityOptions = computed(() =>
     value: e.id_entity
   }))
 )
+
+const relationFieldOptions = ref<{ label: string, value: string }[]>([])
+const loadingRelationFields = ref(false)
+
+async function fetchRelationEntityFields(entityId: string) {
+  if (!entityId) {
+    relationFieldOptions.value = []
+    return
+  }
+  const targetEntity = props.entities.find(e => e.id_entity === entityId)
+  if (!targetEntity) {
+    relationFieldOptions.value = []
+    return
+  }
+  loadingRelationFields.value = true
+  try {
+    const schema = await apiFetch<{ fields: Field[] }>(`/v1/schema/${targetEntity.slug}`)
+    relationFieldOptions.value = (schema.fields ?? []).map(f => ({
+      label: `${f.name} (${f.column_name})`,
+      value: f.column_name
+    }))
+  } catch {
+    relationFieldOptions.value = []
+  } finally {
+    loadingRelationFields.value = false
+  }
+}
+
+watch(() => state.id_relation_entity, (entityId) => {
+  fetchRelationEntityFields(entityId ?? '')
+}, { immediate: true })
 
 // ─── Zod validation ───
 const formSchema = z.object({
@@ -424,9 +456,17 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
         label="Camp de afisat"
         name="relation_display_field"
         required
-        description="Slug-ul campului din entitatea tinta (ex: name)"
+        description="Campul din entitatea tinta folosit pentru afisare in dropdown-uri de relatie"
       >
-        <UInput v-model="state.relation_display_field" placeholder="ex: name" class="w-full" />
+        <USelect
+          v-model="state.relation_display_field"
+          :items="relationFieldOptions"
+          value-key="value"
+          :placeholder="loadingRelationFields ? 'Se incarca...' : 'Selecteaza campul de afisat'"
+          :loading="loadingRelationFields"
+          :disabled="!state.id_relation_entity"
+          class="w-full"
+        />
       </UFormField>
     </div>
 

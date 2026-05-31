@@ -16,6 +16,11 @@ export interface DataSource {
  *
  * Uses wave-based resolution so chained relations work:
  *   Start → GetCompany → GetInvoice → ... (arbitrary depth).
+ *
+ * IMPORTANT: This registry does NOT make API calls. It extracts entity slugs
+ * from node parameters synchronously and leaves fields empty ([]).
+ * Fields are fetched on-demand via fetchEntitySchema() or fetchSourceFields()
+ * only when the user opens a node's config panel.
  */
 export function useWorkflowDataRegistry(
   nodes: Ref<Node[]>,
@@ -26,40 +31,37 @@ export function useWorkflowDataRegistry(
   const dataSources = ref<DataSource[]>([])
   const loading = ref(false)
 
+  // Cache of entitySlug → { name, fields }, populated on-demand when the user opens a node
+  const schemaCache = new Map<string, { name: string, fields: Field[] }>()
+
   function nodeData(node: Node): Record<string, any> {
     return (node.data ?? {}) as Record<string, any>
   }
 
-  async function computeRegistry() {
-    loading.value = true
+  /** Build the data registry synchronously — no API calls. */
+  function computeRegistrySync() {
     const sources: DataSource[] = []
     const processed = new Set<string>()
 
-    // 1. Find START node and register it
+    // 1. START node
     const startNode = nodes.value.find((n) => {
       const t = nodeData(n).nodeType
       return t === 'start' || t === 'trigger' || t === 'webhook_trigger'
     })
 
     if (startNode && startEntitySlug.value) {
-      try {
-        const schema = await apiFetch<EntitySchema>(
-          `/v1/schema/${startEntitySlug.value}`,
-        )
-        sources.push({
-          nodeId: startNode.id,
-          label: `Start: ${schema.entity.name}`,
-          entitySlug: startEntitySlug.value,
-          fields: schema.fields,
-        })
-        processed.add(startNode.id)
-      } catch {
-        // entity might not exist yet — skip
-      }
+      const label = nodeData(startNode).label || 'Start'
+      sources.push({
+        nodeId: startNode.id,
+        label: `${label}: ${schemaCache.get(startEntitySlug.value)?.name ?? startEntitySlug.value}`,
+        entitySlug: startEntitySlug.value,
+        fields: schemaCache.get(startEntitySlug.value)?.fields ?? [],
+      })
+      processed.add(startNode.id)
     }
 
-    // 2. Wave-based resolution: each pass resolves nodes whose
-    //    source dependencies are already in the registry
+    // 2. Wave-based resolution using cache — only resolves app_get_related
+    //    nodes whose source entity schema has already been fetched on-demand
     let changed = true
     while (changed) {
       changed = false
@@ -74,72 +76,109 @@ export function useWorkflowDataRegistry(
           if (!srcNodeId || !relFieldSlug) continue
 
           const srcSource = sources.find((s) => s.nodeId === srcNodeId)
-          if (!srcSource) continue // dependency not yet resolved
+          if (!srcSource) continue
 
           const relField = srcSource.fields.find((f) => f.slug === relFieldSlug)
           if (!relField?.relation_entity_slug) continue
 
-          try {
-            const targetSchema = await apiFetch<EntitySchema>(
-              `/v1/schema/${relField.relation_entity_slug}`,
-            )
-            sources.push({
-              nodeId: node.id,
-              label: `${data.label || 'Relatie'}: ${targetSchema.entity.name}`,
-              entitySlug: relField.relation_entity_slug,
-              fields: targetSchema.fields,
-            })
-            processed.add(node.id)
-            changed = true
-          } catch {
-            // target entity schema not available — skip
-          }
+          const targetSlug = relField.relation_entity_slug
+          sources.push({
+            nodeId: node.id,
+            label: `${data.label || 'Relatie'}: ${schemaCache.get(targetSlug)?.name ?? targetSlug}`,
+            entitySlug: targetSlug,
+            fields: schemaCache.get(targetSlug)?.fields ?? [],
+          })
+          processed.add(node.id)
+          changed = true
         } else if (nodeType === 'app_get_record') {
           const entitySlug: string = data.parameters?.entity ?? ''
           if (!entitySlug) continue
 
-          try {
-            const targetSchema = await apiFetch<EntitySchema>(
-              `/v1/schema/${entitySlug}`,
-            )
-            sources.push({
-              nodeId: node.id,
-              label: `${data.label || 'Citeste'}: ${targetSchema.entity.name}`,
-              entitySlug,
-              fields: targetSchema.fields,
-            })
-            processed.add(node.id)
-            changed = true
-          } catch {
-            // schema not available — skip
-          }
+          sources.push({
+            nodeId: node.id,
+            label: `${data.label || 'Citeste'}: ${schemaCache.get(entitySlug)?.name ?? entitySlug}`,
+            entitySlug,
+            fields: schemaCache.get(entitySlug)?.fields ?? [],
+          })
+          processed.add(node.id)
+          changed = true
         }
       }
     }
 
     dataSources.value = sources
-    loading.value = false
   }
 
-  // Debounced deep-watch: fires on any node data change, but rapid bursts
-  // (e.g. position updates during drag) are coalesced into a single call.
-  // Without debounce, dragging a node triggers a schema re-fetch per pixel.
+  /** Fetch entity schema on-demand — called when user opens a node config panel. */
+  async function fetchEntitySchema(entitySlug: string): Promise<Field[]> {
+    if (!entitySlug) return []
+    const cached = schemaCache.get(entitySlug)
+    if (cached) return cached.fields
+
+    loading.value = true
+    try {
+      const schema = await apiFetch<EntitySchema>(`/v1/schema/${entitySlug}`)
+      const fields: Field[] = schema.fields ?? []
+      schemaCache.set(entitySlug, { name: schema.entity.name, fields })
+      // Recompute so dataSources reflect the newly cached fields
+      computeRegistrySync()
+      return fields
+    } catch {
+      return []
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /** Get cached entity name for a slug (does not trigger fetch). */
+  function getEntityName(entitySlug: string): string | null {
+    return schemaCache.get(entitySlug)?.name ?? null
+  }
+
+  /** Fetch the entity schema for a data source node (by nodeId). */
+  async function fetchSourceFields(nodeId: string): Promise<Field[]> {
+    const source = dataSources.value.find(s => s.nodeId === nodeId)
+    if (!source) return []
+    return fetchEntitySchema(source.entitySlug)
+  }
+
+  // ─── Reactivity: recompute when node structure changes ───
+
+  const graphFingerprint = computed(() => JSON.stringify(
+    nodes.value.map(n => ({
+      id: n.id,
+      type: n.data?.nodeType,
+      params: n.data?.parameters,
+      label: n.data?.label,
+    })),
+  ))
+
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
   function scheduleCompute() {
     if (debounceTimer) clearTimeout(debounceTimer)
     debounceTimer = setTimeout(() => {
-      computeRegistry()
+      computeRegistrySync()
     }, 150)
   }
 
-  watch([nodes, startEntitySlug], () => {
+  watch([graphFingerprint, startEntitySlug], () => {
     scheduleCompute()
-  }, { deep: true })
+  })
 
-  // Run immediately on setup so the registry is populated before the user
-  // opens a node config panel (the watcher above only fires on change).
-  scheduleCompute()
+  // Compute initial registry synchronously (no API calls)
+  computeRegistrySync()
 
-  return { dataSources, loading, computeRegistry }
+  return {
+    dataSources,
+    loading,
+    /** Fetch entity schema for a given entity slug (cached). */
+    fetchEntitySchema,
+    /** Fetch entity schema for the entity of a data source node. */
+    fetchSourceFields,
+    /** Get cached entity name for a slug (does not trigger fetch). */
+    getEntityName,
+    /** Force recompute of the registry (e.g. after schema cache populated). */
+    refresh: computeRegistrySync,
+  }
 }
