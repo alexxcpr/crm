@@ -18,6 +18,7 @@ const flowId = computed(() => props.workflowId ?? 'workflow-builder')
 
 const {
   nodes,
+  edges,
   selectedNode,
   isDirty,
   selectNode,
@@ -40,7 +41,12 @@ const startEntitySlug = computed(() => {
   return (startNode?.data?.parameters?.entity ?? '') as string
 })
 
-const { dataSources, fetchEntitySchema, fetchSourceFields, getEntityName } = useWorkflowDataRegistry(nodes, startEntitySlug)
+const { dataSources, fetchEntitySchema, fetchSourceFields, getEntityName, refresh: refreshRegistry } = useWorkflowDataRegistry(nodes, startEntitySlug, edges)
+
+// Keep registry in sync after any node/edge mutation
+watch(isDirty, (dirty) => {
+  if (dirty) nextTick(() => refreshRegistry())
+})
 
 // ─── Resolve entity names for all nodes that have entity params but no name ───
 async function resolveEntityNames() {
@@ -149,7 +155,21 @@ function onDragOver(event: DragEvent) {
   event.dataTransfer!.dropEffect = 'move'
 }
 
+const toast = useToast()
+
+const TRIGGER_TYPES = new Set(['start', 'trigger', 'webhook_trigger'])
+
 async function save() {
+  const hasTrigger = nodes.value.some(n => TRIGGER_TYPES.has(n.data?.nodeType))
+  if (!hasTrigger) {
+    toast.add({
+      title: 'Lipseste nodul de start',
+      description: 'Adauga un nod START inainte de a salva.',
+      color: 'error',
+    })
+    return
+  }
+
   const data = exportWorkflow()
   const enriched = await enrichBeforeSave(data)
   emit('save', enriched)

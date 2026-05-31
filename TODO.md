@@ -17,8 +17,8 @@
 - [x] login functional
 - [x] logout functional (stergere jwt din client + mesaj de confirmare primit din backend)
 - [ ] logging facut (userul x s-a logat in data y, s-a delogat in data z)
-- [ ] refresh token
-- [ ] blacklist token la logout
+- [x] refresh token
+- [x] blacklist token la logout
 
 ## Logger
 - erorile sa fie salvate intr-un logger (stacktrace)
@@ -589,8 +589,8 @@ pages/
 - [ ] Cache schema pe frontend: `useState()` Nuxt persistent, invalidare manuala sau TTL
 - [ ] Indexare automata: la crearea campului filterable, backend-ul creeaza B-Tree index
 - [ ] Audit log: tabela `audit_logs` (entity, record_id, action, old_values, new_values, user_id, timestamp)
-- [ ] Error handling consistent: middleware NestJS global care returneaza format unificat `{ success, data, error, message }`
-- [ ] Loading skeletons pe DynamicTable si DynamicForm
+- [x] Error handling consistent: middleware NestJS global care returneaza format unificat `{ success, data, error, message }`
+- [x] Loading skeletons pe DynamicTable si DynamicForm
 
 ---
 

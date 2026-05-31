@@ -28,8 +28,19 @@ interface FieldMapping {
 }
 
 interface RecordIdSource {
-  sourceType: 'static' | 'current_record' | 'previous_node';
+  sourceType: 'static' | 'current_record' | 'previous_node' | 'node_output';
   value: string;
+  sourceNodeId?: string;
+  sourceFieldSlug?: string;
+}
+
+interface FormulaToken {
+  type: 'field' | 'literal' | 'operator' | 'group_start' | 'group_end';
+  sourceNodeId?: string;
+  fieldSlug?: string;
+  fieldLabel?: string;
+  sourceLabel?: string;
+  value?: string;
 }
 
 @Injectable()
@@ -178,6 +189,10 @@ export class WorkflowSyncService {
     // Ensure the workflow is activated in n8n so the webhook URL is live
     await this.n8nClient.activateWorkflow(n8nId);
 
+    // Brief delay to let n8n finish processing the update — without this n8n may
+    // execute the previous version of the workflow (before the latest sync).
+    await new Promise(resolve => setTimeout(resolve, 300));
+
     const tenantSlug = this.tenantContext.isAvailable
       ? this.tenantContext.slug
       : 'unknown';
@@ -249,12 +264,7 @@ export class WorkflowSyncService {
           break;
         case 'node_output':
           if (m.sourceNodeId && m.sourceFieldSlug) {
-            const isStart = this.isStartNode(m.sourceNodeId, allNodes);
-            if (isStart) {
-              result[m.key] = `={{$('${m.sourceNodeId}').first().json.body.record.${m.sourceFieldSlug}}}`;
-            } else {
-              result[m.key] = `={{$('${m.sourceNodeId}').first().json.data.${m.sourceFieldSlug}}}`;
-            }
+            result[m.key] = `={{${this.nodeOutputJsonPath(m.sourceNodeId, allNodes)}.${m.sourceFieldSlug}}}`;
           }
           break;
         default:
@@ -264,12 +274,15 @@ export class WorkflowSyncService {
     return result;
   }
 
-  private resolveRecordId(source: RecordIdSource): string {
+  private resolveRecordId(source: RecordIdSource, allNodes: NodeDefinition[]): string {
     if (source.sourceType === 'current_record') {
       return `={{$json.body.${source.value}}}`;
     }
     if (source.sourceType === 'previous_node') {
       return `={{$json.${source.value}}}`;
+    }
+    if (source.sourceType === 'node_output') {
+      return `={{${this.nodeOutputJsonPath(source.sourceNodeId!, allNodes)}.${source.sourceFieldSlug}}}`;
     }
     return source.value;
   }
@@ -291,13 +304,58 @@ export class WorkflowSyncService {
     return startTypes.has(node.type);
   }
 
+  /** HTTP Request nodes wrap output in { success, data }; Set/Code pass through as-is. */
+  private isHttpWrapperNode(nodeId: string, nodes: NodeDefinition[]): boolean {
+    const node = nodes.find(n => n.id === nodeId)
+    if (!node) return false
+    const httpTypes = new Set(['app_get_record', 'app_get_related', 'app_create_record', 'app_update_record'])
+    return httpTypes.has(node.type)
+  }
+
+  private nodeOutputJsonPath(nodeId: string, nodes: NodeDefinition[]): string {
+    if (this.isStartNode(nodeId, nodes)) {
+      return `$('${nodeId}').first().json.body.record`
+    }
+    if (this.isHttpWrapperNode(nodeId, nodes)) {
+      return `$('${nodeId}').first().json.data`
+    }
+    // set_data, code, and other pass-through nodes
+    return `$('${nodeId}').first().json`
+  }
+
   /**
    * n8n expressions (={{ ... }}) are only evaluated in query params, body,
    * and headers — NOT in URL path segments. Check whether a value is an
    * n8n expression so we can route it through query params instead.
    */
   private isN8nExpression(value: any): boolean {
-    return typeof value === 'string' && value.startsWith('={{');
+    return typeof value === 'string' && (value.startsWith('={{') || value.startsWith('{{'));
+  }
+
+  private translateFormulaTokens(tokens: FormulaToken[], allNodes: NodeDefinition[]): string {
+    let expr = '={{'
+    for (const token of tokens) {
+      switch (token.type) {
+        case 'field': {
+          expr += `${this.nodeOutputJsonPath(token.sourceNodeId!, allNodes)}.${token.fieldSlug}`
+          break
+        }
+        case 'literal':
+          expr += token.value ?? ''
+          break
+        case 'operator':
+          expr += ` ${token.value} `
+          break
+        case 'group_start':
+          expr += '('
+          break
+        case 'group_end':
+          expr += ')'
+          break
+      }
+    }
+    expr += '}}'
+    return expr
   }
 
   private translateToN8n(workflow: {
@@ -339,7 +397,7 @@ export class WorkflowSyncService {
       nodes: n8nNodes,
       connections: n8nConnections,
       settings: {
-        executionOrder: 'v1',
+        executionOrder: 'v0',
         saveManualExecutions: true,
         callerPolicy: 'workflowsFromSameOwner',
       },
@@ -407,8 +465,32 @@ export class WorkflowSyncService {
     switch (nodeType) {
       case 'app_get_record': {
           const getEntity = !!params.entity;
+          const hasFilter = !!params.filterField && !!params.filterValueSource;
           const getRecId = !!params.recordId;
           const recIdIsExpr = this.isN8nExpression(params.recordId);
+
+          // Filter mode: find by custom field
+          if (hasFilter) {
+            const filterValue = this.resolveRecordId(
+              params.filterValueSource as RecordIdSource,
+              allNodes,
+            );
+            return {
+              method: 'GET',
+              url: `${webhookDataBase}-resolve`,
+              authentication: 'none',
+              sendQuery: true,
+              queryParameters: {
+                parameters: [
+                  { name: 'entity', value: getEntity ? params.entity : '={{ $json.body.entity }}' },
+                  { name: 'filterField', value: params.filterField },
+                  { name: 'filterValue', value: filterValue },
+                ],
+              },
+              ...webhookHeaders,
+              options: {},
+            };
+          }
 
           // Direct URL only when both values are static (n8n doesn't evaluate expressions in URL paths)
           if (getEntity && getRecId && !recIdIsExpr) {
@@ -478,7 +560,7 @@ export class WorkflowSyncService {
               : (params.fields ?? {});
 
           const resolvedRecordId = params.recordIdSource
-            ? this.resolveRecordId(params.recordIdSource)
+            ? this.resolveRecordId(params.recordIdSource, allNodes)
             : params.recordId;
 
           const updRecId = !!resolvedRecordId;
@@ -594,6 +676,18 @@ export class WorkflowSyncService {
         return {
           jsCode: params.code ?? 'return items;',
         };
+
+      case 'set_data': {
+        const assignments: any[] = params.assignments ?? []
+        const values = assignments.map(a => ({
+          name: a.key,
+          value: this.translateFormulaTokens(a.tokens ?? [], allNodes),
+        }))
+        return {
+          values: { string: values },
+          keepOnlySet: false,
+        }
+      }
 
       case 'start':
       case 'webhook_trigger':

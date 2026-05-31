@@ -1,5 +1,19 @@
 export type FieldValueSource = 'static' | 'current_record' | 'previous_node' | 'relation' | 'expression' | 'node_output'
 
+export interface FormulaToken {
+  type: 'field' | 'literal' | 'operator' | 'group_start' | 'group_end'
+  sourceNodeId?: string
+  fieldSlug?: string
+  fieldLabel?: string
+  sourceLabel?: string
+  value?: string
+}
+
+export interface FormulaAssignment {
+  key: string
+  tokens: FormulaToken[]
+}
+
 export interface FieldMapping {
   key: string
   sourceType: FieldValueSource
@@ -9,8 +23,10 @@ export interface FieldMapping {
 }
 
 export interface RecordIdSource {
-  sourceType: 'static' | 'current_record' | 'previous_node'
+  sourceType: 'static' | 'current_record' | 'previous_node' | 'node_output'
   value: string
+  sourceNodeId?: string
+  sourceFieldSlug?: string
 }
 
 export interface NodeTypeDefinition {
@@ -27,7 +43,7 @@ export interface NodeTypeDefinition {
 export interface NodeConfigField {
   key: string
   label: string
-  type: 'text' | 'textarea' | 'select' | 'number' | 'boolean' | 'entity-select' | 'field-select' | 'field-mappings' | 'record-id-source' | 'data-source-select' | 'relation-field-select'
+  type: 'text' | 'textarea' | 'select' | 'number' | 'boolean' | 'entity-select' | 'field-select' | 'field-mappings' | 'record-id-source' | 'data-source-select' | 'relation-field-select' | 'formula-assignments' | 'target-field-select'
   placeholder?: string
   options?: { label: string, value: string }[]
   required?: boolean
@@ -78,11 +94,13 @@ export function useNodeTypes() {
       icon: 'i-lucide-download',
       category: 'action',
       color: '#3b82f6',
-      description: 'Citeste o inregistrare dintr-o entitate',
-      defaults: { entity: '', recordId: '' },
+      description: 'Citeste o inregistrare dintr-o entitate dupa ID sau dupa un camp specific.',
+      defaults: { entity: '', recordId: '', filterField: '', filterValueSource: null as RecordIdSource | null },
       configFields: [
         { key: 'entity', label: 'Entitate', type: 'entity-select', required: true },
-        { key: 'recordId', label: 'Record ID', type: 'text', placeholder: '{{$json.recordId}}' }
+        { key: 'recordId', label: 'Record ID (optional)', type: 'text', placeholder: 'ID sau lasa gol pentru filtru' },
+        { key: 'filterField', label: 'Camp filtru (optional)', type: 'target-field-select', placeholder: 'Alege campul pentru WHERE' },
+        { key: 'filterValueSource', label: 'Valoare filtru', type: 'record-id-source' }
       ]
     },
     {
@@ -210,6 +228,18 @@ export function useNodeTypes() {
         },
         { key: 'url', label: 'URL', type: 'text', required: true, placeholder: 'https://api.example.com/endpoint' },
         { key: 'body', label: 'Body (JSON)', type: 'textarea' }
+      ]
+    },
+    {
+      type: 'set_data',
+      label: 'Set/Calculeaza',
+      icon: 'i-lucide-calculator',
+      category: 'action',
+      color: '#ec4899',
+      description: 'Adauga campuri calculate folosind campuri din nodurile anterioare si operatori matematici.',
+      defaults: { assignments: [] },
+      configFields: [
+        { key: 'assignments', label: 'Valori de setat', type: 'formula-assignments' }
       ]
     },
     {

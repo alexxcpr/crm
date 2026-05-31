@@ -15,19 +15,24 @@ const props = defineProps<{
 
 const isCondition = computed(() => props.data.nodeType === 'condition')
 const isTrigger = computed(() => props.data.nodeType === 'start')
+const isSetData = computed(() => props.data.nodeType === 'set_data')
 
 // Resolve entity display info from node parameters
 const entityDisplay = computed(() => {
   const params = props.data.parameters ?? {}
-  // Direct entity param (start, app_get_record, app_create_record, app_update_record)
   if (params.entity) {
     return params.entityName ?? params.entity
   }
-  // app_get_related: show target entity once resolved
   if (params.relationEntitySlug) {
     return params.relationEntityName ?? params.relationEntitySlug
   }
   return null
+})
+
+const setDataInfo = computed(() => {
+  if (!isSetData.value) return null
+  const count = (props.data.parameters?.assignments as any[])?.length ?? 0
+  return count > 0 ? `${count} campuri configurate` : 'Nicio formula configurata'
 })
 </script>
 
@@ -55,7 +60,13 @@ const entityDisplay = computed(() => {
         {{ data.nodeType }}
       </p>
       <p
-        v-if="entityDisplay"
+        v-if="setDataInfo"
+        class="text-[10px] text-gray-600 dark:text-gray-300 truncate font-medium"
+      >
+        {{ setDataInfo }}
+      </p>
+      <p
+        v-else-if="entityDisplay"
         class="text-[10px] text-gray-600 dark:text-gray-300 truncate font-medium"
       >
         Entitate: {{ entityDisplay }}

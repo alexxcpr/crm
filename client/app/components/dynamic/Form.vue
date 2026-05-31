@@ -232,8 +232,20 @@ const executingAction = ref<string | null>(null)
 async function handleAction(actionSlug: string, actionName: string) {
   if (!props.recordId) return
   executingAction.value = actionSlug
-  await executeEntityAction(actionSlug, props.recordId)
+  const success = await executeEntityAction(actionSlug, props.recordId)
   executingAction.value = null
+
+  if (success) {
+    const record = await fetchOne(props.recordId)
+    initFormState(record)
+    if (record) {
+      systemData.date_created = record.date_created || null
+      systemData.date_updated = record.date_updated || null
+      systemData.id_owner = record.id_owner || null
+      systemData.owner_email = record.owner_email || null
+      systemData.owner_name = record.owner_name || null
+    }
+  }
 }
 
 // ─── Delete ───

@@ -1,4 +1,4 @@
-import type { Node } from '@vue-flow/core'
+import type { Node, Edge } from '@vue-flow/core'
 import type { Field, EntitySchema } from '~/types/schema'
 
 export interface DataSource {
@@ -25,6 +25,7 @@ export interface DataSource {
 export function useWorkflowDataRegistry(
   nodes: Ref<Node[]>,
   startEntitySlug: Ref<string>,
+  edges: Ref<Edge[]>,
 ) {
   const { apiFetch } = useApi()
 
@@ -102,6 +103,32 @@ export function useWorkflowDataRegistry(
           })
           processed.add(node.id)
           changed = true
+        } else if (nodeType === 'set_data') {
+          const inEdge = edges.value.find(e => e.target === node.id)
+          if (!inEdge) continue
+          const predecessor = sources.find(s => s.nodeId === inEdge.source)
+          if (!predecessor) continue
+
+          // Merge predecessor fields with computed fields from assignments
+          const assignments = (data.parameters?.assignments as any[]) ?? []
+          const computedFields: Field[] = assignments
+            .filter((a: any) => a.key)
+            .map((a: any) => ({
+              column_name: a.key,
+              name: a.key,
+              slug: `_computed_${a.key}`,
+              data_type: 'numeric' as const,
+              ui_type: 'number' as const,
+            } as Field))
+
+          sources.push({
+            nodeId: node.id,
+            label: `${data.label || 'Set Data'}: ${predecessor.label}`,
+            entitySlug: predecessor.entitySlug,
+            fields: [...predecessor.fields, ...computedFields],
+          })
+          processed.add(node.id)
+          changed = true
         }
       }
     }
@@ -118,9 +145,16 @@ export function useWorkflowDataRegistry(
     loading.value = true
     try {
       const schema = await apiFetch<EntitySchema>(`/v1/schema/${entitySlug}`)
-      const fields: Field[] = schema.fields ?? []
+      const customFields: Field[] = schema.fields ?? []
+      // System columns are not in the field table but are real columns available to reference
+      const systemFields: Field[] = [
+        { column_name: 'id', name: 'ID (sistem)', slug: '_sys_id', data_type: 'uuid', ui_type: 'text' },
+        { column_name: 'date_created', name: 'Data creare (sistem)', slug: '_sys_date_created', data_type: 'timestamp', ui_type: 'datepicker' },
+        { column_name: 'date_updated', name: 'Data actualizare (sistem)', slug: '_sys_date_updated', data_type: 'timestamp', ui_type: 'datepicker' },
+        { column_name: 'id_owner', name: 'Owner (sistem)', slug: '_sys_id_owner', data_type: 'uuid', ui_type: 'text' },
+      ] as Field[]
+      const fields = [...systemFields, ...customFields]
       schemaCache.set(entitySlug, { name: schema.entity.name, fields })
-      // Recompute so dataSources reflect the newly cached fields
       computeRegistrySync()
       return fields
     } catch {
@@ -153,17 +187,12 @@ export function useWorkflowDataRegistry(
     })),
   ))
 
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null
+  const edgeFingerprint = computed(() => JSON.stringify(
+    edges.value.map(e => ({ source: e.source, target: e.target })),
+  ))
 
-  function scheduleCompute() {
-    if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => {
-      computeRegistrySync()
-    }, 150)
-  }
-
-  watch([graphFingerprint, startEntitySlug], () => {
-    scheduleCompute()
+  watch([graphFingerprint, edgeFingerprint, startEntitySlug], () => {
+    nextTick(() => computeRegistrySync())
   })
 
   // Compute initial registry synchronously (no API calls)

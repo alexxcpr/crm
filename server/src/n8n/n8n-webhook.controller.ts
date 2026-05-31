@@ -209,18 +209,36 @@ export class N8nWebhookController {
     @Param('tenantSlug') tenantSlug: string,
     @Query('entity') entitySlug: string,
     @Query('id') id: string,
+    @Query('filterField') filterField?: string,
+    @Query('filterValue') filterValue?: string,
     @Headers('x-webhook-secret') secret?: string,
   ) {
     this.verifyDataAccess(secret);
 
-    const result = await this.handleDataOperation(tenantSlug, () => {
+    const result = await this.handleDataOperation(tenantSlug, async () => {
       if (!entitySlug) throw new BadRequestException('Query param "entity" is required');
-      if (!id) throw new BadRequestException('Query param "id" is required');
+
+      if (filterField && filterValue !== undefined && filterValue !== null && filterValue !== '') {
+        const query: Record<string, any> = {
+          limit: 1,
+          filter: {
+            [filterField]: { eq: filterValue },
+          },
+        };
+        const list = await this.dataService.findAll(entitySlug, query);
+        const first = list.data?.[0] ?? null;
+        if (!first) {
+          throw new NotFoundException(`Nicio inregistrare gasita in "${entitySlug}" cu ${filterField} = "${filterValue}".`);
+        }
+        return { data: first };
+      }
+
+      if (!id) throw new BadRequestException('Query param "id" or filter params are required');
       return this.dataService.findOne(entitySlug, id);
     });
 
     this.logger.log(
-      `Webhook data GET (resolve): ${tenantSlug}/${entitySlug}/${id}`,
+      `Webhook data GET (resolve): ${tenantSlug}/${entitySlug}/${id ?? `${filterField}=${filterValue}`}`,
     );
 
     return result;

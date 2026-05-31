@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Node } from '@vue-flow/core'
-import type { FieldMapping, RecordIdSource } from '~/composables/useNodeTypes'
+import type { FieldMapping, FormulaAssignment, RecordIdSource } from '~/composables/useNodeTypes'
 import type { DataSource } from '~/composables/useWorkflowDataRegistry'
 import type { Field } from '~/types/schema'
 
@@ -239,6 +239,17 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
           @update:model-value="onParamChange(field.key, $event)"
         />
 
+        <USelect
+          v-else-if="field.type === 'target-field-select'"
+          :model-value="localParams[field.key] ?? ''"
+          :items="targetEntityFields.map(f => ({ label: `${f.name} (${f.column_name})`, value: f.column_name }))"
+          value-key="value"
+          label-key="label"
+          size="sm"
+          placeholder="Alege campul..."
+          @update:model-value="onParamChange(field.key, $event)"
+        />
+
         <UInput
           v-else-if="field.type === 'number'"
           :model-value="localParams[field.key] ?? 0"
@@ -250,6 +261,8 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
         <WorkflowPanelsRecordIdSourceEditor
           v-else-if="field.type === 'record-id-source'"
           :model-value="(localParams[field.key] as RecordIdSource | null) ?? null"
+          :data-sources="dataSources ?? []"
+          :fetch-source-fields="fetchSourceFields"
           @update:model-value="onParamChange(field.key, $event)"
         />
 
@@ -258,6 +271,14 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
           :model-value="(localParams[field.key] as FieldMapping[]) ?? []"
           :data-sources="dataSources ?? []"
           :target-entity-fields="targetEntityFields"
+          :fetch-source-fields="fetchSourceFields"
+          @update:model-value="onParamChange(field.key, $event)"
+        />
+
+        <WorkflowPanelsSetDataEditor
+          v-else-if="field.type === 'formula-assignments'"
+          :model-value="(localParams[field.key] as FormulaAssignment[]) ?? []"
+          :data-sources="dataSources ?? []"
           :fetch-source-fields="fetchSourceFields"
           @update:model-value="onParamChange(field.key, $event)"
         />
