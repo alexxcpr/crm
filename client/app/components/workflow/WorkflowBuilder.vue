@@ -17,6 +17,7 @@ const emit = defineEmits<{
 const flowId = computed(() => props.workflowId ?? 'workflow-builder')
 
 const {
+  nodes,
   selectedNode,
   isDirty,
   selectNode,
@@ -30,6 +31,54 @@ const {
   project,
   initStartNode
 } = useWorkflowBuilder(flowId.value)
+
+// ─── Data registry ───
+const startEntitySlug = computed(() => {
+  const startNode = nodes.value.find(
+    n => n.data?.nodeType === 'start' || n.data?.nodeType === 'trigger' || n.data?.nodeType === 'webhook_trigger'
+  )
+  return (startNode?.data?.parameters?.entity ?? '') as string
+})
+
+const { dataSources } = useWorkflowDataRegistry(nodes, startEntitySlug)
+
+// ─── Enrich app_get_related nodes before save ───
+function enrichBeforeSave(exported: { nodes: any[], connections: any[] }): { nodes: any[], connections: any[] } {
+  const enrichedNodes = exported.nodes.map(node => {
+    if (node.type !== 'app_get_related') return node
+    if (!node.parameters) return node
+
+    const srcNodeId = node.parameters.sourceNodeId as string | undefined
+    const relFieldSlug = node.parameters.relationField as string | undefined
+    if (!srcNodeId || !relFieldSlug) return node
+
+    const srcSource = dataSources.value.find(s => s.nodeId === srcNodeId)
+    if (!srcSource) return node
+
+    const relField = srcSource.fields.find(f => f.slug === relFieldSlug)
+    if (!relField?.relation_entity_slug || !relField?.column_name) return node
+
+    const isStart = srcSource.entitySlug === startEntitySlug.value &&
+      (nodes.value.find(n => n.id === srcNodeId)?.data?.nodeType === 'start' ||
+       nodes.value.find(n => n.id === srcNodeId)?.data?.nodeType === 'trigger' ||
+       nodes.value.find(n => n.id === srcNodeId)?.data?.nodeType === 'webhook_trigger')
+
+    const recordIdExpr = isStart
+      ? `={{$('${srcNodeId}').first().json.body.record.${relField.column_name}}}`
+      : `={{$('${srcNodeId}').first().json.data.${relField.column_name}}}`
+
+    return {
+      ...node,
+      parameters: {
+        ...node.parameters,
+        relationEntitySlug: relField.relation_entity_slug,
+        relationRecordIdExpr: recordIdExpr,
+      }
+    }
+  })
+
+  return { ...exported, nodes: enrichedNodes }
+}
 
 watch(isDirty, val => emit('dirty', val))
 
@@ -69,7 +118,8 @@ function onDragOver(event: DragEvent) {
 
 function save() {
   const data = exportWorkflow()
-  emit('save', data)
+  const enriched = enrichBeforeSave(data)
+  emit('save', enriched)
   isDirty.value = false
 }
 
@@ -118,6 +168,7 @@ defineExpose({ save, exportWorkflow, fitView })
     <!-- Right Panel -->
     <WorkflowPanelsNodeConfigPanel
       :node="selectedNode"
+      :data-sources="dataSources"
       @update-parameters="updateNodeParameters"
       @update-label="updateNodeLabel"
       @delete-node="deleteSelectedNode"

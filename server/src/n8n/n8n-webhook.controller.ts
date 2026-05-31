@@ -12,7 +12,7 @@ import {
   HttpCode,
   HttpStatus,
   NotFoundException,
-  HttpException,
+  BadRequestException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -213,13 +213,11 @@ export class N8nWebhookController {
   ) {
     this.verifyDataAccess(secret);
 
-    if (!entitySlug) {
-      throw new NotFoundException('Query param "entity" is required');
-    }
-
-    const result = await this.handleDataOperation(tenantSlug, () =>
-      this.dataService.findOne(entitySlug, id),
-    );
+    const result = await this.handleDataOperation(tenantSlug, () => {
+      if (!entitySlug) throw new BadRequestException('Query param "entity" is required');
+      if (!id) throw new BadRequestException('Query param "id" is required');
+      return this.dataService.findOne(entitySlug, id);
+    });
 
     this.logger.log(
       `Webhook data GET (resolve): ${tenantSlug}/${entitySlug}/${id}`,
@@ -238,13 +236,10 @@ export class N8nWebhookController {
   ) {
     this.verifyDataAccess(secret);
 
-    if (!entitySlug) {
-      throw new NotFoundException('Query param "entity" is required');
-    }
-
-    const result = await this.handleDataOperation(tenantSlug, () =>
-      this.dataService.create(entitySlug, body),
-    );
+    const result = await this.handleDataOperation(tenantSlug, () => {
+      if (!entitySlug) throw new BadRequestException('Query param "entity" is required');
+      return this.dataService.create(entitySlug, body);
+    });
 
     this.logger.log(
       `Webhook data POST (resolve): ${tenantSlug}/${entitySlug}`,
@@ -264,13 +259,11 @@ export class N8nWebhookController {
   ) {
     this.verifyDataAccess(secret);
 
-    if (!entitySlug) {
-      throw new NotFoundException('Query param "entity" is required');
-    }
-
-    const result = await this.handleDataOperation(tenantSlug, () =>
-      this.dataService.update(entitySlug, id, body),
-    );
+    const result = await this.handleDataOperation(tenantSlug, () => {
+      if (!entitySlug) throw new BadRequestException('Query param "entity" is required');
+      if (!id) throw new BadRequestException('Query param "id" is required');
+      return this.dataService.update(entitySlug, id, body);
+    });
 
     this.logger.log(
       `Webhook data PUT (resolve): ${tenantSlug}/${entitySlug}/${id}`,
@@ -311,40 +304,11 @@ export class N8nWebhookController {
     }
   }
 
-  /**
-   * Wraps a data operation for n8n consumption: catches NestJS exceptions and
-   * returns them as 200 OK with { success: false, ... } so n8n's HTTP Request
-   * node doesn't treat validation errors as workflow failures.
-   */
   private async handleDataOperation<T>(
     tenantSlug: string,
     callback: () => Promise<T>,
-  ): Promise<T | { success: boolean; statusCode: number; error: string; message: any; timestamp: string }> {
-    try {
-      return await this.runInTenantContext(tenantSlug, callback);
-    } catch (err) {
-      if (err instanceof HttpException) {
-        const statusCode = err.getStatus();
-        const res = err.getResponse();
-        let message: any = 'Internal error';
-        let error = 'Error';
-        if (typeof res === 'string') {
-          message = res;
-        } else if (typeof res === 'object' && res !== null) {
-          const obj = res as Record<string, any>;
-          message = obj.message ?? message;
-          error = obj.error ?? error;
-        }
-        return {
-          success: false,
-          statusCode,
-          error,
-          message,
-          timestamp: new Date().toISOString(),
-        };
-      }
-      throw err;
-    }
+  ): Promise<T> {
+    return await this.runInTenantContext(tenantSlug, callback);
   }
 
   private async runInTenantContext<T>(

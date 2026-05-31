@@ -21,7 +21,9 @@ interface ConnectionDefinition {
 
 interface FieldMapping {
   key: string;
-  sourceType: 'static' | 'current_record' | 'previous_node' | 'relation' | 'expression';
+  sourceType: 'static' | 'current_record' | 'previous_node' | 'relation' | 'expression' | 'node_output';
+  sourceNodeId?: string;
+  sourceFieldSlug?: string;
   value: string;
 }
 
@@ -180,7 +182,7 @@ export class WorkflowSyncService {
       ? this.tenantContext.slug
       : 'unknown';
     const webhookPath = `crm-${tenantSlug}-${workflow.slug}`;
-    const result = await this.n8nClient.executeWebhook(webhookPath, inputData);
+    const result = await this.n8nClient.executeWebhook(webhookPath, inputData, n8nId);
 
     this.logger.log(
       `Executed workflow "${workflow.slug}" via webhook ${webhookPath}`,
@@ -225,7 +227,10 @@ export class WorkflowSyncService {
     }
   }
 
-  private resolveFieldMappings(mappings: FieldMapping[]): Record<string, string> {
+  private resolveFieldMappings(
+    mappings: FieldMapping[],
+    allNodes: NodeDefinition[],
+  ): Record<string, string> {
     const result: Record<string, string> = {};
     for (const m of mappings) {
       if (!m.key) continue;
@@ -241,6 +246,16 @@ export class WorkflowSyncService {
           break;
         case 'expression':
           result[m.key] = m.value;
+          break;
+        case 'node_output':
+          if (m.sourceNodeId && m.sourceFieldSlug) {
+            const isStart = this.isStartNode(m.sourceNodeId, allNodes);
+            if (isStart) {
+              result[m.key] = `={{$('${m.sourceNodeId}').first().json.body.record.${m.sourceFieldSlug}}}`;
+            } else {
+              result[m.key] = `={{$('${m.sourceNodeId}').first().json.data.${m.sourceFieldSlug}}}`;
+            }
+          }
           break;
         default:
           result[m.key] = m.value;
@@ -269,6 +284,22 @@ export class WorkflowSyncService {
     return nodes.some((n) => activatableTypes.includes(n.type));
   }
 
+  private isStartNode(nodeId: string, nodes: NodeDefinition[]): boolean {
+    const node = nodes.find((n) => n.id === nodeId);
+    if (!node) return false;
+    const startTypes = new Set(['start', 'trigger', 'webhook_trigger']);
+    return startTypes.has(node.type);
+  }
+
+  /**
+   * n8n expressions (={{ ... }}) are only evaluated in query params, body,
+   * and headers — NOT in URL path segments. Check whether a value is an
+   * n8n expression so we can route it through query params instead.
+   */
+  private isN8nExpression(value: any): boolean {
+    return typeof value === 'string' && value.startsWith('={{');
+  }
+
   private translateToN8n(workflow: {
     name: string;
     slug: string;
@@ -290,7 +321,7 @@ export class WorkflowSyncService {
       : 'unknown';
 
     const n8nNodes = nodes.map((node, index) =>
-      this.translateNode(node, index, tenantSlug),
+      this.translateNode(node, index, tenantSlug, nodes),
     );
 
     // Set predictable webhook path so we can call it from the CRM
@@ -319,6 +350,7 @@ export class WorkflowSyncService {
     node: NodeDefinition,
     index: number,
     tenantSlug: string,
+    allNodes: NodeDefinition[],
   ): Record<string, any> {
     const typeMap: Record<string, string> = {
       start: 'n8n-nodes-base.webhook',
@@ -332,12 +364,14 @@ export class WorkflowSyncService {
       set_data: 'n8n-nodes-base.set',
       code: 'n8n-nodes-base.code',
       app_get_record: 'n8n-nodes-base.httpRequest',
+      app_get_related: 'n8n-nodes-base.httpRequest',
       app_update_record: 'n8n-nodes-base.httpRequest',
       app_create_record: 'n8n-nodes-base.httpRequest',
     };
 
     const n8nType = typeMap[node.type] ?? 'n8n-nodes-base.noOp';
-    const name = node.name ?? `${node.type}_${index}`;
+    // Use node.id as n8n node name for stable cross-node referencing via $('<id>')
+    const name = node.id;
 
     const n8nNode: Record<string, any> = {
       id: node.id,
@@ -345,7 +379,7 @@ export class WorkflowSyncService {
       type: n8nType,
       typeVersion: n8nType === 'n8n-nodes-base.httpRequest' ? 4 : 1,
       position: [node.position?.x ?? index * 250, node.position?.y ?? 0],
-      parameters: this.translateParameters(node.type, node.parameters ?? {}, tenantSlug),
+      parameters: this.translateParameters(node.type, node.parameters ?? {}, tenantSlug, allNodes),
     };
 
     return n8nNode;
@@ -355,6 +389,7 @@ export class WorkflowSyncService {
     nodeType: string,
     params: Record<string, any>,
     tenantSlug: string,
+    allNodes: NodeDefinition[],
   ): Record<string, any> {
     const webhookDataBase = `${this.webhookBaseUrl}/v1/webhooks/n8n/${tenantSlug}/data`;
 
@@ -373,8 +408,10 @@ export class WorkflowSyncService {
       case 'app_get_record': {
           const getEntity = !!params.entity;
           const getRecId = !!params.recordId;
+          const recIdIsExpr = this.isN8nExpression(params.recordId);
 
-          if (getEntity && getRecId) {
+          // Direct URL only when both values are static (n8n doesn't evaluate expressions in URL paths)
+          if (getEntity && getRecId && !recIdIsExpr) {
             return {
               method: 'GET',
               url: `${webhookDataBase}/${params.entity}/${params.recordId}`,
@@ -400,12 +437,44 @@ export class WorkflowSyncService {
           };
         }
 
+      case 'app_get_related': {
+          const relEntity = !!params.relationEntitySlug;
+          const relRecId: string | undefined = params.relationRecordIdExpr;
+          const relRecIdIsExpr = this.isN8nExpression(relRecId);
+
+          // Direct URL only when both values are static (n8n doesn't evaluate expressions in URL paths)
+          if (relEntity && relRecId && !relRecIdIsExpr) {
+            return {
+              method: 'GET',
+              url: `${webhookDataBase}/${params.relationEntitySlug}/${relRecId}`,
+              authentication: 'none',
+              ...webhookHeaders,
+              options: {},
+            };
+          }
+
+          return {
+            method: 'GET',
+            url: `${webhookDataBase}-resolve`,
+            authentication: 'none',
+            sendQuery: true,
+            queryParameters: {
+              parameters: [
+                { name: 'entity', value: relEntity ? params.relationEntitySlug : '={{ $json.body.entity }}' },
+                { name: 'id', value: relRecId || '={{ $json.body.recordId }}' },
+              ],
+            },
+            ...webhookHeaders,
+            options: {},
+          };
+        }
+
       case 'app_update_record': {
           const updEntity = !!params.entity;
 
           const resolvedFields =
             params.fieldMappings?.length
-              ? this.resolveFieldMappings(params.fieldMappings)
+              ? this.resolveFieldMappings(params.fieldMappings, allNodes)
               : (params.fields ?? {});
 
           const resolvedRecordId = params.recordIdSource
@@ -413,6 +482,7 @@ export class WorkflowSyncService {
             : params.recordId;
 
           const updRecId = !!resolvedRecordId;
+          const recIdIsExpr = this.isN8nExpression(resolvedRecordId);
 
           const shared = {
             method: 'PUT' as const,
@@ -427,7 +497,8 @@ export class WorkflowSyncService {
             options: {},
           };
 
-          if (updEntity && updRecId) {
+          // Direct URL only when both values are static (n8n doesn't evaluate expressions in URL paths)
+          if (updEntity && updRecId && !recIdIsExpr) {
             return { ...shared, url: `${webhookDataBase}/${params.entity}/${resolvedRecordId}` };
           }
 
@@ -446,10 +517,11 @@ export class WorkflowSyncService {
 
       case 'app_create_record': {
           const createEntity = !!params.entity;
+          const entityIsExpr = this.isN8nExpression(params.entity);
 
           const resolvedFields =
             params.fieldMappings?.length
-              ? this.resolveFieldMappings(params.fieldMappings)
+              ? this.resolveFieldMappings(params.fieldMappings, allNodes)
               : (params.fields ?? {});
 
           const shared = {
@@ -465,7 +537,8 @@ export class WorkflowSyncService {
             options: {},
           };
 
-          if (createEntity) {
+          // Direct URL only when entity is static (n8n doesn't evaluate expressions in URL paths)
+          if (createEntity && !entityIsExpr) {
             return { ...shared, url: `${webhookDataBase}/${params.entity}` };
           }
 
@@ -475,7 +548,7 @@ export class WorkflowSyncService {
             sendQuery: true,
             queryParameters: {
               parameters: [
-                { name: 'entity', value: '={{ $json.body.entity }}' },
+                { name: 'entity', value: createEntity ? params.entity : '={{ $json.body.entity }}' },
               ],
             },
           };
@@ -542,8 +615,9 @@ export class WorkflowSyncService {
     nodes: NodeDefinition[],
   ): Record<string, any> {
     const nodeNameMap = new Map<string, string>();
-    nodes.forEach((node, index) => {
-      nodeNameMap.set(node.id, node.name ?? `${node.type}_${index}`);
+    nodes.forEach((node) => {
+      // n8n node name = node.id (stable, used for $('<id>') references)
+      nodeNameMap.set(node.id, node.id);
     });
 
     const n8nConnections: Record<string, any> = {};

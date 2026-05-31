@@ -1,41 +1,17 @@
 <script setup lang="ts">
 import type { FieldMapping, FieldValueSource } from '~/composables/useNodeTypes'
 import type { Field } from '~/types/schema'
+import type { DataSource } from '~/composables/useWorkflowDataRegistry'
 
 const props = defineProps<{
   modelValue: FieldMapping[]
-  entitySlug: string
+  dataSources: DataSource[]
+  targetEntityFields?: Field[]
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: FieldMapping[]]
 }>()
-
-const { apiFetch } = useApi()
-
-// ─── Entity fields fetch ───
-const entityFields = ref<Field[]>([])
-const fieldsLoading = ref(false)
-
-watch(() => props.entitySlug, async (slug) => {
-  if (!slug) {
-    entityFields.value = []
-    return
-  }
-  fieldsLoading.value = true
-  try {
-    const data = await apiFetch<{ entity: any; fields: Field[] }>(`/v1/schema/${slug}`)
-    entityFields.value = data.fields ?? []
-  } catch {
-    entityFields.value = []
-  } finally {
-    fieldsLoading.value = false
-  }
-}, { immediate: true })
-
-const fieldOptions = computed(() =>
-  entityFields.value.map(f => ({ label: `${f.name} (${f.slug})`, value: f.slug }))
-)
 
 // ─── Local state ───
 const mappings = ref<FieldMapping[]>([...props.modelValue])
@@ -69,6 +45,8 @@ function updateSourceType(index: number, sourceType: FieldValueSource) {
   if (!mappings.value[index]) return
   mappings.value[index].sourceType = sourceType
   mappings.value[index].value = ''
+  mappings.value[index].sourceNodeId = undefined
+  mappings.value[index].sourceFieldSlug = undefined
   emitUpdate()
 }
 
@@ -78,42 +56,53 @@ function updateValue(index: number, value: string) {
   emitUpdate()
 }
 
-// ─── Source options ───
-const sourceOptions: { label: string; value: FieldValueSource }[] = [
+function updateSourceNode(index: number, nodeId: string) {
+  if (!mappings.value[index]) return
+  mappings.value[index].sourceNodeId = nodeId || undefined
+  mappings.value[index].sourceFieldSlug = undefined
+  emitUpdate()
+}
+
+function updateSourceField(index: number, fieldSlug: string) {
+  if (!mappings.value[index]) return
+  mappings.value[index].sourceFieldSlug = fieldSlug || undefined
+  emitUpdate()
+}
+
+// ─── Source type options ───
+const sourceTypeOptions: { label: string; value: FieldValueSource }[] = [
   { label: 'Valoare fixa', value: 'static' },
-  { label: 'Din inreg. curenta', value: 'current_record' },
-  { label: 'Din nodul anterior', value: 'previous_node' }
+  { label: 'Din registry (nod anterior)', value: 'node_output' },
 ]
 
-// ─── Payload field options for "current_record" ───
-const payloadFieldOptions = [
-  { label: 'ID inregistrare (id)', value: 'id' },
-  { label: 'ID inregistrare (recordId)', value: 'recordId' },
-  { label: 'Entitate (entity)', value: 'entity' },
-  { label: 'ID Entitate (entityId)', value: 'entityId' },
-  { label: 'ID Utilizator (userId)', value: 'userId' },
-  { label: 'Tenant (tenant)', value: 'tenant' },
-  { label: 'Timestamp', value: 'timestamp' },
-  { label: 'Actiune (action)', value: 'action' }
-]
+// ─── Data source options for the dropdown ───
+const dataSourceOptions = computed(() =>
+  props.dataSources.map((ds) => ({
+    label: `${ds.label} (${ds.entitySlug})`,
+    value: ds.nodeId,
+  })),
+)
 
-// Track which rows are in "custom field" mode
-const customFieldMode = ref<Record<number, boolean>>({})
-
-function getValueOptions(index: number) {
-  const custom = { label: 'Alt camp (scrie manual)...', value: '__custom__' }
-  return [...payloadFieldOptions, custom]
+// ─── Get fields for a specific source ───
+function getFieldsForSource(nodeId: string | undefined): Field[] {
+  if (!nodeId) return []
+  const ds = props.dataSources.find((s) => s.nodeId === nodeId)
+  return ds?.fields ?? []
 }
 
-function onValueSelect(index: number, val: string) {
-  if (val === '__custom__') {
-    customFieldMode.value[index] = true
-    updateValue(index, '')
-  } else {
-    customFieldMode.value[index] = false
-    updateValue(index, val)
-  }
+function getSourceFieldOptions(nodeId: string | undefined) {
+  return getFieldsForSource(nodeId).map((f) => ({
+    label: `${f.name} (${f.column_name})`,
+    value: f.column_name,
+  }))
 }
+
+const targetFieldOptions = computed(() =>
+  (props.targetEntityFields ?? []).map((f) => ({
+    label: `${f.name} (${f.column_name})`,
+    value: f.column_name,
+  })),
+)
 </script>
 
 <template>
@@ -124,15 +113,24 @@ function onValueSelect(index: number, val: string) {
       :key="idx"
       class="border border-gray-200 dark:border-gray-700 rounded-md p-2.5 space-y-2"
     >
+      <!-- Field name (destination key) + Remove -->
       <div class="flex items-center gap-1.5">
         <USelect
+          v-if="targetFieldOptions.length > 0"
           :model-value="mapping.key"
-          :items="fieldOptions"
+          :items="targetFieldOptions"
           value-key="value"
           label-key="label"
           size="xs"
-          placeholder="Camp..."
-          :loading="fieldsLoading"
+          placeholder="Camp destinatie..."
+          class="flex-1"
+          @update:model-value="(v: string) => updateKey(idx, v)"
+        />
+        <UInput
+          v-else
+          :model-value="mapping.key"
+          size="xs"
+          placeholder="Nume camp in destinatie"
           class="flex-1"
           @update:model-value="(v: string) => updateKey(idx, v)"
         />
@@ -146,15 +144,17 @@ function onValueSelect(index: number, val: string) {
         />
       </div>
 
+      <!-- Source Type -->
       <USelect
         :model-value="mapping.sourceType"
-        :items="sourceOptions"
+        :items="sourceTypeOptions"
         value-key="value"
         label-key="label"
         size="xs"
         @update:model-value="(v: FieldValueSource) => updateSourceType(idx, v)"
       />
 
+      <!-- Static value -->
       <UInput
         v-if="mapping.sourceType === 'static'"
         :model-value="mapping.value"
@@ -163,42 +163,53 @@ function onValueSelect(index: number, val: string) {
         @update:model-value="(v: string) => updateValue(idx, v)"
       />
 
-      <template v-else-if="mapping.sourceType === 'current_record'">
+      <!-- node_output: pick source + field -->
+      <template v-else-if="mapping.sourceType === 'node_output'">
         <USelect
-          v-if="!customFieldMode[idx]"
-          :model-value="mapping.value"
-          :items="getValueOptions(idx)"
+          :model-value="mapping.sourceNodeId ?? ''"
+          :items="dataSourceOptions"
           value-key="value"
           label-key="label"
           size="xs"
-          @update:model-value="(v: string) => onValueSelect(idx, v)"
+          placeholder="Sursa datelor..."
+          @update:model-value="(v: string) => updateSourceNode(idx, v)"
         />
-        <div v-else class="flex items-center gap-1.5">
-          <UInput
-            :model-value="mapping.value"
-            size="xs"
-            placeholder="Numele campului din payload"
-            class="flex-1"
-            @update:model-value="(v: string) => updateValue(idx, v)"
-          />
-          <UButton
-            icon="i-lucide-list"
-            color="neutral"
-            variant="ghost"
-            size="xs"
-            title="Inapoi la lista"
-            @click="customFieldMode[idx] = false"
-          />
-        </div>
+        <USelect
+          :model-value="mapping.sourceFieldSlug ?? ''"
+          :items="getSourceFieldOptions(mapping.sourceNodeId)"
+          value-key="value"
+          label-key="label"
+          size="xs"
+          placeholder="Campul din sursa..."
+          @update:model-value="(v: string) => updateSourceField(idx, v)"
+        />
       </template>
 
+      <!-- Legacy backward compat: current_record -->
       <UInput
-        v-else-if="mapping.sourceType === 'previous_node'"
+        v-else-if="mapping.sourceType === 'current_record'"
         :model-value="mapping.value"
         size="xs"
-        placeholder="ex: id, nume, email (din raspunsul nodului anterior)"
+        placeholder="Camp din inreg. curenta (ex: cf_nume)"
         @update:model-value="(v: string) => updateValue(idx, v)"
       />
+
+      <!-- Legacy backward compat: previous_node / expression / relation -->
+      <UInput
+        v-else
+        :model-value="mapping.value"
+        size="xs"
+        placeholder="Valoare"
+        @update:model-value="(v: string) => updateValue(idx, v)"
+      />
+    </div>
+
+    <!-- Empty state -->
+    <div
+      v-if="mappings.length === 0"
+      class="text-xs text-gray-400 text-center py-2"
+    >
+      Niciun camp mapat. Adauga campuri pentru a popula inregistrarea.
     </div>
 
     <!-- Add button -->

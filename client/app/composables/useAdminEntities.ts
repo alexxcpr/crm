@@ -97,12 +97,34 @@ export function useAdminEntities() {
       await apiFetch(`/v1/admin/entities/${id}`, { method: 'DELETE' })
       await fetchEntities()
       return true
-    } 
+    }
     catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la stergerea entitatii'
       console.error('[useAdminEntities] deleteEntity:', err)
       return false
-    } 
+    }
+    finally {
+      loading.value = false
+    }
+  }
+
+  async function deleteEntities(ids: string[]): Promise<string | null> {
+    loading.value = true
+    error.value = null
+
+    try {
+      const res = await apiFetch(`/v1/admin/entities`, {
+        method: 'DELETE',
+        body: { ids }
+      })
+      await fetchEntities()
+      return (res as any).message ?? null
+    }
+    catch (err: any) {
+      error.value = err?.data?.message || err.message || 'Eroare la stergerea entitatilor'
+      console.error('[useAdminEntities] deleteEntities:', err)
+      return null
+    }
     finally {
       loading.value = false
     }
@@ -116,6 +138,7 @@ export function useAdminEntities() {
     fetchEntity,
     createEntity,
     updateEntity,
-    deleteEntity
+    deleteEntity,
+    deleteEntities
   }
 }

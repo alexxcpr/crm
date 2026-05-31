@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { h } from 'vue'
 import type { AdminEntity, AdminModule } from '~/types/admin'
 import type { TableColumn } from '@nuxt/ui'
 
-const { entities, loading, error, fetchEntities, deleteEntity } = useAdminEntities()
+const UCheckbox = resolveComponent('UCheckbox')
+
+const { entities, loading, error, fetchEntities, deleteEntity, deleteEntities } = useAdminEntities()
 const { modules, fetchModules } = useAdminModules()
 const toast = useToast()
 
@@ -40,6 +43,22 @@ function onSaved() {
   editingEntity.value = null
 }
 
+// ─── Bulk selection ───
+const table = useTemplateRef('table')
+const rowSelection = ref({})
+const selectedCount = computed(() => Object.keys(rowSelection.value).length)
+
+async function bulkDelete() {
+  const ids = Object.keys(rowSelection.value)
+  const msg = await deleteEntities(ids)
+  if (msg) {
+    toast.add({ title: msg, color: 'success' })
+    rowSelection.value = {}
+  } else {
+    toast.add({ title: 'Eroare la stergere', description: error.value ?? '', color: 'error' })
+  }
+}
+
 // ─── Delete ───
 const showDeleteConfirm = ref(false)
 const deletingEntity = ref<AdminEntity | null>(null)
@@ -75,6 +94,24 @@ function goToDetail(entity: AdminEntity) {
 
 // ─── Table ───
 const columns: TableColumn<AdminEntity>[] = [
+  {
+    id: 'select',
+    meta: { class: { th: 'w-4', td: 'w-4' } },
+    header: ({ table }) => h(UCheckbox, {
+      'modelValue': table.getIsSomePageRowsSelected()
+        ? 'indeterminate'
+        : table.getIsAllPageRowsSelected(),
+      'onUpdate:modelValue': (value: boolean | 'indeterminate') =>
+        table.toggleAllPageRowsSelected(!!value),
+      'ariaLabel': 'Selecteaza tot'
+    }),
+    cell: ({ row }) => h(UCheckbox, {
+      'modelValue': row.getIsSelected(),
+      'onUpdate:modelValue': (value: boolean | 'indeterminate') =>
+        row.toggleSelected(!!value),
+      'ariaLabel': 'Selecteaza rand'
+    })
+  },
   { id: 'edit', meta: { class: { th: 'w-10', td: 'w-10' } } },
   { id: 'open', meta: { class: { th: 'w-10', td: 'w-10' } } },
   { accessorKey: 'name', header: 'Nume' },
@@ -130,6 +167,18 @@ function getDropdownItems(entity: AdminEntity) {
           class="w-48"
         />
         <UButton
+          v-if="selectedCount > 0"
+          label="Sterge"
+          color="error"
+          variant="subtle"
+          icon="i-lucide-trash"
+          @click="bulkDelete"
+        >
+          <template #trailing>
+            <UKbd>{{ selectedCount }}</UKbd>
+          </template>
+        </UButton>
+        <UButton
           label="Adauga entitate"
           icon="i-lucide-plus"
           @click="openCreate"
@@ -138,6 +187,9 @@ function getDropdownItems(entity: AdminEntity) {
     </div>
 
     <UTable
+      ref="table"
+      v-model:row-selection="rowSelection"
+      row-key="id_entity"
       :data="entities"
       :columns="columns"
       :loading="loading"

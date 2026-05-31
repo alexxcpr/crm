@@ -1,8 +1,10 @@
-export type FieldValueSource = 'static' | 'current_record' | 'previous_node' | 'relation' | 'expression'
+export type FieldValueSource = 'static' | 'current_record' | 'previous_node' | 'relation' | 'expression' | 'node_output'
 
 export interface FieldMapping {
   key: string
   sourceType: FieldValueSource
+  sourceNodeId?: string
+  sourceFieldSlug?: string
   value: string
 }
 
@@ -25,7 +27,7 @@ export interface NodeTypeDefinition {
 export interface NodeConfigField {
   key: string
   label: string
-  type: 'text' | 'textarea' | 'select' | 'number' | 'boolean' | 'entity-select' | 'field-select' | 'field-mappings' | 'record-id-source'
+  type: 'text' | 'textarea' | 'select' | 'number' | 'boolean' | 'entity-select' | 'field-select' | 'field-mappings' | 'record-id-source' | 'data-source-select' | 'relation-field-select'
   placeholder?: string
   options?: { label: string, value: string }[]
   required?: boolean
@@ -40,8 +42,10 @@ export function useNodeTypes() {
       category: 'trigger',
       color: '#22c55e',
       description: 'Punct de intrare pentru workflow. Se executa automat la trigger (manual sau pe eveniment).',
-      defaults: {},
-      configFields: []
+      defaults: { entity: '' },
+      configFields: [
+        { key: 'entity', label: 'Entitate de start', type: 'entity-select', required: true }
+      ]
     },
     // backward compat — old node types mapped to START
     {
@@ -51,8 +55,10 @@ export function useNodeTypes() {
       category: 'trigger',
       color: '#22c55e',
       description: '',
-      defaults: {},
-      configFields: []
+      defaults: { entity: '' },
+      configFields: [
+        { key: 'entity', label: 'Entitate de start', type: 'entity-select', required: true }
+      ]
     },
     {
       type: 'webhook_trigger',
@@ -61,8 +67,10 @@ export function useNodeTypes() {
       category: 'trigger',
       color: '#22c55e',
       description: '',
-      defaults: {},
-      configFields: []
+      defaults: { entity: '' },
+      configFields: [
+        { key: 'entity', label: 'Entitate de start', type: 'entity-select', required: true }
+      ]
     },
     {
       type: 'app_get_record',
@@ -75,6 +83,19 @@ export function useNodeTypes() {
       configFields: [
         { key: 'entity', label: 'Entitate', type: 'entity-select', required: true },
         { key: 'recordId', label: 'Record ID', type: 'text', placeholder: '{{$json.recordId}}' }
+      ]
+    },
+    {
+      type: 'app_get_related',
+      label: 'Citeste Relatie',
+      icon: 'i-lucide-git-branch',
+      category: 'action',
+      color: '#10b981',
+      description: 'Citeste o inregistrare relationata urmarind un camp de tip relatie. Entitatea tinta si ID-ul se rezolva automat.',
+      defaults: { sourceNodeId: '', relationField: '', relationEntitySlug: '', relationRecordIdExpr: '' },
+      configFields: [
+        { key: 'sourceNodeId', label: 'Entitate sursa', type: 'data-source-select', required: true },
+        { key: 'relationField', label: 'Camp relatie', type: 'relation-field-select', required: true }
       ]
     },
     {

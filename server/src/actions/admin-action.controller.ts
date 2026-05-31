@@ -49,4 +49,10 @@ export class AdminActionController {
     await this.actionService.remove(id);
     return returnValidResponse('Actiunea a fost stearsa cu succes.', null);
   }
+
+  @Delete()
+  async removeMany(@Body('ids') ids: string[]) {
+    const result = await this.actionService.removeMany(ids);
+    return returnValidResponse(result.message, null);
+  }
 }

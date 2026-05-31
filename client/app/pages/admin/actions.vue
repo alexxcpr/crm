@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { h } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 
-const { actions, loading, error, fetchActions, createAction, updateAction, deleteAction } = useAdminActions()
+const UCheckbox = resolveComponent('UCheckbox')
+
+const { actions, loading, error, fetchActions, createAction, updateAction, deleteAction, deleteActions } = useAdminActions()
 const { entities, fetchEntities } = useAdminEntities()
 const { workflows, fetchWorkflows } = useAdminWorkflows()
 const toast = useToast()
@@ -136,6 +139,22 @@ async function onSubmit() {
   }
 }
 
+// ─── Bulk selection ───
+const table = useTemplateRef('table')
+const rowSelection = ref({})
+const selectedCount = computed(() => Object.keys(rowSelection.value).length)
+
+async function bulkDelete() {
+  const ids = Object.keys(rowSelection.value)
+  const msg = await deleteActions(ids)
+  if (msg) {
+    toast.add({ title: msg, color: 'success' })
+    rowSelection.value = {}
+  } else {
+    toast.add({ title: 'Eroare la stergere', description: error.value ?? '', color: 'error' })
+  }
+}
+
 // ─── Delete ───
 const showDeleteConfirm = ref(false)
 const deletingAction = ref<any>(null)
@@ -159,6 +178,24 @@ async function onConfirmDelete() {
 
 // ─── Table ───
 const columns: TableColumn<any>[] = [
+  {
+    id: 'select',
+    meta: { class: { th: 'w-4', td: 'w-4' } },
+    header: ({ table }) => h(UCheckbox, {
+      'modelValue': table.getIsSomePageRowsSelected()
+        ? 'indeterminate'
+        : table.getIsAllPageRowsSelected(),
+      'onUpdate:modelValue': (value: boolean | 'indeterminate') =>
+        table.toggleAllPageRowsSelected(!!value),
+      'ariaLabel': 'Selecteaza tot'
+    }),
+    cell: ({ row }) => h(UCheckbox, {
+      'modelValue': row.getIsSelected(),
+      'onUpdate:modelValue': (value: boolean | 'indeterminate') =>
+        row.toggleSelected(!!value),
+      'ariaLabel': 'Selecteaza rand'
+    })
+  },
   { id: 'edit', meta: { class: { th: 'w-10', td: 'w-10' } } },
   { accessorKey: 'name', header: 'Nume' },
   { accessorKey: 'slug', header: 'Slug' },
@@ -194,11 +231,25 @@ function getDropdownItems(action: any) {
           Defineste actiuni (manuale sau automatice) pe entitati
         </p>
       </div>
-      <UButton
-        label="Actiune noua"
-        icon="i-lucide-plus"
-        @click="openCreate"
-      />
+      <div class="flex items-center gap-1.5">
+        <UButton
+          v-if="selectedCount > 0"
+          label="Sterge"
+          color="error"
+          variant="subtle"
+          icon="i-lucide-trash"
+          @click="bulkDelete"
+        >
+          <template #trailing>
+            <UKbd>{{ selectedCount }}</UKbd>
+          </template>
+        </UButton>
+        <UButton
+          label="Actiune noua"
+          icon="i-lucide-plus"
+          @click="openCreate"
+        />
+      </div>
     </div>
 
     <!-- Entity Filter -->
@@ -215,6 +266,9 @@ function getDropdownItems(action: any) {
     </div>
 
     <UTable
+      ref="table"
+      v-model:row-selection="rowSelection"
+      row-key="id_action"
       :data="filteredActions"
       :columns="columns"
       :loading="loading"

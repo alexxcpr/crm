@@ -43,4 +43,10 @@ export class AdminModulesController {
         const result = await this.modulesService.remove(id);
         return returnValidResponse(result.message, null);
     }
+
+    @Delete()
+    async removeMany(@Body('ids') ids: string[]) {
+        const result = await this.modulesService.removeMany(ids);
+        return returnValidResponse(result.message, null);
+    }
 }

@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { h } from 'vue'
 import type { AdminModule } from '~/types/admin'
 import type { TableColumn } from '@nuxt/ui'
 
-const { modules, loading, error, fetchModules, deleteModule } = useAdminModules()
+const UCheckbox = resolveComponent('UCheckbox')
+
+const { modules, loading, error, fetchModules, deleteModule, deleteModules } = useAdminModules()
 const toast = useToast()
 
 await fetchModules()
@@ -50,8 +53,42 @@ async function onConfirmDelete() {
   deletingModule.value = null
 }
 
+// ─── Bulk selection ───
+const table = useTemplateRef('table')
+const rowSelection = ref({})
+const selectedCount = computed(() => Object.keys(rowSelection.value).length)
+
+async function bulkDelete() {
+  const ids = Object.keys(rowSelection.value)
+  const msg = await deleteModules(ids)
+  if (msg) {
+    toast.add({ title: msg, color: 'success' })
+    rowSelection.value = {}
+  } else {
+    toast.add({ title: 'Eroare la stergere', description: error.value ?? '', color: 'error' })
+  }
+}
+
 // ─── Table ───
 const columns: TableColumn<AdminModule>[] = [
+  {
+    id: 'select',
+    meta: { class: { th: 'w-4', td: 'w-4' } },
+    header: ({ table }) => h(UCheckbox, {
+      'modelValue': table.getIsSomePageRowsSelected()
+        ? 'indeterminate'
+        : table.getIsAllPageRowsSelected(),
+      'onUpdate:modelValue': (value: boolean | 'indeterminate') =>
+        table.toggleAllPageRowsSelected(!!value),
+      'ariaLabel': 'Selecteaza tot'
+    }),
+    cell: ({ row }) => h(UCheckbox, {
+      'modelValue': row.getIsSelected(),
+      'onUpdate:modelValue': (value: boolean | 'indeterminate') =>
+        row.toggleSelected(!!value),
+      'ariaLabel': 'Selecteaza rand'
+    })
+  },
   { id: 'edit', meta: { class: { th: 'w-10', td: 'w-10' } } },
   { accessorKey: 'name', header: 'Nume' },
   { accessorKey: 'slug', header: 'Slug' },
@@ -86,14 +123,31 @@ function getDropdownItems(mod: AdminModule) {
           Grupeaza entitatile in module logice (CRM, ERP, etc.)
         </p>
       </div>
-      <UButton
-        label="Adauga modul"
-        icon="i-lucide-plus"
-        @click="openCreate"
-      />
+      <div class="flex items-center gap-1.5">
+        <UButton
+          v-if="selectedCount > 0"
+          label="Sterge"
+          color="error"
+          variant="subtle"
+          icon="i-lucide-trash"
+          @click="bulkDelete"
+        >
+          <template #trailing>
+            <UKbd>{{ selectedCount }}</UKbd>
+          </template>
+        </UButton>
+        <UButton
+          label="Adauga modul"
+          icon="i-lucide-plus"
+          @click="openCreate"
+        />
+      </div>
     </div>
 
     <UTable
+      ref="table"
+      v-model:row-selection="rowSelection"
+      row-key="id_module"
       :data="modules"
       :columns="columns"
       :loading="loading"

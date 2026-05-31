@@ -183,6 +183,19 @@ export class ActionService {
     this.logger.log(`Actiune stearsa: ${existing.slug}`);
   }
 
+  async removeMany(ids: string[]) {
+    if (!ids || ids.length === 0) {
+      throw new BadRequestException('Lista de id-uri este goala.');
+    }
+
+    const deletedCount = await this.knex(this.TABLE)
+      .whereIn('id_action', ids)
+      .del();
+
+    this.logger.log(`${deletedCount} actiuni sterse in bulk`);
+    return { message: `${deletedCount} actiuni au fost sterse.` };
+  }
+
   // ─── Manual execution ───
 
   async executeManual(
@@ -264,7 +277,7 @@ export class ActionService {
       const msg = err.message ?? '';
       const isN8nInfra = msg.startsWith('n8n') || msg.includes('workflow');
       this.logger.error(
-        `Eroare la executia workflow-ului "${action.id_workflow}": ${msg}`,
+        `Eroare la executia workflow-ului "${action.id_workflow}" / ${action.slug}: ${msg}`,
       );
       throw new BadRequestException(
         isN8nInfra ? `Eroare la executia workflow-ului: ${msg}` : msg,

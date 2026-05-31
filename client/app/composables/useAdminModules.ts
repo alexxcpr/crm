@@ -105,6 +105,28 @@ export function useAdminModules() {
     }
   }
 
+  async function deleteModules(ids: string[]): Promise<string | null> {
+    loading.value = true
+    error.value = null
+
+    try {
+      const res = await apiFetch(`/v1/admin/modules`, {
+        method: 'DELETE',
+        body: { ids }
+      })
+      await fetchModules()
+      return (res as any).message ?? null
+    }
+    catch (err: any) {
+      error.value = err?.data?.message || err.message || 'Eroare la stergerea modulelor'
+      console.error('[useAdminModules] deleteModules:', err)
+      return null
+    }
+    finally {
+      loading.value = false
+    }
+  }
+
   return {
     modules,
     loading,
@@ -113,6 +135,7 @@ export function useAdminModules() {
     fetchModule,
     createModule,
     updateModule,
-    deleteModule
+    deleteModule,
+    deleteModules
   }
 }

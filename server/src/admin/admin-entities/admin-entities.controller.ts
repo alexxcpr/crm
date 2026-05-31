@@ -41,4 +41,10 @@ export class AdminEntitiesController {
         const result = await this.entitiesService.remove(id);
         return returnValidResponse(result.message, null);
     }
+
+    @Delete()
+    async removeMany(@Body('ids') ids: string[]) {
+        const result = await this.entitiesService.removeMany(ids);
+        return returnValidResponse(result.message, null);
+    }
 }

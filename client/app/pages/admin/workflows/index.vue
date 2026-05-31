@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { h } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 
-const { workflows, loading, error, fetchWorkflows, deleteWorkflow, activateWorkflow, deactivateWorkflow } = useAdminWorkflows()
+const UCheckbox = resolveComponent('UCheckbox')
+
+const { workflows, loading, error, fetchWorkflows, deleteWorkflow, deleteWorkflows, activateWorkflow, deactivateWorkflow } = useAdminWorkflows()
 const toast = useToast()
 const router = useRouter()
 
@@ -29,6 +32,22 @@ async function onConfirmDelete() {
   deletingWorkflow.value = null
 }
 
+// ─── Bulk selection ───
+const table = useTemplateRef('table')
+const rowSelection = ref({})
+const selectedCount = computed(() => Object.keys(rowSelection.value).length)
+
+async function bulkDelete() {
+  const ids = Object.keys(rowSelection.value)
+  const msg = await deleteWorkflows(ids)
+  if (msg) {
+    toast.add({ title: msg, color: 'success' })
+    rowSelection.value = {}
+  } else {
+    toast.add({ title: 'Eroare la stergere', description: error.value ?? '', color: 'error' })
+  }
+}
+
 async function toggleActivation(wf: any) {
   if (wf.status === 'active') {
     const result = await deactivateWorkflow(wf.id_workflow)
@@ -48,6 +67,24 @@ async function toggleActivation(wf: any) {
 }
 
 const columns: TableColumn<any>[] = [
+  {
+    id: 'select',
+    meta: { class: { th: 'w-4', td: 'w-4' } },
+    header: ({ table }) => h(UCheckbox, {
+      'modelValue': table.getIsSomePageRowsSelected()
+        ? 'indeterminate'
+        : table.getIsAllPageRowsSelected(),
+      'onUpdate:modelValue': (value: boolean | 'indeterminate') =>
+        table.toggleAllPageRowsSelected(!!value),
+      'ariaLabel': 'Selecteaza tot'
+    }),
+    cell: ({ row }) => h(UCheckbox, {
+      'modelValue': row.getIsSelected(),
+      'onUpdate:modelValue': (value: boolean | 'indeterminate') =>
+        row.toggleSelected(!!value),
+      'ariaLabel': 'Selecteaza rand'
+    })
+  },
   { id: 'edit', meta: { class: { th: 'w-10', td: 'w-10' } } },
   { accessorKey: 'name', header: 'Nume' },
   { accessorKey: 'slug', header: 'Slug' },
@@ -98,14 +135,31 @@ function getDropdownItems(wf: any) {
           Defineste si gestioneaza workflow-urile de automatizare
         </p>
       </div>
-      <UButton
-        label="Workflow nou"
-        icon="i-lucide-plus"
-        @click="router.push('/admin/workflows/new')"
-      />
+      <div class="flex items-center gap-1.5">
+        <UButton
+          v-if="selectedCount > 0"
+          label="Sterge"
+          color="error"
+          variant="subtle"
+          icon="i-lucide-trash"
+          @click="bulkDelete"
+        >
+          <template #trailing>
+            <UKbd>{{ selectedCount }}</UKbd>
+          </template>
+        </UButton>
+        <UButton
+          label="Workflow nou"
+          icon="i-lucide-plus"
+          @click="router.push('/admin/workflows/new')"
+        />
+      </div>
     </div>
 
     <UTable
+      ref="table"
+      v-model:row-selection="rowSelection"
+      row-key="id_workflow"
       :data="workflows"
       :columns="columns"
       :loading="loading"

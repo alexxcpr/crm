@@ -139,4 +139,31 @@ export class AdminEntitiesService {
 
     return { message: `Entitatea "${entity.name}" a fost stearsa cu succes.` };
   }
+
+  async removeMany(ids: string[]) {
+    if (!ids || ids.length === 0) {
+      throw new BadRequestException('Lista de id-uri este goala.');
+    }
+
+    const entities = await this.knex('entity').whereIn('id_entity', ids);
+    const errors: string[] = [];
+
+    for (const ent of entities) {
+      if (ent.is_system) {
+        errors.push(
+          `Entitatea "${ent.name}" este o entitate de sistem si nu poate fi stearsa.`,
+        );
+      }
+    }
+
+    if (errors.length > 0) {
+      throw new BadRequestException(errors.join(' '));
+    }
+
+    const deletedCount = await this.knex('entity')
+      .whereIn('id_entity', ids)
+      .del();
+
+    return { message: `${deletedCount} entitati au fost sterse.` };
+  }
 }

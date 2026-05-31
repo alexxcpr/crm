@@ -49,6 +49,12 @@ export class AdminWorkflowController {
     return returnValidResponse('Workflow-ul a fost sters cu succes.', null);
   }
 
+  @Delete()
+  async removeMany(@Body('ids') ids: string[]) {
+    const result = await this.workflowService.removeMany(ids);
+    return returnValidResponse(result.message, null);
+  }
+
   @Post(':id/activate')
   async activate(@Param('id') id: string) {
     const result = await this.workflowService.activate(id);

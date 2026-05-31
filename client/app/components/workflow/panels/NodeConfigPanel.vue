@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import type { Node } from '@vue-flow/core'
 import type { FieldMapping, RecordIdSource } from '~/composables/useNodeTypes'
+import type { DataSource } from '~/composables/useWorkflowDataRegistry'
+import type { Field } from '~/types/schema'
 
 const props = defineProps<{
   node: Node | null
+  dataSources?: DataSource[]
 }>()
 
 const emit = defineEmits<{
@@ -15,10 +18,49 @@ const emit = defineEmits<{
 
 const { getNodeType } = useNodeTypes()
 const { entities, fetchEntities } = useAdminEntities()
+const { apiFetch } = useApi()
+
+// ─── Target entity fields (for field-mappings in create/update nodes) ───
+const targetEntityFields = ref<Field[]>([])
+
+async function fetchTargetEntityFields(entitySlug: string) {
+  if (!entitySlug) {
+    targetEntityFields.value = []
+    return
+  }
+  try {
+    const schema = await apiFetch<{ fields: Field[] }>(`/v1/schema/${entitySlug}`)
+    targetEntityFields.value = schema.fields ?? []
+  } catch {
+    targetEntityFields.value = []
+  }
+}
 
 const entityOptions = computed(() =>
   (entities.value || []).map(e => ({ label: e.name, value: e.slug })),
 )
+
+// ─── Data source select options (for app_get_related, etc.) ───
+const dataSourceOptions = computed(() =>
+  (props.dataSources || []).map(ds => ({
+    label: `${ds.label} (${ds.entitySlug})`,
+    value: ds.nodeId,
+  })),
+)
+
+// ─── Relation field options (cascading — depends on sourceNodeId) ───
+const relationFieldOptions = computed(() => {
+  const srcNodeId: string = localParams.value.sourceNodeId ?? ''
+  if (!srcNodeId) return []
+  const ds = (props.dataSources || []).find(s => s.nodeId === srcNodeId)
+  if (!ds) return []
+  return ds.fields
+    .filter(f => f.ui_type === 'relation' && f.relation_entity_slug)
+    .map(f => ({
+      label: `${f.name} (${f.slug} → ${f.relation_entity_slug})`,
+      value: f.slug,
+    }))
+})
 
 onMounted(() => {
   fetchEntities()
@@ -53,6 +95,20 @@ function onParamChange(key: string, value: any) {
 watch(() => localParams.value.entity, (newEntity, oldEntity) => {
   if (oldEntity && newEntity !== oldEntity) {
     localParams.value.fieldMappings = []
+    if (props.node) {
+      emit('updateParameters', props.node.id, { ...localParams.value })
+    }
+  }
+})
+
+// Fetch target entity schema for field-mappings autocomplete
+watch(() => localParams.value.entity, (entitySlug) => {
+  fetchTargetEntityFields(entitySlug ?? '')
+})
+
+watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
+  if (oldVal && newVal !== oldVal) {
+    localParams.value.relationField = ''
     if (props.node) {
       emit('updateParameters', props.node.id, { ...localParams.value })
     }
@@ -149,6 +205,28 @@ watch(() => localParams.value.entity, (newEntity, oldEntity) => {
           @update:model-value="onParamChange(field.key, $event)"
         />
 
+        <USelect
+          v-else-if="field.type === 'data-source-select'"
+          :model-value="localParams[field.key] ?? ''"
+          size="sm"
+          :items="dataSourceOptions"
+          value-key="value"
+          label-key="label"
+          placeholder="Selecteaza sursa de date..."
+          @update:model-value="onParamChange(field.key, $event)"
+        />
+
+        <USelect
+          v-else-if="field.type === 'relation-field-select'"
+          :model-value="localParams[field.key] ?? ''"
+          size="sm"
+          :items="relationFieldOptions"
+          value-key="value"
+          label-key="label"
+          placeholder="Selecteaza campul relatie..."
+          @update:model-value="onParamChange(field.key, $event)"
+        />
+
         <UInput
           v-else-if="field.type === 'number'"
           :model-value="localParams[field.key] ?? 0"
@@ -166,7 +244,8 @@ watch(() => localParams.value.entity, (newEntity, oldEntity) => {
         <WorkflowPanelsFieldMappingEditor
           v-else-if="field.type === 'field-mappings'"
           :model-value="(localParams[field.key] as FieldMapping[]) ?? []"
-          :entity-slug="localParams.entity ?? ''"
+          :data-sources="dataSources ?? []"
+          :target-entity-fields="targetEntityFields"
           @update:model-value="onParamChange(field.key, $event)"
         />
       </div>

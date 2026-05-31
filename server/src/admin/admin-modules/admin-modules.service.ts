@@ -117,4 +117,35 @@ export class AdminModulesService {
 
     return { message: `Modulul "${mod.name}" a fost sters.` };
   }
+
+  async removeMany(ids: string[]) {
+    if (!ids || ids.length === 0) {
+      throw new BadRequestException('Lista de id-uri este goala.');
+    }
+
+    const modules = await this.knex('module').whereIn('id_module', ids);
+    const errors: string[] = [];
+
+    for (const mod of modules) {
+      const [{ count }] = await this.knex('entity')
+        .where('id_module', mod.id_module)
+        .count('* as count');
+
+      if (Number(count) > 0) {
+        errors.push(
+          `Modulul "${mod.name}" contine ${count} entitati. Muta sau sterge entitatile inainte.`,
+        );
+      }
+    }
+
+    if (errors.length > 0) {
+      throw new BadRequestException(errors.join(' '));
+    }
+
+    const deletedCount = await this.knex('module')
+      .whereIn('id_module', ids)
+      .del();
+
+    return { message: `${deletedCount} module au fost sterse.` };
+  }
 }

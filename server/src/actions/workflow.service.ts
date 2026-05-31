@@ -118,6 +118,43 @@ export class WorkflowService {
     this.logger.log(`Workflow sters: ${existing.slug}`);
   }
 
+  async removeMany(ids: string[]) {
+    if (!ids || ids.length === 0) {
+      throw new BadRequestException('Lista de id-uri este goala.');
+    }
+
+    const workflows = await this.knex(this.TABLE).whereIn('id_workflow', ids);
+    const errors: string[] = [];
+
+    for (const wf of workflows) {
+      const linkedActions = await this.knex('action_definition')
+        .select('name', 'slug')
+        .where('id_workflow', wf.id_workflow);
+
+      if (linkedActions.length > 0) {
+        const names = linkedActions.map((a: any) => `"${a.name}"`).join(', ');
+        errors.push(
+          `Workflow-ul "${wf.name}" nu poate fi sters deoarece este asociat cu ${linkedActions.length > 1 ? 'actiunile' : 'actiunea'}: ${names}.`,
+        );
+      }
+    }
+
+    if (errors.length > 0) {
+      throw new BadRequestException(errors.join(' '));
+    }
+
+    for (const wf of workflows) {
+      await this.syncService.deleteWorkflow(wf.id_workflow);
+    }
+
+    const deletedCount = await this.knex(this.TABLE)
+      .whereIn('id_workflow', ids)
+      .del();
+
+    this.logger.log(`${deletedCount} workflow-uri sterse in bulk`);
+    return { message: `${deletedCount} workflow-uri au fost sterse.` };
+  }
+
   async activate(id: string) {
     const existing = await this.knex(this.TABLE)
       .where('id_workflow', id)

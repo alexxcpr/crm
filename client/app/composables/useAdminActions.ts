@@ -129,6 +129,24 @@ export function useAdminActions() {
     }
   }
 
+  async function deleteActions(ids: string[]): Promise<string | null> {
+    loading.value = true
+    error.value = null
+    try {
+      const res = await apiFetch(`/v1/admin/actions`, {
+        method: 'DELETE',
+        body: { ids }
+      })
+      await fetchActions()
+      return (res as any).message ?? null
+    } catch (err: any) {
+      error.value = err?.data?.message || err.message || 'Eroare la stergerea actiunilor'
+      return null
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     actions,
     loading,
@@ -137,6 +155,7 @@ export function useAdminActions() {
     fetchAction,
     createAction,
     updateAction,
-    deleteAction
+    deleteAction,
+    deleteActions
   }
 }

@@ -110,6 +110,24 @@ export function useAdminWorkflows() {
     }
   }
 
+  async function deleteWorkflows(ids: string[]): Promise<string | null> {
+    loading.value = true
+    error.value = null
+    try {
+      const res = await apiFetch(`/v1/admin/workflows`, {
+        method: 'DELETE',
+        body: { ids }
+      })
+      await fetchWorkflows()
+      return (res as any).message ?? null
+    } catch (err: any) {
+      error.value = err?.data?.message || err.message || 'Eroare la stergerea workflow-urilor'
+      return null
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function activateWorkflow(id: string): Promise<WorkflowDefinition | null> {
     loading.value = true
     error.value = null
@@ -167,6 +185,7 @@ export function useAdminWorkflows() {
     createWorkflow,
     updateWorkflow,
     deleteWorkflow,
+    deleteWorkflows,
     activateWorkflow,
     deactivateWorkflow,
     syncWorkflow
