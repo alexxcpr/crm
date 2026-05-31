@@ -30,7 +30,8 @@ const {
   error: dataError,
   fetchOne,
   create,
-  update
+  update,
+  remove
 } = useEntityData(props.entity)
 
 const isEditMode = computed(() => !!props.recordId)
@@ -234,6 +235,26 @@ async function handleAction(actionSlug: string, actionName: string) {
   await executeEntityAction(actionSlug, props.recordId)
   executingAction.value = null
 }
+
+// ─── Delete ───
+const showDeleteConfirm = ref(false)
+const deleting = ref(false)
+const deleteError = ref<string | null>(null)
+
+async function confirmDelete() {
+  if (!props.recordId) return
+  deleting.value = true
+  deleteError.value = null
+  const success = await remove(props.recordId)
+  deleting.value = false
+  if (success) {
+    showDeleteConfirm.value = false
+    toast.add({ title: 'Inregistrare stearsa', color: 'success' })
+    router.replace(`/${props.entity}`)
+  } else {
+    deleteError.value = dataError.value ?? 'Stergerea a esuat.'
+  }
+}
 </script>
 
 <template>
@@ -368,6 +389,15 @@ async function handleAction(actionSlug: string, actionName: string) {
             icon="i-lucide-x"
             @click="router.back()"
           />
+          <UButton
+            v-if="isEditMode"
+            label="Sterge"
+            icon="i-lucide-trash-2"
+            color="error"
+            variant="outline"
+            class="ml-auto"
+            @click="showDeleteConfirm = true"
+          />
         </div>
       </div>
 
@@ -399,4 +429,40 @@ async function handleAction(actionSlug: string, actionName: string) {
       </div>
     </div>
   </UForm>
+
+  <!-- Delete Confirm Modal -->
+  <UModal v-model:open="showDeleteConfirm" title="Confirmare stergere">
+    <template #body>
+      <p>
+        Esti sigur ca vrei sa stergi aceasta inregistrare?
+        <strong v-if="entityMeta?.label_singular">
+          ({{ entityMeta.label_singular }})
+        </strong>
+      </p>
+      <p class="text-sm text-muted mt-1">
+        Aceasta actiune este permanenta si nu poate fi anulata.
+      </p>
+      <p
+        v-if="deleteError"
+        class="text-sm text-red-500 mt-2"
+      >
+        {{ deleteError }}
+      </p>
+      <div class="flex items-center gap-3 justify-end mt-4">
+        <UButton
+          label="Anuleaza"
+          color="neutral"
+          variant="outline"
+          @click="showDeleteConfirm = false"
+        />
+        <UButton
+          label="Sterge"
+          color="error"
+          icon="i-lucide-trash-2"
+          :loading="deleting"
+          @click="confirmDelete"
+        />
+      </div>
+    </template>
+  </UModal>
 </template>

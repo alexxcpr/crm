@@ -239,6 +239,26 @@ const columns = computed<TableColumn<Record<string, any>>[]>(() => {
 })
 
 const selectedCount = computed(() => Object.keys(rowSelection.value).length)
+
+// ─── Bulk delete ───
+const showBulkDeleteConfirm = ref(false)
+const bulkDeleting = ref(false)
+
+async function confirmBulkDelete() {
+  const ids = Object.keys(rowSelection.value)
+  if (ids.length === 0) return
+  bulkDeleting.value = true
+  let deleted = 0
+  for (const id of ids) {
+    const ok = await remove(id)
+    if (ok) deleted++
+  }
+  bulkDeleting.value = false
+  showBulkDeleteConfirm.value = false
+  rowSelection.value = {}
+  toast.add({ title: `${deleted} inregistrari sterse`, color: 'success' })
+  await loadData()
+}
 </script>
 
 <template>
@@ -273,6 +293,7 @@ const selectedCount = computed(() => Object.keys(rowSelection.value).length)
           color="error"
           variant="subtle"
           icon="i-lucide-trash"
+          @click="showBulkDeleteConfirm = true"
         >
           <template #trailing>
             <UKbd>{{ selectedCount }}</UKbd>
@@ -372,4 +393,33 @@ const selectedCount = computed(() => Object.keys(rowSelection.value).length)
       />
     </div>
   </div>
+
+  <!-- Bulk Delete Confirm Modal -->
+  <UModal v-model:open="showBulkDeleteConfirm" title="Confirmare stergere">
+    <template #body>
+      <p>
+        Esti sigur ca vrei sa stergi
+        <strong>{{ selectedCount }}</strong>
+        inregistrari?
+      </p>
+      <p class="text-sm text-muted mt-1">
+        Aceasta actiune este permanenta si nu poate fi anulata.
+      </p>
+      <div class="flex items-center gap-3 justify-end mt-4">
+        <UButton
+          label="Anuleaza"
+          color="neutral"
+          variant="outline"
+          @click="showBulkDeleteConfirm = false"
+        />
+        <UButton
+          label="Sterge"
+          color="error"
+          icon="i-lucide-trash-2"
+          :loading="bulkDeleting"
+          @click="confirmBulkDelete"
+        />
+      </div>
+    </template>
+  </UModal>
 </template>
