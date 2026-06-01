@@ -58,12 +58,12 @@ const workflowOptions = computed(() => [
 ])
 
 const triggerEventOptions = [
-  { label: 'Dupa creare', value: 'after_insert' },
-  { label: 'Dupa actualizare', value: 'after_update' },
-  { label: 'Dupa stergere', value: 'after_delete' },
-  { label: 'Inainte de creare', value: 'before_insert' },
-  { label: 'Inainte de actualizare', value: 'before_update' },
-  { label: 'Inainte de stergere', value: 'before_delete' }
+  { label: 'Dupa creare', value: 'entity.after_insert' },
+  { label: 'Dupa actualizare', value: 'entity.after_update' },
+  { label: 'Dupa stergere', value: 'entity.after_delete' },
+  { label: 'Inainte de creare', value: 'entity.before_insert' },
+  { label: 'Inainte de actualizare', value: 'entity.before_update' },
+  { label: 'Inainte de stergere', value: 'entity.before_delete' }
 ]
 
 function openCreate() {

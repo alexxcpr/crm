@@ -188,9 +188,12 @@ export class DynamicDataService {
     async create(entitySlug: string, body: Record<string, any>, userId?: string) {
         const { entity, fields } = await this.resolveEntity(entitySlug);
 
+        // Extrage id_owner din body (injectat automat de workflow-uri)
+        const ownerId = userId || body.id_owner || null;
+
         // Valideaza si sanitizeaza body
         const sanitized = await this.validation.validateAndSanitize(
-            body, fields, entity.table_name, 'create', undefined,  
+            body, fields, entity.table_name, 'create', undefined,
         );
 
         const insertData: Record<string, any> = {
@@ -200,8 +203,8 @@ export class DynamicDataService {
         };
 
         // Seteaza id_owner daca este furnizat
-        if (userId) {
-            insertData.id_owner = userId;
+        if (ownerId) {
+            insertData.id_owner = ownerId;
         }
 
         const eventCtx = {

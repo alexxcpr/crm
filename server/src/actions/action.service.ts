@@ -311,7 +311,7 @@ export class ActionService {
 
   // ─── Auto-trigger listeners ───
 
-  @OnEvent('entity.after_insert.**')
+  @OnEvent('entity.after_insert.*')
   async onAfterInsert(payload: unknown) {
     await this.evaluateAutoTriggers(
       EntityEvent.AfterInsert,
@@ -319,7 +319,7 @@ export class ActionService {
     );
   }
 
-  @OnEvent('entity.after_update.**')
+  @OnEvent('entity.after_update.*')
   async onAfterUpdate(payload: unknown) {
     await this.evaluateAutoTriggers(
       EntityEvent.AfterUpdate,
@@ -327,7 +327,7 @@ export class ActionService {
     );
   }
 
-  @OnEvent('entity.after_delete.**')
+  @OnEvent('entity.after_delete.*')
   async onAfterDelete(payload: unknown) {
     await this.evaluateAutoTriggers(
       EntityEvent.AfterDelete,
@@ -335,7 +335,7 @@ export class ActionService {
     );
   }
 
-  @OnEvent('entity.before_insert.**')
+  @OnEvent('entity.before_insert.*')
   async onBeforeInsert(payload: unknown) {
     await this.evaluateAutoTriggers(
       EntityEvent.BeforeInsert,
@@ -343,7 +343,7 @@ export class ActionService {
     );
   }
 
-  @OnEvent('entity.before_update.**')
+  @OnEvent('entity.before_update.*')
   async onBeforeUpdate(payload: unknown) {
     await this.evaluateAutoTriggers(
       EntityEvent.BeforeUpdate,
@@ -351,7 +351,7 @@ export class ActionService {
     );
   }
 
-  @OnEvent('entity.before_delete.**')
+  @OnEvent('entity.before_delete.*')
   async onBeforeDelete(payload: unknown) {
     await this.evaluateAutoTriggers(
       EntityEvent.BeforeDelete,
@@ -371,8 +371,11 @@ export class ActionService {
 
     const matched = allActions.filter((action) => {
       const events: string[] = action.trigger_events ?? [];
-      return events.includes(event);
+      const shortEvent = event.replace('entity.', ''); // backward compat: 'entity.before_insert' → 'before_insert'
+      return events.includes(event) || events.includes(shortEvent);
     });
+
+    const isBeforeInsert = event === EntityEvent.BeforeInsert;
 
     for (const action of matched) {
       if (!this.matchesConditions(action.trigger_conditions, payload)) {
@@ -383,14 +386,58 @@ export class ActionService {
         `Auto-trigger: ${action.slug} (${event}) pe ${payload.entitySlug}#${payload.recordId}`,
       );
 
-      await this.emitActionExecuted(action, {
-        entitySlug: payload.entitySlug,
-        entityId: payload.entityId,
-        recordId: payload.recordId,
-        record: payload.data,
-        userId: payload.userId,
-      });
+      if (!action.id_workflow) continue;
+
+      if (isBeforeInsert) {
+        // BeforeInsert: execută workflow-ul direct și face merge în DTO
+        try {
+          const collected = await this.workflowSync.executeAndCollect(
+            action.id_workflow,
+            this.buildWorkflowInput(action, payload),
+          );
+          Object.assign(payload.data, collected);
+          this.logger.log(
+            `BeforeInsert merge: ${action.slug} → ${Object.keys(collected).join(', ')}`,
+          );
+        } catch (err) {
+          const msg = err.message ?? 'Eroare necunoscuta';
+          this.logger.error(
+            `BeforeInsert workflow "${action.slug}" a esuat: ${msg}`,
+          );
+          throw new BadRequestException(
+            `Actiunea automata "${action.name}" a esuat: ${msg}`,
+          );
+        }
+      } else {
+        // After events: emit async (comportament existent)
+        await this.emitActionExecuted(action, {
+          entitySlug: payload.entitySlug,
+          entityId: payload.entityId,
+          recordId: payload.recordId,
+          record: payload.data,
+          userId: payload.userId,
+        });
+      }
     }
+  }
+
+  private buildWorkflowInput(
+    action: Record<string, any>,
+    payload: EntityEventPayload,
+  ): Record<string, any> {
+    return {
+      trigger: 'action',
+      action: action.slug,
+      entity: payload.entitySlug,
+      entityId: payload.entityId,
+      recordId: payload.recordId,
+      record: payload.data,
+      previousData: payload.previousData,
+      userId: payload.userId,
+      tenant: this.tenantContext.slug,
+      dbName: this.tenantContext.dbName,
+      timestamp: new Date().toISOString(),
+    };
   }
 
   private async emitActionExecuted(

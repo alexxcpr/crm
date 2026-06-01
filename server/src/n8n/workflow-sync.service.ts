@@ -206,6 +206,32 @@ export class WorkflowSyncService {
     return { executionId: `webhook:${webhookPath}`, result };
   }
 
+  /**
+   * Execută workflow-ul și colectează output-ul (field:value) din ultimul nod.
+   * Folosit de BeforeInsert pentru a face merge în DTO înainte de INSERT.
+   */
+  async executeAndCollect(
+    workflowId: string,
+    inputData: Record<string, any>,
+  ): Promise<Record<string, any>> {
+    const { result } = await this.executeWorkflow(workflowId, inputData);
+    const items = Array.isArray(result) ? result : [result];
+    const collected: Record<string, any> = {};
+    for (const item of items) {
+      const json = item?.json ?? item;
+      if (json && typeof json === 'object' && !Array.isArray(json)) {
+        const { success, message, statusCode, error, data, ...rest } = json;
+        // Only merge scalar values — skip nested objects (like `data` wrapper from HTTP nodes)
+        for (const [key, value] of Object.entries(rest)) {
+          if (value === null || typeof value !== 'object') {
+            collected[key] = value;
+          }
+        }
+      }
+    }
+    return collected;
+  }
+
   @OnEvent('action.executed')
   async onActionExecuted(payload: {
     workflowId: string | null;
@@ -245,6 +271,7 @@ export class WorkflowSyncService {
   private resolveFieldMappings(
     mappings: FieldMapping[],
     allNodes: NodeDefinition[],
+    startNodeId: string,
   ): Record<string, string> {
     const result: Record<string, string> = {};
     for (const m of mappings) {
@@ -254,7 +281,7 @@ export class WorkflowSyncService {
           result[m.key] = m.value;
           break;
         case 'current_record':
-          result[m.key] = `={{$json.body.record.${m.value}}}`;
+          result[m.key] = `={{$('${startNodeId}').first().json.body.record.${m.value}}}`;
           break;
         case 'previous_node':
           result[m.key] = `={{$json.${m.value}}}`;
@@ -274,9 +301,9 @@ export class WorkflowSyncService {
     return result;
   }
 
-  private resolveRecordId(source: RecordIdSource, allNodes: NodeDefinition[]): string {
+  private resolveRecordId(source: RecordIdSource, allNodes: NodeDefinition[], startNodeId: string): string {
     if (source.sourceType === 'current_record') {
-      return `={{$json.body.${source.value}}}`;
+      return `={{$('${startNodeId}').first().json.body.${source.value}}}`;
     }
     if (source.sourceType === 'previous_node') {
       return `={{$json.${source.value}}}`;
@@ -378,8 +405,14 @@ export class WorkflowSyncService {
       ? this.tenantContext.slug
       : 'unknown';
 
+    const startNode = nodes.find(
+      (n) => ['start', 'trigger', 'webhook_trigger'].includes(n.type),
+    );
+    const startEntitySlug = startNode?.parameters?.entity ?? '';
+    const startNodeId = startNode?.id ?? '';
+
     const n8nNodes = nodes.map((node, index) =>
-      this.translateNode(node, index, tenantSlug, nodes),
+      this.translateNode(node, index, tenantSlug, startEntitySlug, startNodeId, nodes),
     );
 
     // Set predictable webhook path so we can call it from the CRM
@@ -408,6 +441,8 @@ export class WorkflowSyncService {
     node: NodeDefinition,
     index: number,
     tenantSlug: string,
+    startEntitySlug: string,
+    startNodeId: string,
     allNodes: NodeDefinition[],
   ): Record<string, any> {
     const typeMap: Record<string, string> = {
@@ -427,7 +462,18 @@ export class WorkflowSyncService {
       app_create_record: 'n8n-nodes-base.httpRequest',
     };
 
-    const n8nType = typeMap[node.type] ?? 'n8n-nodes-base.noOp';
+    // Detect self-update (no recordId, same entity as start) → translate as set node
+    let resolvedType = node.type;
+    if (node.type === 'app_update_record') {
+      const params = node.parameters ?? {};
+      const targetEntity: string = params.entity ?? '';
+      const hasRecordId = !!params.recordId || !!params.recordIdSource?.value;
+      if ((!targetEntity || targetEntity === startEntitySlug) && !hasRecordId) {
+        resolvedType = 'set_data';
+      }
+    }
+
+    const n8nType = typeMap[resolvedType] ?? 'n8n-nodes-base.noOp';
     // Use node.id as n8n node name for stable cross-node referencing via $('<id>')
     const name = node.id;
 
@@ -437,7 +483,7 @@ export class WorkflowSyncService {
       type: n8nType,
       typeVersion: n8nType === 'n8n-nodes-base.httpRequest' ? 4 : 1,
       position: [node.position?.x ?? index * 250, node.position?.y ?? 0],
-      parameters: this.translateParameters(node.type, node.parameters ?? {}, tenantSlug, allNodes),
+      parameters: this.translateParameters(node.type, node.parameters ?? {}, tenantSlug, startEntitySlug, startNodeId, allNodes),
     };
 
     return n8nNode;
@@ -447,6 +493,8 @@ export class WorkflowSyncService {
     nodeType: string,
     params: Record<string, any>,
     tenantSlug: string,
+    startEntitySlug: string,
+    startNodeId: string,
     allNodes: NodeDefinition[],
   ): Record<string, any> {
     const webhookDataBase = `${this.webhookBaseUrl}/v1/webhooks/n8n/${tenantSlug}/data`;
@@ -474,6 +522,7 @@ export class WorkflowSyncService {
             const filterValue = this.resolveRecordId(
               params.filterValueSource as RecordIdSource,
               allNodes,
+              startNodeId,
             );
             return {
               method: 'GET',
@@ -482,7 +531,7 @@ export class WorkflowSyncService {
               sendQuery: true,
               queryParameters: {
                 parameters: [
-                  { name: 'entity', value: getEntity ? params.entity : '={{ $json.body.entity }}' },
+                  { name: 'entity', value: getEntity ? params.entity : `={{ $('${startNodeId}').first().json.body.entity }}` },
                   { name: 'filterField', value: params.filterField },
                   { name: 'filterValue', value: filterValue },
                 ],
@@ -510,8 +559,8 @@ export class WorkflowSyncService {
             sendQuery: true,
             queryParameters: {
               parameters: [
-                { name: 'entity', value: getEntity ? params.entity : '={{ $json.body.entity }}' },
-                { name: 'id', value: getRecId ? params.recordId : '={{ $json.body.recordId }}' },
+                { name: 'entity', value: getEntity ? params.entity : `={{ $('${startNodeId}').first().json.body.entity }}` },
+                { name: 'id', value: getRecId ? params.recordId : `={{ $('${startNodeId}').first().json.body.recordId }}` },
               ],
             },
             ...webhookHeaders,
@@ -542,8 +591,8 @@ export class WorkflowSyncService {
             sendQuery: true,
             queryParameters: {
               parameters: [
-                { name: 'entity', value: relEntity ? params.relationEntitySlug : '={{ $json.body.entity }}' },
-                { name: 'id', value: relRecId || '={{ $json.body.recordId }}' },
+                { name: 'entity', value: relEntity ? params.relationEntitySlug : `={{ $('${startNodeId}').first().json.body.entity }}` },
+                { name: 'id', value: relRecId || `={{ $('${startNodeId}').first().json.body.recordId }}` },
               ],
             },
             ...webhookHeaders,
@@ -552,15 +601,30 @@ export class WorkflowSyncService {
         }
 
       case 'app_update_record': {
-          const updEntity = !!params.entity;
+          const targetEntity = params.entity ?? '';
+          const hasRecordId = !!params.recordId || !!params.recordIdSource?.value;
+          const isSelfUpdate =
+            (!targetEntity || targetEntity === startEntitySlug) && !hasRecordId;
 
           const resolvedFields =
             params.fieldMappings?.length
-              ? this.resolveFieldMappings(params.fieldMappings, allNodes)
+              ? this.resolveFieldMappings(params.fieldMappings, allNodes, startNodeId)
               : (params.fields ?? {});
 
+          // Self-entity update without recordId → DTO merge mode (BeforeInsert)
+          if (isSelfUpdate) {
+            const values = Object.entries(resolvedFields).map(([key, value]) => ({
+              name: key,
+              value,
+            }));
+            return {
+              values: { string: values },
+              keepOnlySet: false,
+            };
+          }
+
           const resolvedRecordId = params.recordIdSource
-            ? this.resolveRecordId(params.recordIdSource, allNodes)
+            ? this.resolveRecordId(params.recordIdSource, allNodes, startNodeId)
             : params.recordId;
 
           const updRecId = !!resolvedRecordId;
@@ -580,7 +644,7 @@ export class WorkflowSyncService {
           };
 
           // Direct URL only when both values are static (n8n doesn't evaluate expressions in URL paths)
-          if (updEntity && updRecId && !recIdIsExpr) {
+          if (targetEntity && updRecId && !recIdIsExpr) {
             return { ...shared, url: `${webhookDataBase}/${params.entity}/${resolvedRecordId}` };
           }
 
@@ -590,8 +654,8 @@ export class WorkflowSyncService {
             sendQuery: true,
             queryParameters: {
               parameters: [
-                { name: 'entity', value: updEntity ? params.entity : '={{ $json.body.entity }}' },
-                { name: 'id', value: updRecId ? resolvedRecordId : '={{ $json.body.recordId }}' },
+                { name: 'entity', value: targetEntity ? params.entity : `={{ $('${startNodeId}').first().json.body.entity }}` },
+                { name: 'id', value: updRecId ? resolvedRecordId : `={{ $('${startNodeId}').first().json.body.recordId }}` },
               ],
             },
           };
@@ -603,7 +667,7 @@ export class WorkflowSyncService {
 
           const resolvedFields =
             params.fieldMappings?.length
-              ? this.resolveFieldMappings(params.fieldMappings, allNodes)
+              ? this.resolveFieldMappings(params.fieldMappings, allNodes, startNodeId)
               : (params.fields ?? {});
 
           const shared = {
@@ -611,9 +675,12 @@ export class WorkflowSyncService {
             authentication: 'none' as const,
             sendBody: true,
             bodyParameters: {
-              parameters: Object.entries(resolvedFields).map(
-                ([key, value]) => ({ name: key, value }),
-              ),
+              parameters: [
+                ...Object.entries(resolvedFields).map(
+                  ([key, value]) => ({ name: key, value }),
+                ),
+                { name: 'id_owner', value: `={{ $('${startNodeId}').first().json.body.userId }}` },
+              ],
             },
             ...webhookHeaders,
             options: {},
@@ -630,7 +697,7 @@ export class WorkflowSyncService {
             sendQuery: true,
             queryParameters: {
               parameters: [
-                { name: 'entity', value: createEntity ? params.entity : '={{ $json.body.entity }}' },
+                { name: 'entity', value: createEntity ? params.entity : `={{ $('${startNodeId}').first().json.body.entity }}` },
               ],
             },
           };
