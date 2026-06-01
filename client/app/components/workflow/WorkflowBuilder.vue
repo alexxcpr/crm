@@ -160,11 +160,39 @@ const toast = useToast()
 const TRIGGER_TYPES = new Set(['start', 'trigger', 'webhook_trigger'])
 
 async function save() {
-  const hasTrigger = nodes.value.some(n => TRIGGER_TYPES.has(n.data?.nodeType))
-  if (!hasTrigger) {
+  const triggerNodes = nodes.value.filter(n => TRIGGER_TYPES.has(n.data?.nodeType))
+  if (triggerNodes.length === 0) {
     toast.add({
       title: 'Lipseste nodul de start',
       description: 'Adauga un nod START inainte de a salva.',
+      color: 'error',
+    })
+    return
+  }
+  if (triggerNodes.length > 1) {
+    toast.add({
+      title: 'Prea multe noduri de start',
+      description: `Ai ${triggerNodes.length} noduri de start. Un workflow poate avea un singur punct de intrare.`,
+      color: 'error',
+    })
+    return
+  }
+
+  // Detect orphan nodes: every non-start node must have at least one incoming edge.
+  // Nodes with outgoing edges but no input will never be triggered.
+  const nodesWithInput = new Set<string>()
+  for (const edge of edges.value) {
+    nodesWithInput.add(edge.target)
+  }
+  const orphanNodes = nodes.value.filter(n => {
+    if (TRIGGER_TYPES.has(n.data?.nodeType)) return false
+    return !nodesWithInput.has(n.id)
+  })
+  if (orphanNodes.length > 0) {
+    const names = orphanNodes.map(n => `"${n.data.label}"`).join(', ')
+    toast.add({
+      title: 'Noduri fara intrare',
+      description: `Urmatoarele noduri nu au nicio conexiune de intrare si nu vor fi executate vreodata: ${names}. Conecteaza-le sau sterge-le.`,
       color: 'error',
     })
     return
