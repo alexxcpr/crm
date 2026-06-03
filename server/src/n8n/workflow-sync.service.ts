@@ -28,7 +28,7 @@ interface FieldMapping {
 }
 
 interface RecordIdSource {
-  sourceType: 'static' | 'current_record' | 'previous_node' | 'node_output';
+  sourceType: 'static' | 'node_output';
   value: string;
   sourceNodeId?: string;
   sourceFieldSlug?: string;
@@ -301,13 +301,7 @@ export class WorkflowSyncService {
     return result;
   }
 
-  private resolveRecordId(source: RecordIdSource, allNodes: NodeDefinition[], startNodeId: string): string {
-    if (source.sourceType === 'current_record') {
-      return `={{$('${startNodeId}').first().json.body.${source.value}}}`;
-    }
-    if (source.sourceType === 'previous_node') {
-      return `={{$json.${source.value}}}`;
-    }
+  private resolveRecordId(source: RecordIdSource, allNodes: NodeDefinition[], _startNodeId: string): string {
     if (source.sourceType === 'node_output') {
       return `={{${this.nodeOutputJsonPath(source.sourceNodeId!, allNodes)}.${source.sourceFieldSlug}}}`;
     }

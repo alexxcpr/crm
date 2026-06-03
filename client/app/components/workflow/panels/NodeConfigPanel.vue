@@ -71,11 +71,14 @@ const nodeTypeDef = computed(() => {
 
 const localLabel = ref('')
 const localParams = ref<Record<string, any>>({})
+const isSwitchingNode = ref(false)
 
 watch(() => props.node, (newNode) => {
   if (newNode) {
+    isSwitchingNode.value = true
     localLabel.value = newNode.data.label ?? ''
     localParams.value = { ...(newNode.data.parameters ?? {}) }
+    nextTick(() => { isSwitchingNode.value = false })
   }
 }, { immediate: true })
 
@@ -91,6 +94,9 @@ function onParamChange(key: string, value: any) {
 }
 
 watch(() => localParams.value.entity, (newEntity, oldEntity) => {
+  // Nu sterge fieldMappings cand se schimba nodul — doar cand userul
+  // schimba manual dropdown-ul de entitate pe acelasi nod.
+  if (isSwitchingNode.value) return
   if (oldEntity && newEntity !== oldEntity) {
     localParams.value.fieldMappings = []
     if (props.node) {
@@ -115,10 +121,13 @@ watch(() => localParams.value.entity, (entitySlug) => {
 })
 
 watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
-  if (oldVal && newVal !== oldVal) {
-    localParams.value.relationField = ''
-    if (props.node) {
-      emit('updateParameters', props.node.id, { ...localParams.value })
+  // Nu sterge relationField cand se schimba nodul.
+  if (!isSwitchingNode.value) {
+    if (oldVal && newVal !== oldVal) {
+      localParams.value.relationField = ''
+      if (props.node) {
+        emit('updateParameters', props.node.id, { ...localParams.value })
+      }
     }
   }
   // Fetch source entity schema so relation field options are populated
@@ -131,7 +140,7 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
 <template>
   <div
     v-if="node && nodeTypeDef"
-    class="w-72 border-l border-gray-200 dark:border-gray-800 overflow-y-auto bg-gray-50 dark:bg-gray-950 flex flex-col"
+    class="w-80 border-l border-gray-200 dark:border-gray-800 overflow-y-auto bg-gray-50 dark:bg-gray-950 flex flex-col"
   >
     <!-- Header -->
     <div class="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-800">
@@ -167,6 +176,7 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
         <UInput
           v-model="localLabel"
           size="sm"
+          class="w-full"
           placeholder="Nume personalizat"
           @blur="onLabelChange"
         />
@@ -183,6 +193,7 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
           v-if="field.type === 'text'"
           :model-value="localParams[field.key] ?? ''"
           size="sm"
+          class="w-full"
           :placeholder="field.placeholder"
           @update:model-value="onParamChange(field.key, $event)"
         />
@@ -191,6 +202,7 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
           v-else-if="field.type === 'textarea'"
           :model-value="localParams[field.key] ?? ''"
           size="sm"
+          class="w-full"
           :placeholder="field.placeholder"
           :rows="3"
           @update:model-value="onParamChange(field.key, $event)"
@@ -200,6 +212,7 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
           v-else-if="field.type === 'select'"
           :model-value="localParams[field.key] ?? ''"
           size="sm"
+          class="w-full"
           :items="field.options ?? []"
           value-key="value"
           label-key="label"
@@ -210,6 +223,7 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
           v-else-if="field.type === 'entity-select'"
           :model-value="localParams[field.key] ?? ''"
           size="sm"
+          class="w-full"
           :items="entityOptions"
           value-key="value"
           label-key="label"
@@ -221,6 +235,7 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
           v-else-if="field.type === 'data-source-select'"
           :model-value="localParams[field.key] ?? ''"
           size="sm"
+          class="w-full"
           :items="dataSourceOptions"
           value-key="value"
           label-key="label"
@@ -232,6 +247,7 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
           v-else-if="field.type === 'relation-field-select'"
           :model-value="localParams[field.key] ?? ''"
           size="sm"
+          class="w-full"
           :items="relationFieldOptions"
           value-key="value"
           label-key="label"
@@ -246,6 +262,7 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
           value-key="value"
           label-key="label"
           size="sm"
+          class="w-full"
           placeholder="Alege campul..."
           @update:model-value="onParamChange(field.key, $event)"
         />
@@ -255,6 +272,7 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
           :model-value="localParams[field.key] ?? 0"
           type="number"
           size="sm"
+          class="w-full"
           @update:model-value="onParamChange(field.key, Number($event))"
         />
 

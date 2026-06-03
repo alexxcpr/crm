@@ -23,7 +23,7 @@ export interface FieldMapping {
 }
 
 export interface RecordIdSource {
-  sourceType: 'static' | 'current_record' | 'previous_node' | 'node_output'
+  sourceType: 'static' | 'node_output'
   value: string
   sourceNodeId?: string
   sourceFieldSlug?: string

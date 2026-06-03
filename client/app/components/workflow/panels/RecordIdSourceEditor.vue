@@ -37,17 +37,7 @@ function emitUpdate() {
 
 const sourceOptions = [
   { label: 'Valoare fixa', value: 'static' },
-  { label: 'Din inreg. curenta', value: 'current_record' },
-  { label: 'Din nodul anterior', value: 'previous_node' },
   { label: 'Din registry (nod)', value: 'node_output' },
-]
-
-const payloadFieldOptions = [
-  { label: 'ID inregistrare (id)', value: 'id' },
-  { label: 'ID inregistrare (recordId)', value: 'recordId' },
-  { label: 'Entitate (entity)', value: 'entity' },
-  { label: 'ID Entitate (entityId)', value: 'entityId' },
-  { label: 'ID Utilizator (userId)', value: 'userId' },
 ]
 
 const dataSourceOptions = computed(() =>
@@ -91,6 +81,7 @@ function onFieldChange(fieldSlug: string) {
       value-key="value"
       label-key="label"
       size="sm"
+      class="w-full"
       @update:model-value="(v: string) => {
         sourceType = v as RecordIdSource['sourceType']
         sourceNodeId = ''
@@ -101,23 +92,13 @@ function onFieldChange(fieldSlug: string) {
       }"
     />
 
-    <!-- static / previous_node -->
+    <!-- static -->
     <UInput
-      v-if="sourceType === 'static' || sourceType === 'previous_node'"
+      v-if="sourceType === 'static'"
       :model-value="value"
       size="sm"
-      :placeholder="sourceType === 'static' ? 'Scrie valoarea' : 'ex: id (camp din raspunsul nodului anterior)'"
-      @update:model-value="(v: string) => { value = v; emitUpdate() }"
-    />
-
-    <!-- current_record -->
-    <USelect
-      v-else-if="sourceType === 'current_record'"
-      :model-value="value"
-      :items="payloadFieldOptions"
-      value-key="value"
-      label-key="label"
-      size="sm"
+      class="w-full"
+      placeholder="Scrie valoarea"
       @update:model-value="(v: string) => { value = v; emitUpdate() }"
     />
 
@@ -129,6 +110,7 @@ function onFieldChange(fieldSlug: string) {
         value-key="value"
         label-key="label"
         size="sm"
+        class="w-full"
         placeholder="Sursa date..."
         @update:model-value="(v: string) => onSourceNodeChange(v)"
       />
@@ -138,6 +120,7 @@ function onFieldChange(fieldSlug: string) {
         value-key="value"
         label-key="label"
         size="sm"
+        class="w-full"
         placeholder="Campul..."
         @update:model-value="(v: string) => onFieldChange(v)"
       />

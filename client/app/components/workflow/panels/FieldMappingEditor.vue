@@ -155,6 +155,7 @@ const targetFieldOptions = computed(() =>
         value-key="value"
         label-key="label"
         size="xs"
+        class="w-full"
         @update:model-value="(v: FieldValueSource) => updateSourceType(idx, v)"
       />
 
@@ -163,6 +164,7 @@ const targetFieldOptions = computed(() =>
         v-if="mapping.sourceType === 'static'"
         :model-value="mapping.value"
         size="xs"
+        class="w-full"
         placeholder="ex: Ana, 5, true"
         @update:model-value="(v: string) => updateValue(idx, v)"
       />
@@ -175,6 +177,7 @@ const targetFieldOptions = computed(() =>
           value-key="value"
           label-key="label"
           size="xs"
+          class="w-full"
           placeholder="Sursa datelor..."
           @update:model-value="(v: string) => updateSourceNode(idx, v)"
         />
@@ -184,6 +187,7 @@ const targetFieldOptions = computed(() =>
           value-key="value"
           label-key="label"
           size="xs"
+          class="w-full"
           placeholder="Campul din sursa..."
           @update:model-value="(v: string) => updateSourceField(idx, v)"
         />
@@ -194,6 +198,7 @@ const targetFieldOptions = computed(() =>
         v-else-if="mapping.sourceType === 'current_record'"
         :model-value="mapping.value"
         size="xs"
+        class="w-full"
         placeholder="Camp din inreg. curenta (ex: cf_nume)"
         @update:model-value="(v: string) => updateValue(idx, v)"
       />
@@ -203,6 +208,7 @@ const targetFieldOptions = computed(() =>
         v-else
         :model-value="mapping.value"
         size="xs"
+        class="w-full"
         placeholder="Valoare"
         @update:model-value="(v: string) => updateValue(idx, v)"
       />
