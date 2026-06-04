@@ -187,6 +187,13 @@ function getDropdownItems(field: Field) {
                 variant="subtle"
                 size="sm"
               />
+              <UBadge
+                v-if="row.original.is_readonly"
+                label="Read-Only"
+                color="info"
+                variant="subtle"
+                size="sm"
+              />
             </div>
           </template>
 

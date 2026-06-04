@@ -79,6 +79,7 @@ const state = reactive({
   is_sortable: props.field?.is_sortable ?? true,
   visible_in_table: props.field?.visible_in_table ?? true,
   visible_in_form: props.field?.visible_in_form ?? true,
+  is_readonly: props.field?.is_readonly ?? false,
   validation_min_length: (props.field?.validation_rules?.min_length as number) ?? undefined as number | undefined,
   validation_max_length: (props.field?.validation_rules?.max_length as number) ?? undefined as number | undefined,
   validation_min: (props.field?.validation_rules?.min as number) ?? undefined as number | undefined,
@@ -265,6 +266,7 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
         is_sortable: state.is_sortable,
         visible_in_table: state.visible_in_table,
         visible_in_form: state.visible_in_form,
+        is_readonly: state.is_readonly,
         validation_rules: Object.keys(validationRules).length ? validationRules : undefined,
         group_name: state.group_name || 'general',
         rank: state.rank,
@@ -291,6 +293,7 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
         is_sortable: state.is_sortable,
         visible_in_table: state.visible_in_table,
         visible_in_form: state.visible_in_form,
+        is_readonly: state.is_readonly,
         validation_rules: Object.keys(validationRules).length ? validationRules : undefined,
         group_name: state.group_name || 'general',
         rank: state.rank,
@@ -501,6 +504,10 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
 
         <UFormField label="Vizibil in formular" name="visible_in_form">
           <USwitch v-model="state.visible_in_form" />
+        </UFormField>
+
+        <UFormField label="Read-Only" name="is_readonly" description="Doar citire in formular. Valoarea poate fi schimbata doar din workflow.">
+          <USwitch v-model="state.is_readonly" />
         </UFormField>
       </div>
     </div>

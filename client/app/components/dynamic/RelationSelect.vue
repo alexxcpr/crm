@@ -4,6 +4,7 @@ import type { Field } from '~/types/schema'
 const props = defineProps<{
   field: Field
   modelValue: string | null | undefined
+  disabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -125,6 +126,7 @@ function onUpdate(val: string | string[] | undefined) {
       :loading="loading"
       :placeholder="field.placeholder ?? `Selecteaza ${field.name.toLowerCase()}...`"
       :search-input="{ placeholder: 'Cauta...' }"
+      :disabled="disabled"
       class="w-full"
       clear
       @update:model-value="onUpdate"

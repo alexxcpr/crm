@@ -18,6 +18,7 @@ export interface Field {
   visible_in_table: boolean
   visible_in_form: boolean
   is_system: boolean
+  is_readonly: boolean
   validation_rules: Record<string, any> | null
   id_relation_entity: string | null
   relation_display_field: string | null

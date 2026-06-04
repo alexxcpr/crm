@@ -77,6 +77,7 @@ export async function up(knex: Knex): Promise<void> {
     t.boolean('is_sortable').notNullable().defaultTo(true);
     t.boolean('visible_in_table').notNullable().defaultTo(true);
     t.boolean('visible_in_form').notNullable().defaultTo(true);
+    t.boolean('is_readonly').notNullable().defaultTo(false);
     t.boolean('is_system').notNullable().defaultTo(false);
     t.jsonb('validation_rules').nullable();
     t.uuid('id_relation_entity').nullable().references('id_entity').inTable('entity').onDelete('SET NULL');

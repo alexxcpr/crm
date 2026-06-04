@@ -50,6 +50,7 @@ export class SchemaService {
         visible_in_table: f.visible_in_table,
         visible_in_form: f.visible_in_form,
         is_system: f.is_system,
+        is_readonly: f.is_readonly,
         validation_rules: f.validation_rules,
         id_relation_entity: f.id_relation_entity,
         relation_display_field: f.relation_display_field,

@@ -77,6 +77,7 @@ export interface FieldPayload {
   is_sortable?: boolean
   visible_in_table?: boolean
   visible_in_form?: boolean
+  is_readonly?: boolean
   validation_rules?: Record<string, any>
   id_relation_entity?: string
   relation_display_field?: string
@@ -101,6 +102,7 @@ export interface UpdateFieldPayload {
   is_sortable?: boolean
   visible_in_table?: boolean
   visible_in_form?: boolean
+  is_readonly?: boolean
   validation_rules?: Record<string, any>
   group_name?: string
   rank?: number

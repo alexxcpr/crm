@@ -150,6 +150,7 @@ const displayDateTime = computed(() => {
       v-model="value"
       type="text"
       :placeholder="field.placeholder ?? undefined"
+      :disabled="field.is_readonly"
       class="w-full"
     />
 
@@ -159,6 +160,7 @@ const displayDateTime = computed(() => {
       v-model="value"
       :placeholder="field.placeholder ?? undefined"
       :rows="4"
+      :disabled="field.is_readonly"
       class="w-full"
     />
 
@@ -168,6 +170,7 @@ const displayDateTime = computed(() => {
       v-model="value"
       type="number"
       :placeholder="field.placeholder ?? undefined"
+      :disabled="field.is_readonly"
       class="w-full"
     />
 
@@ -177,6 +180,7 @@ const displayDateTime = computed(() => {
       v-model="value"
       type="number"
       :placeholder="field.placeholder ?? '0.00'"
+      :disabled="field.is_readonly"
       class="w-full currency-input"
     >
       <template #trailing>
@@ -190,6 +194,7 @@ const displayDateTime = computed(() => {
       v-model="value"
       type="email"
       :placeholder="field.placeholder ?? 'email@exemplu.ro'"
+      :disabled="field.is_readonly"
       class="w-full"
     />
 
@@ -199,6 +204,7 @@ const displayDateTime = computed(() => {
       v-model="value"
       type="tel"
       :placeholder="field.placeholder ?? '+40 XXX XXX XXX'"
+      :disabled="field.is_readonly"
       class="w-full"
     />
 
@@ -208,6 +214,7 @@ const displayDateTime = computed(() => {
       v-model="value"
       :items="selectItems"
       :placeholder="field.placeholder ?? `Selecteaza ${field.name.toLowerCase()}`"
+      :disabled="field.is_readonly"
       value-key="value"
       class="w-full"
     />
@@ -218,6 +225,7 @@ const displayDateTime = computed(() => {
       v-model="value"
       multiple
       :items="selectItems"
+      :disabled="field.is_readonly"
       value-key="value"
       :placeholder="field.placeholder ?? `Selecteaza ${field.name.toLowerCase()}`"
       class="w-full"
@@ -227,6 +235,7 @@ const displayDateTime = computed(() => {
     <USwitch
       v-else-if="field.ui_type === 'checkbox'"
       v-model="value"
+      :disabled="field.is_readonly"
     />
 
     <!-- radio -->
@@ -234,6 +243,7 @@ const displayDateTime = computed(() => {
       v-else-if="field.ui_type === 'radio'"
       v-model="value"
       :items="selectItems"
+      :disabled="field.is_readonly"
       orientation="horizontal"
     />
 
@@ -253,6 +263,7 @@ const displayDateTime = computed(() => {
           color="neutral"
           variant="outline"
           icon="i-lucide-calendar"
+          :disabled="field.is_readonly"
           class="w-full justify-between"
           trailing-icon="i-lucide-chevron-down"
         >
@@ -268,7 +279,7 @@ const displayDateTime = computed(() => {
 
       <!-- Clear button -->
       <UButton
-        v-if="calendarDate"
+        v-if="calendarDate && !field.is_readonly"
         color="neutral"
         variant="ghost"
         icon="i-lucide-x"
@@ -294,6 +305,7 @@ const displayDateTime = computed(() => {
           color="neutral"
           variant="outline"
           icon="i-lucide-calendar-clock"
+          :disabled="field.is_readonly"
           class="w-full justify-between"
           trailing-icon="i-lucide-chevron-down"
         >
@@ -343,7 +355,7 @@ const displayDateTime = computed(() => {
 
       <!-- Clear button -->
       <UButton
-        v-if="calendarDateTime"
+        v-if="calendarDateTime && !field.is_readonly"
         color="neutral"
         variant="ghost"
         icon="i-lucide-x"
@@ -358,6 +370,7 @@ const displayDateTime = computed(() => {
       v-else-if="field.ui_type === 'relation'"
       :field="field"
       :model-value="value"
+      :disabled="field.is_readonly"
       @update:model-value="value = $event"
     />
 
@@ -367,6 +380,7 @@ const displayDateTime = computed(() => {
       v-model="value"
       type="text"
       :placeholder="field.placeholder ?? undefined"
+      :disabled="field.is_readonly"
       class="w-full"
     />
   </UFormField>

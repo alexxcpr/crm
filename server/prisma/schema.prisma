@@ -134,6 +134,7 @@ model Field {
   visible_in_form     Boolean       @default(true)       // true = campul apare in DynamicForm (create/edit)  -> Vizibil in EV
   is_system           Boolean       @default(false)      // true = camp fix al entitatii (ex: name) - nu poate fi sters/modificat de admin din UI
                                                          // false = camp custom adaugat de admin - poate fi sters (ALTER TABLE DROP COLUMN)
+  is_readonly         Boolean       @default(false)      // true = campul e doar citire in formular — valoarea poate fi schimbata doar din workflow
 
   validation_rules        Json?                          // JSONB - reguli de validare interpretate de backend si frontend
                                                          // Format: {"min_length": 2, "max_length": 100, "pattern": "^[a-zA-Z]+$", "min": 0, "max": 999999}

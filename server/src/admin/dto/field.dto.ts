@@ -75,6 +75,10 @@ export class CreateFieldDto {
     visible_in_form?: boolean;
 
     @IsOptional()
+    @IsBoolean()
+    is_readonly?: boolean;
+
+    @IsOptional()
     @IsObject()
     validation_rules?: Record<string, any>;
 
@@ -171,6 +175,10 @@ export class UpdateFieldDto {
     @IsOptional()
     @IsBoolean()
     visible_in_form?: boolean;
+
+    @IsOptional()
+    @IsBoolean()
+    is_readonly?: boolean;
 
     @IsOptional()
     @IsObject()
