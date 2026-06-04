@@ -225,6 +225,38 @@ const formSchema = z.object({
   }
 })
 
+// ─── Grid column visual picker ───
+function isGridColSelected(col: number): boolean {
+  const start = state.grid_col
+  const end = state.grid_col + state.col_span - 1
+  return col >= start && col <= end
+}
+
+function selectGridColumn(col: number) {
+  const start = state.grid_col
+  const end = state.grid_col + state.col_span - 1
+
+  if (col === start - 1) {
+    // click imediat in stanga → extinde la stanga
+    state.grid_col = col
+    state.col_span = state.col_span + 1
+  } else if (col === end + 1 && end < 3) {
+    // click imediat in dreapta → extinde la dreapta
+    state.col_span = state.col_span + 1
+  } else if (col === start && state.col_span > 1) {
+    // click pe marginea stanga → elimina din stanga
+    state.grid_col = start + 1
+    state.col_span = state.col_span - 1
+  } else if (col === end && state.col_span > 1) {
+    // click pe marginea dreapta → elimina din dreapta
+    state.col_span = state.col_span - 1
+  } else {
+    // click separat → selectie noua pe o singura coloana
+    state.grid_col = col
+    state.col_span = 1
+  }
+}
+
 // ─── Submit ───
 const submitting = ref(false)
 
@@ -506,7 +538,7 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
           <USwitch v-model="state.visible_in_form" />
         </UFormField>
 
-        <UFormField label="Read-Only" name="is_readonly" description="Doar citire in formular. Valoarea poate fi schimbata doar din workflow.">
+        <UFormField label="Read-Only" name="is_readonly" description="Doar citire in formular.">
           <USwitch v-model="state.is_readonly" />
         </UFormField>
       </div>
@@ -568,8 +600,8 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
         <UInput v-model="state.group_name" placeholder="general" class="w-full" />
       </UFormField>
 
-      <div class="grid grid-cols-3 gap-4">
-        <UFormField label="Ordine" name="rank" description="in afisare">
+      <div class="grid grid-cols-2 gap-4">
+        <UFormField label="Ordine" name="rank" description="Ordinea in care apare campul in grup">
           <UInput
             v-model.number="state.rank"
             type="number"
@@ -577,27 +609,34 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
             class="w-full"
           />
         </UFormField>
-
-        <UFormField label="Coloana grid" name="grid_col" description="1-3">
-          <UInput
-            v-model.number="state.grid_col"
-            type="number"
-            :min="1"
-            :max="3"
-            class="w-full"
-          />
-        </UFormField>
-
-        <UFormField label="Col span" name="col_span" description="1-3">
-          <UInput
-            v-model.number="state.col_span"
-            type="number"
-            :min="1"
-            :max="3"
-            class="w-full"
-          />
-        </UFormField>
       </div>
+
+      <UFormField label="Latime in formular" name="grid_col">
+        <template #description>
+          <span v-if="state.col_span === 1">Ocupa o singura coloana (pozitia {{ state.grid_col }})</span>
+          <span v-else-if="state.col_span === 3">Ocupa toata latimea formularului</span>
+          <span v-else>Ocupa {{ state.col_span }} coloane, incepand de la pozitia {{ state.grid_col }}</span>
+        </template>
+        <div class="flex gap-2">
+          <button
+            v-for="col in 3"
+            :key="col"
+            type="button"
+            class="flex-1 h-16 rounded-lg border-2 transition-all cursor-pointer flex flex-col items-center justify-center gap-1"
+            :class="isGridColSelected(col)
+              ? 'bg-primary/10 border-primary text-primary shadow-sm'
+              : 'border-dashed border-muted/50 text-muted hover:border-primary/40 hover:bg-primary/5'"
+            @click="selectGridColumn(col)"
+          >
+            <UIcon
+              :name="isGridColSelected(col) ? 'i-lucide-rectangle-horizontal' : 'i-lucide-rectangle-horizontal'"
+              class="size-5"
+              :class="isGridColSelected(col) ? 'text-primary' : 'text-muted/40'"
+            />
+            <span class="text-xs font-medium">{{ col }}</span>
+          </button>
+        </div>
+      </UFormField>
     </div>
 
     <!-- Actions -->
