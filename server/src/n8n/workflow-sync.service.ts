@@ -379,6 +379,67 @@ export class WorkflowSyncService {
     return expr
   }
 
+  // ─── Condition / IF node helpers ───
+
+  private translateConditionOperand(
+    operand: any,
+    allNodes: NodeDefinition[],
+    startNodeId: string,
+  ): string {
+    if (!operand) return ''
+
+    if (operand.sourceType === 'static') {
+      return operand.value ?? ''
+    }
+
+    if (operand.sourceType === 'node_output') {
+      if (operand.sourceNodeId && (operand.fieldSlug || operand.columnName)) {
+        const field = operand.fieldSlug || operand.columnName
+        return `={{${this.nodeOutputJsonPath(operand.sourceNodeId, allNodes)}.${field}}}`
+      }
+      // Fallback: only fieldSlug (no sourceNodeId) → assume $json (immediate predecessor)
+      const field = operand.fieldSlug || operand.columnName
+      if (field) {
+        return `={{$json.${field}}}`
+      }
+      return ''
+    }
+
+    return ''
+  }
+
+  private translateConditionOperator(moduvisOp: string, n8nGroup: string): string {
+    const map: Record<string, string> = {
+      equals: 'equals', notEquals: 'notEquals',
+      contains: 'contains', startsWith: 'startsWith', endsWith: 'endsWith',
+      regex: 'regex',
+      larger: 'larger', smaller: 'smaller', largerEqual: 'largerEqual', smallerEqual: 'smallerEqual',
+      divisibleBy: 'divisibleBy',
+      after: 'after', before: 'before', afterEqual: 'afterEqual', beforeEqual: 'beforeEqual',
+      isNull: 'isEmpty', isNotNull: 'isNotEmpty',
+      true: 'true', false: 'false',
+      // legacy operators
+      greaterThan: n8nGroup === 'dateTime' ? 'after' : 'larger',
+      lessThan: n8nGroup === 'dateTime' ? 'before' : 'smaller',
+    }
+    return map[moduvisOp] ?? 'equals'
+  }
+
+  private isUnaryConditionOperator(op: string): boolean {
+    const unary = new Set(['isNull', 'isNotNull', 'true', 'false', 'isEmpty', 'isNotEmpty'])
+    return unary.has(op)
+  }
+
+  private mapDataTypeToN8nGroup(dataType: string): 'string' | 'number' | 'boolean' | 'dateTime' {
+    switch (dataType) {
+      case 'varchar': case 'text': case 'uuid': case 'jsonb': return 'string'
+      case 'integer': case 'numeric': return 'number'
+      case 'boolean': return 'boolean'
+      case 'date': case 'timestamp': return 'dateTime'
+      default: return 'string'
+    }
+  }
+
   private translateToN8n(workflow: {
     name: string;
     slug: string;
@@ -456,13 +517,19 @@ export class WorkflowSyncService {
       app_create_record: 'n8n-nodes-base.httpRequest',
     };
 
-    // Detect self-update (no recordId, same entity as start) → translate as set node
+    // Detect self-update (same entity as start, no external recordId) → translate as set node
     let resolvedType = node.type;
     if (node.type === 'app_update_record') {
       const params = node.parameters ?? {};
       const targetEntity: string = params.entity ?? '';
-      const hasRecordId = !!params.recordId || !!params.recordIdSource?.value;
-      if ((!targetEntity || targetEntity === startEntitySlug) && !hasRecordId) {
+      const recordIdSrc = params.recordIdSource as RecordIdSource | null;
+      // A recordId coming from the start node means "update myself" — in BeforeInsert
+      // the record doesn't have an id yet, so we must merge via set_data.
+      const recordIdFromStart =
+        recordIdSrc?.sourceNodeId === startNodeId && !!recordIdSrc?.value;
+      const hasExternalRecordId =
+        !!params.recordId || (!!recordIdSrc?.value && !recordIdFromStart);
+      if ((!targetEntity || targetEntity === startEntitySlug) && !hasExternalRecordId) {
         resolvedType = 'set_data';
       }
     }
@@ -506,60 +573,39 @@ export class WorkflowSyncService {
 
     switch (nodeType) {
       case 'app_get_record': {
-          const getEntity = !!params.entity;
-          const hasFilter = !!params.filterField && !!params.filterValueSource;
-          const getRecId = !!params.recordId;
-          const recIdIsExpr = this.isN8nExpression(params.recordId);
+          const filters: any[] = params.filters ?? []
+          const limit: number | null = params.limit ?? null
 
-          // Filter mode: find by custom field
-          if (hasFilter) {
+          const queryParams: { name: string; value: string }[] = [
+            { name: 'entity', value: params.entity || `={{ $('${startNodeId}').first().json.body.entity }}` },
+          ]
+
+          for (const f of filters) {
+            if (!f.field || !f.operator) continue
             const filterValue = this.resolveRecordId(
-              params.filterValueSource as RecordIdSource,
+              f.valueSource as RecordIdSource,
               allNodes,
               startNodeId,
-            );
-            return {
-              method: 'GET',
-              url: `${webhookDataBase}-resolve`,
-              authentication: 'none',
-              sendQuery: true,
-              queryParameters: {
-                parameters: [
-                  { name: 'entity', value: getEntity ? params.entity : `={{ $('${startNodeId}').first().json.body.entity }}` },
-                  { name: 'filterField', value: params.filterField },
-                  { name: 'filterValue', value: filterValue },
-                ],
-              },
-              ...webhookHeaders,
-              options: {},
-            };
+            )
+            queryParams.push({
+              name: `filter[${f.field}][${f.operator}]`,
+              value: filterValue || '',
+            })
           }
 
-          // Direct URL only when both values are static (n8n doesn't evaluate expressions in URL paths)
-          if (getEntity && getRecId && !recIdIsExpr) {
-            return {
-              method: 'GET',
-              url: `${webhookDataBase}/${params.entity}/${params.recordId}`,
-              authentication: 'none',
-              ...webhookHeaders,
-              options: {},
-            };
+          if (limit != null) {
+            queryParams.push({ name: 'limit', value: String(limit) })
           }
 
           return {
             method: 'GET',
-            url: `${webhookDataBase}-resolve`,
+            url: `${webhookDataBase}-list`,
             authentication: 'none',
             sendQuery: true,
-            queryParameters: {
-              parameters: [
-                { name: 'entity', value: getEntity ? params.entity : `={{ $('${startNodeId}').first().json.body.entity }}` },
-                { name: 'id', value: getRecId ? params.recordId : `={{ $('${startNodeId}').first().json.body.recordId }}` },
-              ],
-            },
+            queryParameters: { parameters: queryParams },
             ...webhookHeaders,
             options: {},
-          };
+          }
         }
 
       case 'app_get_related': {
@@ -596,9 +642,13 @@ export class WorkflowSyncService {
 
       case 'app_update_record': {
           const targetEntity = params.entity ?? '';
-          const hasRecordId = !!params.recordId || !!params.recordIdSource?.value;
+          const recordIdSrc = params.recordIdSource as RecordIdSource | null;
+          const recordIdFromStart =
+            recordIdSrc?.sourceNodeId === startNodeId && !!recordIdSrc?.value;
+          const hasExternalRecordId =
+            !!params.recordId || (!!recordIdSrc?.value && !recordIdFromStart);
           const isSelfUpdate =
-            (!targetEntity || targetEntity === startEntitySlug) && !hasRecordId;
+            (!targetEntity || targetEntity === startEntitySlug) && !hasExternalRecordId;
 
           const resolvedFields =
             params.fieldMappings?.length
@@ -706,18 +756,46 @@ export class WorkflowSyncService {
           options: {},
         };
 
-      case 'condition':
-        return {
-          conditions: {
-            string: [
-              {
-                value1: params.field ? `={{$json.${params.field}}}` : '',
-                operation: params.operator ?? 'equals',
-                value2: params.value ?? '',
-              },
-            ],
-          },
-        };
+      case 'condition': {
+        const conditions: any[] = params.conditions ?? []
+        const combinator = params.combinator ?? 'and'
+        const result: Record<string, any> = {
+          conditions: {},
+          options: { combinators: [combinator] },
+        }
+
+        for (const cond of conditions) {
+          if (!cond.leftOperand || !cond.operator) continue
+
+          const leftType = cond.leftOperand.dataType ?? 'varchar'
+          const n8nGroup = this.mapDataTypeToN8nGroup(leftType)
+
+          if (!result.conditions[n8nGroup]) {
+            result.conditions[n8nGroup] = []
+          }
+
+          const entry: any = {
+            value1: this.translateConditionOperand(cond.leftOperand, allNodes, startNodeId),
+            operation: this.translateConditionOperator(cond.operator, n8nGroup),
+          }
+
+          if (!this.isUnaryConditionOperator(cond.operator)) {
+            entry.value2 = this.translateConditionOperand(
+              cond.rightOperand ?? { sourceType: 'static', value: '' },
+              allNodes,
+              startNodeId,
+            )
+          }
+
+          result.conditions[n8nGroup].push(entry)
+        }
+
+        if (Object.keys(result.conditions).length === 0) {
+          result.conditions.string = []
+        }
+
+        return result
+      }
 
       case 'delay':
         return {

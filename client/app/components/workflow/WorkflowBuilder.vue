@@ -156,6 +156,7 @@ function onDragOver(event: DragEvent) {
 }
 
 const toast = useToast()
+const { getNodeType } = useNodeTypes()
 
 const TRIGGER_TYPES = new Set(['start', 'trigger', 'webhook_trigger'])
 
@@ -176,6 +177,29 @@ async function save() {
       color: 'error',
     })
     return
+  }
+
+  // Validate required fields for each node
+  for (const node of nodes.value) {
+    const nodeType = node.data?.nodeType as string | undefined
+    if (!nodeType) continue
+
+    const def = getNodeType(nodeType)
+    if (!def) continue
+
+    const params: Record<string, any> = node.data?.parameters ?? {}
+    for (const field of def.configFields) {
+      if (!field.required) continue
+      const value = params[field.key]
+      if (value === undefined || value === null || value === '') {
+        toast.add({
+          title: `Camp obligatoriu necompletat in nodul "${node.data.label}"`,
+          description: `Campul "${field.label}" este obligatoriu. Completeaza-l inainte de a salva.`,
+          color: 'error',
+        })
+        return
+      }
+    }
   }
 
   // Detect orphan nodes: every non-start node must have at least one incoming edge.

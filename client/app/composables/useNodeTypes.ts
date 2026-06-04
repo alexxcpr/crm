@@ -29,6 +29,96 @@ export interface RecordIdSource {
   sourceFieldSlug?: string
 }
 
+export interface FilterEntry {
+  field: string
+  operator: string
+  valueSource: RecordIdSource
+}
+
+// ─── Condition / IF node types ───
+
+export type ConditionOperandSource = 'static' | 'node_output'
+
+export interface ConditionOperand {
+  sourceType: ConditionOperandSource
+  sourceNodeId?: string
+  fieldSlug?: string
+  fieldLabel?: string
+  dataType?: string
+  value?: string
+}
+
+export interface Condition {
+  id: string
+  leftOperand: ConditionOperand
+  operator: string
+  rightOperand: ConditionOperand
+}
+
+export interface OperatorDef {
+  moduvisValue: string
+  label: string
+  n8nOperation: string
+  types: string[]
+  unary: boolean
+}
+
+export const OPERATOR_DEFS: OperatorDef[] = [
+  // Universali
+  { moduvisValue: 'equals',       label: 'Egal cu',              n8nOperation: 'equals',       types: ['string', 'number', 'date', 'boolean'], unary: false },
+  { moduvisValue: 'notEquals',    label: 'Diferit de',           n8nOperation: 'notEquals',    types: ['string', 'number', 'date', 'boolean'], unary: false },
+  { moduvisValue: 'isNull',       label: 'Este gol (null)',      n8nOperation: 'isEmpty',      types: ['null'], unary: true },
+  { moduvisValue: 'isNotNull',    label: 'Nu este gol',          n8nOperation: 'isNotEmpty',   types: ['null'], unary: true },
+  // String
+  { moduvisValue: 'contains',     label: 'Contine',              n8nOperation: 'contains',     types: ['string'], unary: false },
+  { moduvisValue: 'startsWith',   label: 'Incepe cu',            n8nOperation: 'startsWith',   types: ['string'], unary: false },
+  { moduvisValue: 'endsWith',     label: 'Se termina cu',        n8nOperation: 'endsWith',     types: ['string'], unary: false },
+  { moduvisValue: 'regex',        label: 'Regex',                n8nOperation: 'regex',        types: ['string'], unary: false },
+  // Number
+  { moduvisValue: 'larger',       label: 'Mai mare decat',       n8nOperation: 'larger',       types: ['number'], unary: false },
+  { moduvisValue: 'smaller',      label: 'Mai mic decat',        n8nOperation: 'smaller',      types: ['number'], unary: false },
+  { moduvisValue: 'largerEqual',  label: 'Mai mare sau egal',   n8nOperation: 'largerEqual',  types: ['number'], unary: false },
+  { moduvisValue: 'smallerEqual', label: 'Mai mic sau egal',    n8nOperation: 'smallerEqual', types: ['number'], unary: false },
+  { moduvisValue: 'divisibleBy',  label: 'Divizibil cu',         n8nOperation: 'divisibleBy',  types: ['number'], unary: false },
+  // Date
+  { moduvisValue: 'after',        label: 'Dupa',                 n8nOperation: 'after',        types: ['date'], unary: false },
+  { moduvisValue: 'before',       label: 'Inainte de',           n8nOperation: 'before',       types: ['date'], unary: false },
+  { moduvisValue: 'afterEqual',   label: 'Dupa sau egal',       n8nOperation: 'afterEqual',   types: ['date'], unary: false },
+  { moduvisValue: 'beforeEqual',  label: 'Inainte sau egal',    n8nOperation: 'beforeEqual',  types: ['date'], unary: false },
+  // Boolean
+  { moduvisValue: 'true',         label: 'Este adevarat',        n8nOperation: 'true',         types: ['boolean'], unary: true },
+  { moduvisValue: 'false',        label: 'Este fals',            n8nOperation: 'false',        types: ['boolean'], unary: true },
+]
+
+export function getOperatorsForType(dataType?: string): OperatorDef[] {
+  if (!dataType) return OPERATOR_DEFS.filter(o => o.types.includes('string') || o.types.includes('null'))
+  const cat = dataTypeCategory(dataType)
+  const allowed = new Set([cat, 'null']) // null operators always available
+  return OPERATOR_DEFS.filter(o => o.types.some(t => allowed.has(t)))
+}
+
+export function dataTypeCategory(dataType: string): string {
+  switch (dataType) {
+    case 'varchar': case 'text': case 'uuid': case 'jsonb': return 'string'
+    case 'integer': case 'numeric': return 'number'
+    case 'boolean': return 'boolean'
+    case 'date': case 'timestamp': return 'date'
+    default: return 'string'
+  }
+}
+
+export function mapDataTypeToN8nGroup(dataType?: string): 'string' | 'number' | 'boolean' | 'dateTime' {
+  switch (dataTypeCategory(dataType ?? 'varchar')) {
+    case 'string': return 'string'
+    case 'number': return 'number'
+    case 'boolean': return 'boolean'
+    case 'date': return 'dateTime'
+    default: return 'string'
+  }
+}
+
+// ─── Node type definition ───
+
 export interface NodeTypeDefinition {
   type: string
   label: string
@@ -43,7 +133,7 @@ export interface NodeTypeDefinition {
 export interface NodeConfigField {
   key: string
   label: string
-  type: 'text' | 'textarea' | 'select' | 'number' | 'boolean' | 'entity-select' | 'field-select' | 'field-mappings' | 'record-id-source' | 'data-source-select' | 'relation-field-select' | 'formula-assignments' | 'target-field-select'
+  type: 'text' | 'textarea' | 'select' | 'number' | 'boolean' | 'entity-select' | 'field-select' | 'field-mappings' | 'record-id-source' | 'data-source-select' | 'relation-field-select' | 'formula-assignments' | 'target-field-select' | 'condition-editor' | 'filter-list'
   placeholder?: string
   options?: { label: string, value: string }[]
   required?: boolean
@@ -90,17 +180,16 @@ export function useNodeTypes() {
     },
     {
       type: 'app_get_record',
-      label: 'Citeste Record',
-      icon: 'i-lucide-download',
+      label: 'Citeste Inregistrari',
+      icon: 'i-lucide-database-search',
       category: 'action',
       color: '#3b82f6',
-      description: 'Citeste o inregistrare dintr-o entitate dupa ID sau dupa un camp specific.',
-      defaults: { entity: '', recordId: '', filterField: '', filterValueSource: null as RecordIdSource | null },
+      description: 'Citeste inregistrari dintr-o entitate, cu filtre optionale. Daca LIMIT = 1, aduce o singura inregistrare.',
+      defaults: { entity: '', filters: [] as FilterEntry[], limit: null as number | null },
       configFields: [
         { key: 'entity', label: 'Entitate', type: 'entity-select', required: true },
-        { key: 'recordId', label: 'Record ID (optional)', type: 'text', placeholder: 'ID sau lasa gol pentru filtru' },
-        { key: 'filterField', label: 'Camp filtru (optional)', type: 'target-field-select', placeholder: 'Alege campul pentru WHERE' },
-        { key: 'filterValueSource', label: 'Valoare filtru', type: 'record-id-source' }
+        { key: 'filters', label: 'Filtre', type: 'filter-list' },
+        { key: 'limit', label: 'Limit (1 = o inregistrare, gol = toate)', type: 'number', placeholder: '1' }
       ]
     },
     {
@@ -164,23 +253,10 @@ export function useNodeTypes() {
       icon: 'i-lucide-git-branch',
       category: 'logic',
       color: '#f97316',
-      description: 'Ramifica workflow-ul bazat pe o conditie',
-      defaults: { field: '', operator: 'equals', value: '' },
+      description: 'Ramifica workflow-ul bazat pe conditii multiple cu SI/SAU.',
+      defaults: { conditions: [], combinator: 'and' },
       configFields: [
-        { key: 'field', label: 'Camp', type: 'text', required: true, placeholder: 'status' },
-        {
-          key: 'operator',
-          label: 'Operator',
-          type: 'select',
-          options: [
-            { label: 'Egal cu', value: 'equals' },
-            { label: 'Diferit de', value: 'notEquals' },
-            { label: 'Contine', value: 'contains' },
-            { label: 'Mai mare decat', value: 'greaterThan' },
-            { label: 'Mai mic decat', value: 'lessThan' }
-          ]
-        },
-        { key: 'value', label: 'Valoare', type: 'text', required: true }
+        { key: 'conditions', label: 'Conditii', type: 'condition-editor' }
       ]
     },
     {

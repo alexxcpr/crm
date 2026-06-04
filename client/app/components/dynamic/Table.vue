@@ -245,7 +245,8 @@ const showBulkDeleteConfirm = ref(false)
 const bulkDeleting = ref(false)
 
 async function confirmBulkDelete() {
-  const ids = Object.keys(rowSelection.value)
+  const selectedIndices = Object.keys(rowSelection.value).map(Number)
+  const ids = selectedIndices.map(i => items.value[i]?.id).filter((id): id is string => !!id)
   if (ids.length === 0) return
   bulkDeleting.value = true
   let deleted = 0

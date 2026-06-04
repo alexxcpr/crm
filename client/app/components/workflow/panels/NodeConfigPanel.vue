@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Node } from '@vue-flow/core'
-import type { FieldMapping, FormulaAssignment, RecordIdSource } from '~/composables/useNodeTypes'
+import type { FieldMapping, FormulaAssignment, RecordIdSource, FilterEntry, Condition } from '~/composables/useNodeTypes'
 import type { DataSource } from '~/composables/useWorkflowDataRegistry'
 import type { Field } from '~/types/schema'
 
@@ -99,6 +99,7 @@ watch(() => localParams.value.entity, (newEntity, oldEntity) => {
   if (isSwitchingNode.value) return
   if (oldEntity && newEntity !== oldEntity) {
     localParams.value.fieldMappings = []
+    localParams.value.filters = []
     if (props.node) {
       emit('updateParameters', props.node.id, { ...localParams.value })
     }
@@ -296,6 +297,25 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
         <WorkflowPanelsSetDataEditor
           v-else-if="field.type === 'formula-assignments'"
           :model-value="(localParams[field.key] as FormulaAssignment[]) ?? []"
+          :data-sources="dataSources ?? []"
+          :fetch-source-fields="fetchSourceFields"
+          @update:model-value="onParamChange(field.key, $event)"
+        />
+
+        <WorkflowPanelsConditionEditor
+          v-else-if="field.type === 'condition-editor'"
+          :model-value="(localParams[field.key] as Condition[]) ?? []"
+          :combinator="(localParams.combinator as 'and' | 'or') ?? 'and'"
+          :data-sources="dataSources ?? []"
+          :fetch-source-fields="fetchSourceFields"
+          @update:model-value="onParamChange(field.key, $event)"
+          @update:combinator="onParamChange('combinator', $event)"
+        />
+
+        <WorkflowPanelsFilterListEditor
+          v-else-if="field.type === 'filter-list'"
+          :model-value="(localParams[field.key] as FilterEntry[]) ?? []"
+          :target-entity-fields="targetEntityFields"
           :data-sources="dataSources ?? []"
           :fetch-source-fields="fetchSourceFields"
           @update:model-value="onParamChange(field.key, $event)"

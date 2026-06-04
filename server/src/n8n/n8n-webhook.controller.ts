@@ -202,6 +202,35 @@ export class N8nWebhookController {
     return result;
   }
 
+  // ─── Data list route (used by app_get_record node with optional filters + limit) ───
+
+  @Get(':tenantSlug/data-list')
+  async getDataList(
+    @Param('tenantSlug') tenantSlug: string,
+    @Query() query: Record<string, any>,
+    @Headers('x-webhook-secret') secret?: string,
+  ) {
+    this.verifyDataAccess(secret);
+
+    const result = await this.handleDataOperation(tenantSlug, async () => {
+      if (!query.entity) throw new BadRequestException('Query param "entity" is required');
+      const list = await this.dataService.findAll(query.entity, query);
+      // When limit=1, unwrap the array so downstream $json.data.field works the same
+      // as the old data-resolve endpoint did for single-record fetches.
+      if (query.limit === '1' || query.limit === 1) {
+        const first = list.data?.[0] ?? null;
+        return { data: first };
+      }
+      return list;
+    });
+
+    this.logger.log(
+      `Webhook data LIST: ${tenantSlug}/${query.entity} filters=${JSON.stringify(query.filter ?? {})} limit=${query.limit ?? 'none'}`,
+    );
+
+    return result;
+  }
+
   // ─── Data CRUD routes (query params — used by n8n when entity/id are dynamic expressions) ───
 
   @Get(':tenantSlug/data-resolve')
