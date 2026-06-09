@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Field } from '~/types/schema'
+import type { Field, UiTab } from '~/types/schema'
 import type { TabsItem } from '@nuxt/ui'
 import { buildZodSchema } from '~/utils/buildZodSchema'
 
@@ -20,6 +20,7 @@ const {
   entity: entityMeta,
   formFields,
   groups,
+  tabs,
   loading: schemaLoading,
   error: schemaError,
   schema
@@ -48,12 +49,12 @@ const initialLoading = ref(false)
 
 // ─── Form ref for error handling ───
 const formRef = ref(null)
-const activeTab = ref('general')
+const activeTab = ref('')
 
 // Initialize activeTab when groups are loaded
 watch(() => groups.value, (newGroups) => {
   if (newGroups.length > 0 && !newGroups.includes(activeTab.value)) {
-    activeTab.value = newGroups[0] || 'general'
+    activeTab.value = newGroups[0] || ''
   }
 }, { immediate: true })
 
@@ -100,10 +101,10 @@ const isMobile = computed(() => {
 })
 
 // ─── Grupuri campuri pentru layout ───
-function getFieldsByGroup(groupName: string): Field[] {
+function getFieldsByGroup(groupSlug: string): Field[] {
   return formFields.value
-    .filter((f: { group_name: string }) => f.group_name === groupName)
-    .sort((a: { rank: number }, b: { rank: number }) => a.rank - b.rank)
+    .filter((f: Field) => f.tab_slug === groupSlug)
+    .sort((a, b) => a.rank - b.rank)
 }
 
 // ─── Tab-uri (doar daca > 1 grup) ───
@@ -115,10 +116,17 @@ const tabItems = computed<TabsItem[]>(() =>
   }))
 )
 
-function formatGroupLabel(groupName: string): string {
-  return groupName
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, l => l.toUpperCase())
+const tabLabelMap = computed(() => {
+  const map = new Map<string, string>()
+  for (const t of tabs.value) {
+    map.set(t.slug, t.name)
+  }
+  return map
+})
+
+function formatGroupLabel(groupSlug: string): string {
+  return tabLabelMap.value.get(groupSlug)
+    || groupSlug.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
 }
 
 // Folosește utilitarul de formatare pentru metadate

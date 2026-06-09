@@ -6,7 +6,7 @@ export interface LayoutFieldLike {
     id_field?: string;
     slug?: string;
     name?: string;
-    group_name?: string | null;
+    id_ui_tab?: string | null;
     rank: number;
     grid_col: number;
     col_span: number;

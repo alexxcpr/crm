@@ -66,21 +66,20 @@ export function useEntitySchema(entitySlug: MaybeRef<string>) {
     fields.value.filter(f => f.is_filterable)
   )
 
-  const groups = computed(() => {
-    const raw = schema.value?.groups ?? []
-    return [...raw].sort((a, b) => {
-      if (a === 'general') return -1
-      if (b === 'general') return 1
-      return a.localeCompare(b)
-    })
+  const tabs = computed(() => {
+    return (schema.value?.tabs ?? []).sort((a, b) => a.rank - b.rank)
   })
+
+  const groups = computed(() => tabs.value.map(t => t.slug))
 
   function getFieldBySlug(fieldSlug: string): Field | undefined {
     return fields.value.find(f => f.slug === fieldSlug)
   }
 
-  function getFieldsByGroup(groupName: string): Field[] {
-    return formFields.value.filter(f => f.group_name === groupName)
+  function getFieldsByGroup(groupSlug: string): Field[] {
+    return formFields.value
+      .filter(f => f.tab_slug === groupSlug)
+      .sort((a, b) => a.rank - b.rank)
   }
 
   // Fetch automat la initializare
@@ -93,6 +92,7 @@ export function useEntitySchema(entitySlug: MaybeRef<string>) {
     tableFields,
     formFields,
     filterFields,
+    tabs,
     groups,
     loading,
     error,

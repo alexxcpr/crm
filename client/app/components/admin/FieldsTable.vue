@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import type { Field } from '~/types/schema'
+import type { Field, UiTab } from '~/types/schema'
 import type { TableColumn } from '@nuxt/ui'
 
 const props = defineProps<{
   fields: Field[]
+  tabs?: UiTab[]
   loading?: boolean
 }>()
 
@@ -32,17 +33,21 @@ const columns: TableColumn<Field>[] = [
 ]
 
 const fieldsByGroup = computed(() => {
+  const tabMap = new Map(props.tabs?.map(t => [t.id_ui_tab, t]) ?? [])
+
   const sorted = [...props.fields].sort((a, b) => {
-    const ga = a.group_name || 'general'
-    const gb = b.group_name || 'general'
-    if (ga !== gb)
-      return ga.localeCompare(gb)
+    const tabA = a.id_ui_tab ? tabMap.get(a.id_ui_tab) : null
+    const tabB = b.id_ui_tab ? tabMap.get(b.id_ui_tab) : null
+    const ra = tabA?.rank ?? 9999
+    const rb = tabB?.rank ?? 9999
+    if (ra !== rb) return ra - rb
     return a.rank - b.rank
   })
 
   const blocks: { group: string, fields: Field[] }[] = []
   for (const f of sorted) {
-    const g = f.group_name?.trim() || 'general'
+    const tab = f.id_ui_tab ? tabMap.get(f.id_ui_tab) : null
+    const g = tab?.name || 'Fara tab'
     const last = blocks[blocks.length - 1]
     if (last && last.group === g)
       last.fields.push(f)
@@ -102,7 +107,7 @@ function getDropdownItems(field: Field) {
         <div
           class="sticky top-0 z-1 flex items-center gap-2 border-b border-default px-4 py-2.5 bg-default/95 backdrop-blur-sm supports-backdrop-filter:bg-default/80"
         >
-          <UIcon name="i-lucide-layout-grid" class="size-4 text-muted shrink-0" />
+          <UIcon name="i-lucide-folder" class="size-4 text-muted shrink-0" />
           <h4 class="text-sm font-semibold text-highlighted truncate">
             {{ block.group }}
           </h4>

@@ -58,6 +58,20 @@ export async function up(knex: Knex): Promise<void> {
     t.timestamp('date_updated', { useTz: true }).notNullable().defaultTo(knex.fn.now());
   });
 
+  // ── ui_tab ──
+  await knex.schema.createTable('ui_tab', (t) => {
+    t.uuid('id_ui_tab').primary().defaultTo(knex.fn.uuid());
+    t.uuid('id_entity').notNullable().references('id_entity').inTable('entity').onDelete('CASCADE');
+    t.string('name', 100).notNullable();
+    t.string('slug', 100).notNullable();
+    t.integer('rank').notNullable().defaultTo(0);
+    t.boolean('is_system').notNullable().defaultTo(false);
+    t.timestamp('date_created', { useTz: true }).notNullable().defaultTo(knex.fn.now());
+    t.timestamp('date_updated', { useTz: true }).notNullable().defaultTo(knex.fn.now());
+
+    t.unique(['id_entity', 'slug']);
+  });
+
   // ── field ──
   await knex.schema.createTable('field', (t) => {
     t.uuid('id_field').primary().defaultTo(knex.fn.uuid());
@@ -82,7 +96,7 @@ export async function up(knex: Knex): Promise<void> {
     t.jsonb('validation_rules').nullable();
     t.uuid('id_relation_entity').nullable().references('id_entity').inTable('entity').onDelete('SET NULL');
     t.string('relation_display_field', 100).nullable();
-    t.string('group_name', 100).notNullable().defaultTo('general');
+    t.uuid('id_ui_tab').nullable().references('id_ui_tab').inTable('ui_tab').onDelete('RESTRICT');
     t.integer('rank').notNullable().defaultTo(1);
     t.integer('grid_col').notNullable().defaultTo(1);
     t.integer('col_span').notNullable().defaultTo(1);
@@ -107,6 +121,7 @@ export async function up(knex: Knex): Promise<void> {
 export async function down(knex: Knex): Promise<void> {
   await knex.schema.dropTableIfExists('role_permission');
   await knex.schema.dropTableIfExists('field');
+  await knex.schema.dropTableIfExists('ui_tab');
   await knex.schema.dropTableIfExists('entity');
   await knex.schema.dropTableIfExists('module');
   await knex.schema.dropTableIfExists('user_role');

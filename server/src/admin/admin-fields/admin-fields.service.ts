@@ -17,11 +17,13 @@ export class AdminFieldsService {
     await this.ensureEntityExists(entityId);
 
     const fields = await this.knex('field')
+      .leftJoin('ui_tab', 'field.id_ui_tab', 'ui_tab.id_ui_tab')
       .where('field.id_entity', entityId)
       .orderBy([
-        { column: 'group_name', order: 'asc' },
-        { column: 'rank', order: 'asc' },
-      ]);
+        { column: 'ui_tab.rank', order: 'asc' },
+        { column: 'field.rank', order: 'asc' },
+      ])
+      .select('field.*');
 
     const result: any[] = [];
     for (const f of fields) {
@@ -88,14 +90,25 @@ export class AdminFieldsService {
     await this.validateLayoutForCreate(entityId, dto);
 
     const columnName = `cf_${dto.slug}`;
-    const groupName = dto.group_name ?? 'general';
 
-    const maxRankResult = await this.knex('field')
-      .where({ id_entity: entityId, group_name: groupName })
-      .max('rank as max_rank')
-      .first();
+    // Resolve id_ui_tab: use provided value, or fallback to entity's "general" tab
+    let idUiTab = dto.id_ui_tab ?? null;
+    if (!idUiTab) {
+      const generalTab = await this.knex('ui_tab')
+        .where({ id_entity: entityId, slug: 'general' })
+        .first();
+      idUiTab = generalTab?.id_ui_tab ?? null;
+    }
 
-    const nextRank = ((maxRankResult?.max_rank as number) ?? 0) + 1;
+    // Auto-calculate rank within the selected tab
+    let nextRank = 1;
+    if (idUiTab) {
+      const maxRankResult = await this.knex('field')
+        .where({ id_entity: entityId, id_ui_tab: idUiTab })
+        .max('rank as max_rank')
+        .first();
+      nextRank = ((maxRankResult?.max_rank as number) ?? 0) + 1;
+    }
 
     const [field] = await this.knex('field')
       .insert({
@@ -120,7 +133,7 @@ export class AdminFieldsService {
         validation_rules: dto.validation_rules ? JSON.stringify(dto.validation_rules) : null,
         id_relation_entity: dto.id_relation_entity ?? null,
         relation_display_field: dto.relation_display_field ?? null,
-        group_name: groupName,
+        id_ui_tab: idUiTab,
         rank: dto.rank ?? nextRank,
         grid_col: dto.grid_col ?? 1,
         col_span: dto.col_span ?? 1,
@@ -152,6 +165,17 @@ export class AdminFieldsService {
 
     await this.validateLayoutForUpdate(entityId, field, dto);
 
+    // Daca tab-ul se schimba si rank-ul nu e setat explicit, recalculeaza automat
+    const tabChanged = dto.id_ui_tab !== undefined && dto.id_ui_tab !== field.id_ui_tab;
+    let effectiveRank = dto.rank;
+    if (tabChanged && dto.rank === undefined && dto.id_ui_tab) {
+      const newTabMax = await this.knex('field')
+        .where({ id_entity: entityId, id_ui_tab: dto.id_ui_tab })
+        .max('rank as max_rank')
+        .first();
+      effectiveRank = ((newTabMax?.max_rank as number) ?? 0) + 1;
+    }
+
     const updateData: Record<string, any> = {
       name: dto.name ?? field.name,
       ui_type: dto.ui_type ?? field.ui_type,
@@ -166,8 +190,8 @@ export class AdminFieldsService {
       visible_in_table: dto.visible_in_table ?? field.visible_in_table,
       visible_in_form: dto.visible_in_form ?? field.visible_in_form,
       is_readonly: dto.is_readonly ?? field.is_readonly,
-      group_name: dto.group_name ?? field.group_name,
-      rank: dto.rank ?? field.rank,
+      id_ui_tab: dto.id_ui_tab !== undefined ? dto.id_ui_tab : field.id_ui_tab,
+      rank: effectiveRank ?? field.rank,
       grid_col: dto.grid_col ?? field.grid_col,
       col_span: dto.col_span ?? field.col_span,
       default_value: dto.default_value !== undefined ? dto.default_value : field.default_value,
@@ -229,8 +253,16 @@ export class AdminFieldsService {
   }
 
   private async validateLayoutForCreate(entityId: string, dto: CreateFieldDto) {
-    const groupName = dto.group_name ?? 'general';
-    const existingFields = await this.getGroupLayoutFields(entityId, groupName);
+    // Resolve the effective id_ui_tab for layout validation
+    let idUiTab = dto.id_ui_tab ?? null;
+    if (!idUiTab) {
+      const generalTab = await this.knex('ui_tab')
+        .where({ id_entity: entityId, slug: 'general' })
+        .first();
+      idUiTab = generalTab?.id_ui_tab ?? null;
+    }
+
+    const existingFields = await this.getGroupLayoutFields(entityId, idUiTab);
 
     validateGroupFieldLayout([
       ...existingFields,
@@ -238,7 +270,7 @@ export class AdminFieldsService {
         id_field: `new:${dto.slug}`,
         name: dto.name,
         slug: dto.slug,
-        group_name: groupName,
+        id_ui_tab: idUiTab,
         rank: dto.rank ?? 1,
         grid_col: dto.grid_col ?? 1,
         col_span: dto.col_span ?? 1,
@@ -251,8 +283,8 @@ export class AdminFieldsService {
     field: Record<string, any>,
     dto: UpdateFieldDto,
   ) {
-    const groupName = dto.group_name ?? field.group_name ?? 'general';
-    const existingFields = await this.getGroupLayoutFields(entityId, groupName, field.id_field);
+    const idUiTab = dto.id_ui_tab !== undefined ? dto.id_ui_tab : field.id_ui_tab;
+    const existingFields = await this.getGroupLayoutFields(entityId, idUiTab, field.id_field);
 
     validateGroupFieldLayout([
       ...existingFields,
@@ -260,7 +292,7 @@ export class AdminFieldsService {
         id_field: field.id_field,
         name: dto.name ?? field.name,
         slug: field.slug,
-        group_name: groupName,
+        id_ui_tab: idUiTab,
         rank: dto.rank ?? field.rank,
         grid_col: dto.grid_col ?? field.grid_col,
         col_span: dto.col_span ?? field.col_span,
@@ -268,10 +300,10 @@ export class AdminFieldsService {
     ]);
   }
 
-  private async getGroupLayoutFields(entityId: string, groupName: string, excludeFieldId?: string) {
+  private async getGroupLayoutFields(entityId: string, idUiTab: string | null, excludeFieldId?: string) {
     let query = this.knex('field')
-      .select('id_field', 'name', 'slug', 'group_name', 'rank', 'grid_col', 'col_span')
-      .where({ id_entity: entityId, group_name: groupName });
+      .select('id_field', 'name', 'slug', 'id_ui_tab', 'rank', 'grid_col', 'col_span')
+      .where({ id_entity: entityId, id_ui_tab: idUiTab });
 
     if (excludeFieldId) {
       query = query.whereNot('id_field', excludeFieldId);

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { z } from 'zod'
-import type { Field } from '~/types/schema'
+import type { Field, UiTab } from '~/types/schema'
 import type { AdminEntity, FieldPayload, UpdateFieldPayload } from '~/types/admin'
 import type { FormSubmitEvent } from '@nuxt/ui'
 
@@ -8,6 +8,7 @@ const props = defineProps<{
   entityId: string
   field?: Field | null
   entities: AdminEntity[]
+  tabs: UiTab[]
 }>()
 
 const emit = defineEmits<{
@@ -86,8 +87,8 @@ const state = reactive({
   validation_max: (props.field?.validation_rules?.max as number) ?? undefined as number | undefined,
   validation_pattern: (props.field?.validation_rules?.pattern as string) ?? '',
   validation_error_message: (props.field?.validation_rules?.error_message as string) ?? '',
-  group_name: props.field?.group_name ?? 'general',
-  rank: props.field?.rank ?? 1,
+  id_ui_tab: props.field?.id_ui_tab ?? '',
+  rank: props.field?.rank ?? undefined as number | undefined,
   grid_col: props.field?.grid_col ?? 1,
   col_span: props.field?.col_span ?? 1
 })
@@ -126,6 +127,13 @@ watch(() => state.data_type, () => {
   }
 })
 
+// La schimbarea tab-ului in mod editare, goleste rank-ul ca sa se recalculeze automat
+watch(() => state.id_ui_tab, (newTabId) => {
+  if (isEdit.value && props.field && newTabId !== props.field.id_ui_tab) {
+    state.rank = undefined as number | undefined
+  }
+})
+
 // ─── Computed: show sections ───
 const showOptionsEditor = computed(() =>
   ['select', 'multi-select', 'radio'].includes(state.ui_type)
@@ -139,6 +147,13 @@ const showStringValidation = computed(() =>
 
 const showNumericValidation = computed(() =>
   ['integer', 'numeric'].includes(state.data_type)
+)
+
+const tabOptions = computed(() =>
+  props.tabs.map(t => ({
+    label: t.name,
+    value: t.id_ui_tab
+  }))
 )
 
 // ─── Options editor ───
@@ -210,7 +225,7 @@ const formSchema = z.object({
     .min(2, 'Slug-ul trebuie sa aiba minim 2 caractere')
     .max(100)
     .regex(/^[a-z][a-z0-9_]{1,50}$/, 'Doar litere mici, cifre si _ (incepe cu litera)'),
-  rank: z.coerce.number().int().min(1, 'Ordinea trebuie sa fie cel putin 1'),
+  rank: z.coerce.number().int().min(1, 'Ordinea trebuie sa fie cel putin 1').optional(),
   grid_col: z.coerce.number().int().min(1, 'Coloana grid trebuie sa fie intre 1 si 3').max(3, 'Coloana grid trebuie sa fie intre 1 si 3'),
   col_span: z.coerce.number().int().min(1, 'Col span trebuie sa fie intre 1 si 3').max(3, 'Col span trebuie sa fie intre 1 si 3')
 }).superRefine((data, context) => {
@@ -300,7 +315,7 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
         visible_in_form: state.visible_in_form,
         is_readonly: state.is_readonly,
         validation_rules: Object.keys(validationRules).length ? validationRules : undefined,
-        group_name: state.group_name || 'general',
+        id_ui_tab: state.id_ui_tab || undefined,
         rank: state.rank,
         grid_col: state.grid_col,
         col_span: state.col_span
@@ -327,7 +342,7 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
         visible_in_form: state.visible_in_form,
         is_readonly: state.is_readonly,
         validation_rules: Object.keys(validationRules).length ? validationRules : undefined,
-        group_name: state.group_name || 'general',
+        id_ui_tab: state.id_ui_tab || undefined,
         rank: state.rank,
         grid_col: state.grid_col,
         col_span: state.col_span
@@ -596,8 +611,15 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
         Layout
       </h4>
 
-      <UFormField label="Grup" name="group_name" description="Sectiunea/tab-ul in formular">
-        <UInput v-model="state.group_name" placeholder="general" class="w-full" />
+      <UFormField label="Tab" name="id_ui_tab" description="Sectiunea/tab-ul in formular">
+        <USelectMenu
+          v-model="state.id_ui_tab"
+          :items="tabOptions"
+          value-key="value"
+          placeholder="Selecteaza un tab"
+          searchable
+          class="w-full"
+        />
       </UFormField>
 
       <div class="grid grid-cols-2 gap-4">

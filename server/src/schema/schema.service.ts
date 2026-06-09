@@ -15,11 +15,24 @@ export class SchemaService {
     }
 
     const fields = await this.knex('field')
-      .where('id_entity', entity.id_entity)
+      .leftJoin('ui_tab', 'field.id_ui_tab', 'ui_tab.id_ui_tab')
+      .where('field.id_entity', entity.id_entity)
       .orderBy([
-        { column: 'group_name', order: 'asc' },
-        { column: 'rank', order: 'asc' },
-      ]);
+        { column: 'ui_tab.rank', order: 'asc' },
+        { column: 'field.rank', order: 'asc' },
+      ])
+      .select('field.*');
+
+    // Fetch tabs for this entity
+    const tabs = await this.knex('ui_tab')
+      .where('id_entity', entity.id_entity)
+      .orderBy('rank', 'asc');
+
+    // Build a map: id_ui_tab → slug for quick lookup
+    const tabMap = new Map<string, string>();
+    for (const t of tabs) {
+      tabMap.set(t.id_ui_tab, t.slug);
+    }
 
     const enrichedFields: any[] = [];
     for (const f of fields) {
@@ -55,14 +68,13 @@ export class SchemaService {
         id_relation_entity: f.id_relation_entity,
         relation_display_field: f.relation_display_field,
         relation_entity_slug: relationEntitySlug,
-        group_name: f.group_name,
+        id_ui_tab: f.id_ui_tab,
+        tab_slug: tabMap.get(f.id_ui_tab) ?? null,
         rank: f.rank,
         grid_col: f.grid_col,
         col_span: f.col_span,
       });
     }
-
-    const groups = [...new Set(enrichedFields.map(f => f.group_name))];
 
     return {
       entity: {
@@ -77,7 +89,7 @@ export class SchemaService {
         module: entity.id_module,
       },
       fields: enrichedFields,
-      groups,
+      tabs,
     };
   }
 }

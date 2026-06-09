@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { Field } from '~/types/schema'
-import type { AdminEntity } from '~/types/admin'
+import type { Field, UiTab } from '~/types/schema'
+import type { AdminEntity, AdminTab } from '~/types/admin'
 
 const route = useRoute()
 const router = useRouter()
@@ -13,6 +13,7 @@ const { fetchEntity } = useAdminEntities()
 const { fields, loading: fieldsLoading, fetchFields, deleteField, error: fieldsError } = useAdminFields(entityId)
 const { modules, fetchModules } = useAdminModules()
 const { entities, fetchEntities } = useAdminEntities()
+const { tabs, loading: tabsLoading, fetchTabs, deleteTab, error: tabsError } = useAdminTabs(entityId)
 
 const entity = ref<AdminEntity | null>(null)
 const pageLoading = ref(true)
@@ -24,7 +25,8 @@ async function loadData() {
       fetchEntity(entityId.value),
       fetchFields(),
       fetchModules(),
-      fetchEntities()
+      fetchEntities(),
+      fetchTabs()
     ])
     entity.value = entityData
   } finally {
@@ -88,6 +90,67 @@ async function onConfirmDeleteField() {
   showDeleteConfirm.value = false
   deletingField.value = null
 }
+
+// ─── Tab management ───
+const showTabModal = ref(false)
+const editingTab = ref<AdminTab | null>(null)
+
+function openAddTab() {
+  editingTab.value = null
+  showTabModal.value = true
+}
+
+function openEditTab(tab: AdminTab) {
+  editingTab.value = tab
+  showTabModal.value = true
+}
+
+async function onTabSaved() {
+  showTabModal.value = false
+  editingTab.value = null
+  await fetchTabs()
+}
+
+const showTabDeleteConfirm = ref(false)
+const deletingTab = ref<AdminTab | null>(null)
+
+function confirmDeleteTab(tab: AdminTab) {
+  if (tab.is_system) {
+    toast.add({ title: 'Tab-ul system nu poate fi sters', color: 'warning' })
+    return
+  }
+  deletingTab.value = tab
+  showTabDeleteConfirm.value = true
+}
+
+async function onConfirmDeleteTab() {
+  if (!deletingTab.value) return
+
+  const success = await deleteTab(deletingTab.value.id_ui_tab)
+  if (success) {
+    toast.add({ title: 'Tab sters', color: 'success' })
+  }
+  else {
+    toast.add({ title: 'Eroare la stergere', description: tabsError.value ?? '', color: 'error' })
+  }
+
+  showTabDeleteConfirm.value = false
+  deletingTab.value = null
+}
+
+// ─── Tab options for FieldForm ───
+const tabOptions = computed<UiTab[]>(() =>
+  tabs.value.map(t => ({
+    id_ui_tab: t.id_ui_tab,
+    id_entity: t.id_entity,
+    name: t.name,
+    slug: t.slug,
+    rank: t.rank,
+    is_system: t.is_system,
+    date_created: t.date_created,
+    date_updated: t.date_updated
+  }))
+)
 
 // ─── Module name helper ───
 function getModuleName(moduleId: string | null): string {
@@ -193,9 +256,55 @@ function getModuleName(moduleId: string | null): string {
         </div>
       </UPageCard>
 
+      <!-- Tabs management -->
+      <UPageCard variant="subtle">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-base font-semibold">
+            Tab-uri
+          </h3>
+          <UButton label="Adauga tab" icon="i-lucide-plus" size="sm" @click="openAddTab" />
+        </div>
+
+        <div v-if="tabs.length === 0 && !tabsLoading" class="text-sm text-muted py-4 text-center">
+          Niciun tab creat. Tab-urile controleaza cum sunt grupate campurile in formular.
+        </div>
+
+        <div v-if="tabsLoading" class="space-y-2">
+          <USkeleton v-for="i in 2" :key="i" class="h-12 w-full" />
+        </div>
+
+        <div v-else class="space-y-2">
+          <div
+            v-for="tab in tabs"
+            :key="tab.id_ui_tab"
+            class="flex items-center gap-3 p-3 rounded-lg border border-default bg-elevated/30"
+          >
+            <UIcon name="i-lucide-folder" class="size-5 text-muted shrink-0" />
+            <div class="flex-1 min-w-0">
+              <div class="font-medium truncate">{{ tab.name }}</div>
+              <div class="text-xs text-muted">{{ tab.slug }}</div>
+            </div>
+            <UBadge v-if="tab.is_system" label="System" color="warning" variant="subtle" size="sm" />
+            <UBadge :label="String(tab.rank)" color="neutral" variant="subtle" size="sm" />
+            <div class="flex items-center gap-1">
+              <UButton icon="i-lucide-pencil" color="neutral" variant="ghost" size="xs" @click="openEditTab(tab)" />
+              <UButton
+                icon="i-lucide-trash-2"
+                color="error"
+                variant="ghost"
+                size="xs"
+                :disabled="tab.is_system"
+                @click="confirmDeleteTab(tab)"
+              />
+            </div>
+          </div>
+        </div>
+      </UPageCard>
+
       <!-- Fields table -->
       <AdminFieldsTable
         :fields="fields"
+        :tabs="tabOptions"
         :loading="fieldsLoading"
         @add="openAddField"
         @edit="openEditField"
@@ -225,6 +334,7 @@ function getModuleName(moduleId: string | null): string {
             :entity-id="entityId"
             :field="editingField"
             :entities="entities"
+            :tabs="tabOptions"
             @saved="onFieldSaved"
             @cancel="showFieldSlideover = false"
           />
@@ -258,6 +368,46 @@ function getModuleName(moduleId: string | null): string {
               icon="i-lucide-trash-2"
               :loading="fieldsLoading"
               @click="onConfirmDeleteField"
+            />
+          </div>
+        </template>
+      </UModal>
+
+      <!-- Tab Create/Edit Modal -->
+      <UModal v-model:open="showTabModal" :title="editingTab ? 'Editeaza tab' : 'Tab nou'">
+        <template #body>
+          <AdminTabForm
+            :entity-id="entityId"
+            :tab="editingTab"
+            @saved="onTabSaved"
+            @cancel="showTabModal = false"
+          />
+        </template>
+      </UModal>
+
+      <!-- Delete Tab Confirm -->
+      <UModal
+        v-model:open="showTabDeleteConfirm"
+        title="Confirmare stergere tab"
+      >
+        <template #body>
+          <p>
+            Esti sigur ca vrei sa stergi tab-ul
+            <strong>{{ deletingTab?.name }}</strong>?
+          </p>
+          <div class="flex items-center gap-3 justify-end mt-4">
+            <UButton
+              label="Anuleaza"
+              color="neutral"
+              variant="outline"
+              @click="showTabDeleteConfirm = false"
+            />
+            <UButton
+              label="Sterge"
+              color="error"
+              icon="i-lucide-trash-2"
+              :loading="tabsLoading"
+              @click="onConfirmDeleteTab"
             />
           </div>
         </template>

@@ -58,11 +58,13 @@ export class AdminEntitiesService {
       : null;
 
     const fields = await this.knex('field')
-      .where('id_entity', id)
+      .leftJoin('ui_tab', 'field.id_ui_tab', 'ui_tab.id_ui_tab')
+      .where('field.id_entity', id)
       .orderBy([
-        { column: 'group_name', order: 'asc' },
-        { column: 'rank', order: 'asc' },
-      ]);
+        { column: 'ui_tab.rank', order: 'asc' },
+        { column: 'field.rank', order: 'asc' },
+      ])
+      .select('field.*');
 
     return { ...entity, module: mod ?? null, fields };
   }
@@ -97,6 +99,15 @@ export class AdminEntitiesService {
       .returning('*');
 
     await this.dynamicSchema.createEntityTable(entity);
+
+    // Auto-create "General" tab
+    await this.knex('ui_tab').insert({
+      id_entity: entity.id_entity,
+      name: 'General',
+      slug: 'general',
+      rank: 0,
+      is_system: true,
+    });
 
     return entity;
   }

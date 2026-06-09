@@ -61,6 +61,17 @@ export interface Entity {
   date_updated: Date;
 }
 
+export interface UiTab {
+  id_ui_tab: string;
+  id_entity: string;
+  name: string;
+  slug: string;
+  rank: number;
+  is_system: boolean;
+  date_created: Date;
+  date_updated: Date;
+}
+
 export interface Field {
   id_field: string;
   id_entity: string;
@@ -83,7 +94,7 @@ export interface Field {
   validation_rules: any;
   id_relation_entity: string | null;
   relation_display_field: string | null;
-  group_name: string;
+  id_ui_tab: string;
   rank: number;
   grid_col: number;
   col_span: number;

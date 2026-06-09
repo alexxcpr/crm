@@ -6,11 +6,13 @@ import { AdminEntitiesController } from './admin-entities/admin-entities.control
 import { AdminFieldsController } from './admin-fields/admin-fields.controller';
 import { AdminEntitiesService } from './admin-entities/admin-entities.service';
 import { AdminFieldsService } from './admin-fields/admin-fields.service';
+import { AdminTabsController } from './admin-tabs/admin-tabs.controller';
+import { AdminTabsService } from './admin-tabs/admin-tabs.service';
 
 @Module({
   imports: [DynamicSchemaModule],
-  controllers: [AdminModulesController, AdminEntitiesController, AdminFieldsController],
-  providers: [AdminModulesService, AdminEntitiesService, AdminFieldsService],
-  exports: [AdminModulesService, AdminEntitiesService, AdminFieldsService],
+  controllers: [AdminModulesController, AdminEntitiesController, AdminFieldsController, AdminTabsController],
+  providers: [AdminModulesService, AdminEntitiesService, AdminFieldsService, AdminTabsService],
+  exports: [AdminModulesService, AdminEntitiesService, AdminFieldsService, AdminTabsService],
 })
 export class AdminModule {}

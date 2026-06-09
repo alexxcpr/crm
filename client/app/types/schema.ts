@@ -23,7 +23,8 @@ export interface Field {
   id_relation_entity: string | null
   relation_display_field: string | null
   relation_entity_slug: string | null
-  group_name: string
+  id_ui_tab: string
+  tab_slug: string | null
   rank: number
   grid_col: number
   col_span: number
@@ -41,10 +42,21 @@ export interface EntityMeta {
   module: string | null
 }
 
+export interface UiTab {
+  id_ui_tab: string
+  id_entity: string
+  name: string
+  slug: string
+  rank: number
+  is_system: boolean
+  date_created: string
+  date_updated: string
+}
+
 export interface EntitySchema {
   entity: EntityMeta
   fields: Field[]
-  groups: string[]
+  tabs: UiTab[]
 }
 
 // ─── Response-uri de la GET /api/v1/data/:entitySlug ───

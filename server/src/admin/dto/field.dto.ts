@@ -94,9 +94,8 @@ export class CreateFieldDto {
     relation_display_field?: string;
 
     @IsOptional()
-    @IsString()
-    @MaxLength(100)
-    group_name?: string;
+    @IsUUID()
+    id_ui_tab?: string;
 
     @IsOptional()
     @IsInt()
@@ -185,9 +184,8 @@ export class UpdateFieldDto {
     validation_rules?: Record<string, any>;
 
     @IsOptional()
-    @IsString()
-    @MaxLength(100)
-    group_name?: string;
+    @IsUUID()
+    id_ui_tab?: string;
 
     @IsOptional()
     @IsInt()

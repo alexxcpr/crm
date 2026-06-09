@@ -87,6 +87,14 @@ async function upsertEntity(slug: string, data: Record<string, any>) {
   return entity;
 }
 
+async function upsertTab(idEntity: string, slug: string, data: Record<string, any>) {
+  let tab = await db('ui_tab').where({ id_entity: idEntity, slug }).first();
+  if (!tab) {
+    [tab] = await db('ui_tab').insert({ id_entity: idEntity, slug, ...data }).returning('*');
+  }
+  return tab;
+}
+
 async function upsertField(idEntity: string, slug: string, data: Record<string, any>) {
   let field = await db('field').where({ id_entity: idEntity, slug }).first();
   if (!field) {
@@ -138,18 +146,33 @@ async function seedCRM() {
 
   console.log('Entitati create:', contactsEntity.name, companiesEntity.name);
 
-  // 3. Contact fields
+  // 3. Create tabs for entities
+  const contactsGeneralTab = await upsertTab(contactsEntity.id_entity, 'general', {
+    name: 'General', rank: 0, is_system: true,
+  });
+  const contactsInfoTab = await upsertTab(contactsEntity.id_entity, 'contact_info', {
+    name: 'Informatii contact', rank: 1, is_system: false,
+  });
+  const companiesGeneralTab = await upsertTab(companiesEntity.id_entity, 'general', {
+    name: 'General', rank: 0, is_system: true,
+  });
+  const companiesInfoTab = await upsertTab(companiesEntity.id_entity, 'contact_info', {
+    name: 'Informatii contact', rank: 1, is_system: false,
+  });
+  console.log('Tab-uri create.');
+
+  // 4. Contact fields
   const contactFields = [
-    { name: 'Nume', slug: 'nume', column_name: 'nume', data_type: 'varchar', ui_type: 'text', is_required: true, is_system: true, placeholder: 'Introduceti numele', validation_rules: { min_length: 2, max_length: 100 }, group_name: 'general', rank: 1, grid_col: 1, col_span: 1 },
-    { name: 'Prenume', slug: 'prenume', column_name: 'prenume', data_type: 'varchar', ui_type: 'text', is_required: true, is_system: true, placeholder: 'Introduceti prenumele', validation_rules: { min_length: 2, max_length: 100 }, group_name: 'general', rank: 2, grid_col: 2, col_span: 1 },
-    { name: 'Email companie', slug: 'email_companie', column_name: 'email_companie', data_type: 'varchar', ui_type: 'email', is_required: true, is_system: true, placeholder: 'email@companie.ro', validation_rules: { max_length: 255 }, group_name: 'general', rank: 3, grid_col: 3, col_span: 1 },
-    { name: 'Pozitie', slug: 'pozitie', column_name: 'pozitie', data_type: 'varchar', ui_type: 'text', is_required: false, is_system: true, placeholder: 'Ex: Director Vanzari', group_name: 'general', rank: 4, grid_col: 1, col_span: 1 },
-    { name: 'Activ', slug: 'is_activ', column_name: 'is_activ', data_type: 'boolean', ui_type: 'checkbox', is_required: true, is_system: true, default_value: 'true', group_name: 'general', rank: 5, grid_col: 2, col_span: 1 },
-    { name: 'Decision Maker', slug: 'is_decision_maker', column_name: 'is_decision_maker', data_type: 'boolean', ui_type: 'checkbox', is_required: false, is_system: true, group_name: 'general', rank: 6, grid_col: 3, col_span: 1 },
-    { name: 'Telefon 1', slug: 'telefon1', column_name: 'telefon1', data_type: 'varchar', ui_type: 'phone', is_required: false, is_system: true, placeholder: '+40 7XX XXX XXX', group_name: 'contact_info', rank: 1, grid_col: 1, col_span: 1 },
-    { name: 'Telefon 2', slug: 'telefon2', column_name: 'telefon2', data_type: 'varchar', ui_type: 'phone', is_required: false, is_system: true, placeholder: '+40 7XX XXX XXX', group_name: 'contact_info', rank: 2, grid_col: 2, col_span: 1 },
-    { name: 'Email alternativ', slug: 'email_alternativ', column_name: 'email_alternativ', data_type: 'varchar', ui_type: 'email', is_required: false, is_system: true, placeholder: 'email@personal.ro', group_name: 'contact_info', rank: 3, grid_col: 3, col_span: 1 },
-    { name: 'Profil LinkedIn', slug: 'profile_linkedin', column_name: 'profile_linkedin', data_type: 'varchar', ui_type: 'text', is_required: false, is_system: true, placeholder: 'https://linkedin.com/in/...', validation_rules: { max_length: 500 }, group_name: 'contact_info', rank: 4, grid_col: 1, col_span: 3 },
+    { name: 'Nume', slug: 'nume', column_name: 'nume', data_type: 'varchar', ui_type: 'text', is_required: true, is_system: true, placeholder: 'Introduceti numele', validation_rules: { min_length: 2, max_length: 100 }, id_ui_tab: contactsGeneralTab.id_ui_tab, rank: 1, grid_col: 1, col_span: 1 },
+    { name: 'Prenume', slug: 'prenume', column_name: 'prenume', data_type: 'varchar', ui_type: 'text', is_required: true, is_system: true, placeholder: 'Introduceti prenumele', validation_rules: { min_length: 2, max_length: 100 }, id_ui_tab: contactsGeneralTab.id_ui_tab, rank: 2, grid_col: 2, col_span: 1 },
+    { name: 'Email companie', slug: 'email_companie', column_name: 'email_companie', data_type: 'varchar', ui_type: 'email', is_required: true, is_system: true, placeholder: 'email@companie.ro', validation_rules: { max_length: 255 }, id_ui_tab: contactsGeneralTab.id_ui_tab, rank: 3, grid_col: 3, col_span: 1 },
+    { name: 'Pozitie', slug: 'pozitie', column_name: 'pozitie', data_type: 'varchar', ui_type: 'text', is_required: false, is_system: true, placeholder: 'Ex: Director Vanzari', id_ui_tab: contactsGeneralTab.id_ui_tab, rank: 4, grid_col: 1, col_span: 1 },
+    { name: 'Activ', slug: 'is_activ', column_name: 'is_activ', data_type: 'boolean', ui_type: 'checkbox', is_required: true, is_system: true, default_value: 'true', id_ui_tab: contactsGeneralTab.id_ui_tab, rank: 5, grid_col: 2, col_span: 1 },
+    { name: 'Decision Maker', slug: 'is_decision_maker', column_name: 'is_decision_maker', data_type: 'boolean', ui_type: 'checkbox', is_required: false, is_system: true, id_ui_tab: contactsGeneralTab.id_ui_tab, rank: 6, grid_col: 3, col_span: 1 },
+    { name: 'Telefon 1', slug: 'telefon1', column_name: 'telefon1', data_type: 'varchar', ui_type: 'phone', is_required: false, is_system: true, placeholder: '+40 7XX XXX XXX', id_ui_tab: contactsInfoTab.id_ui_tab, rank: 1, grid_col: 1, col_span: 1 },
+    { name: 'Telefon 2', slug: 'telefon2', column_name: 'telefon2', data_type: 'varchar', ui_type: 'phone', is_required: false, is_system: true, placeholder: '+40 7XX XXX XXX', id_ui_tab: contactsInfoTab.id_ui_tab, rank: 2, grid_col: 2, col_span: 1 },
+    { name: 'Email alternativ', slug: 'email_alternativ', column_name: 'email_alternativ', data_type: 'varchar', ui_type: 'email', is_required: false, is_system: true, placeholder: 'email@personal.ro', id_ui_tab: contactsInfoTab.id_ui_tab, rank: 3, grid_col: 3, col_span: 1 },
+    { name: 'Profil LinkedIn', slug: 'profile_linkedin', column_name: 'profile_linkedin', data_type: 'varchar', ui_type: 'text', is_required: false, is_system: true, placeholder: 'https://linkedin.com/in/...', validation_rules: { max_length: 500 }, id_ui_tab: contactsInfoTab.id_ui_tab, rank: 4, grid_col: 1, col_span: 3 },
   ];
 
   for (const f of contactFields) {
@@ -157,14 +180,14 @@ async function seedCRM() {
     console.log(`  Field: ${created.name} (${created.column_name})`);
   }
 
-  // 4. Company fields
+  // 5. Company fields
   const companyFields = [
-    { name: 'Nume companie', slug: 'name', column_name: 'name', data_type: 'varchar', ui_type: 'text', is_required: true, is_system: true, placeholder: 'Introduceti numele companiei', validation_rules: { min_length: 2, max_length: 200 }, group_name: 'general', rank: 1, grid_col: 1, col_span: 1 },
-    { name: 'CUI', slug: 'cui', column_name: 'cui', data_type: 'varchar', ui_type: 'text', is_required: false, is_system: true, placeholder: 'RO12345678', is_unique: true, group_name: 'general', rank: 2, grid_col: 2, col_span: 1 },
-    { name: 'Industrie', slug: 'industry', column_name: 'cf_industry', data_type: 'varchar', ui_type: 'select', is_required: false, is_system: false, options: [{ label: 'IT & Software', value: 'it' }, { label: 'Finance & Banking', value: 'finance' }, { label: 'Sanatate', value: 'health' }, { label: 'Productie', value: 'manufacturing' }, { label: 'Retail', value: 'retail' }, { label: 'Constructii', value: 'construction' }, { label: 'Altele', value: 'other' }], group_name: 'general', rank: 3, grid_col: 3, col_span: 1 },
-    { name: 'Website', slug: 'website', column_name: 'website', data_type: 'varchar', ui_type: 'text', is_required: false, is_system: true, placeholder: 'https://www.exemplu.ro', group_name: 'contact_info', rank: 1, grid_col: 1, col_span: 1 },
-    { name: 'Telefon', slug: 'phone', column_name: 'phone', data_type: 'varchar', ui_type: 'phone', is_required: false, is_system: true, placeholder: '+40 XXX XXX XXX', group_name: 'contact_info', rank: 2, grid_col: 2, col_span: 1 },
-    { name: 'Adresa', slug: 'address', column_name: 'address', data_type: 'text', ui_type: 'textarea', is_required: false, is_system: true, placeholder: 'Strada, numar, oras, judet', group_name: 'contact_info', rank: 3, grid_col: 1, col_span: 3 },
+    { name: 'Nume companie', slug: 'name', column_name: 'name', data_type: 'varchar', ui_type: 'text', is_required: true, is_system: true, placeholder: 'Introduceti numele companiei', validation_rules: { min_length: 2, max_length: 200 }, id_ui_tab: companiesGeneralTab.id_ui_tab, rank: 1, grid_col: 1, col_span: 1 },
+    { name: 'CUI', slug: 'cui', column_name: 'cui', data_type: 'varchar', ui_type: 'text', is_required: false, is_system: true, placeholder: 'RO12345678', is_unique: true, id_ui_tab: companiesGeneralTab.id_ui_tab, rank: 2, grid_col: 2, col_span: 1 },
+    { name: 'Industrie', slug: 'industry', column_name: 'cf_industry', data_type: 'varchar', ui_type: 'select', is_required: false, is_system: false, options: [{ label: 'IT & Software', value: 'it' }, { label: 'Finance & Banking', value: 'finance' }, { label: 'Sanatate', value: 'health' }, { label: 'Productie', value: 'manufacturing' }, { label: 'Retail', value: 'retail' }, { label: 'Constructii', value: 'construction' }, { label: 'Altele', value: 'other' }], id_ui_tab: companiesGeneralTab.id_ui_tab, rank: 3, grid_col: 3, col_span: 1 },
+    { name: 'Website', slug: 'website', column_name: 'website', data_type: 'varchar', ui_type: 'text', is_required: false, is_system: true, placeholder: 'https://www.exemplu.ro', id_ui_tab: companiesInfoTab.id_ui_tab, rank: 1, grid_col: 1, col_span: 1 },
+    { name: 'Telefon', slug: 'phone', column_name: 'phone', data_type: 'varchar', ui_type: 'phone', is_required: false, is_system: true, placeholder: '+40 XXX XXX XXX', id_ui_tab: companiesInfoTab.id_ui_tab, rank: 2, grid_col: 2, col_span: 1 },
+    { name: 'Adresa', slug: 'address', column_name: 'address', data_type: 'text', ui_type: 'textarea', is_required: false, is_system: true, placeholder: 'Strada, numar, oras, judet', id_ui_tab: companiesInfoTab.id_ui_tab, rank: 3, grid_col: 1, col_span: 3 },
   ];
 
   for (const f of companyFields) {
@@ -172,7 +195,7 @@ async function seedCRM() {
     console.log(`  Field: ${created.name} (${created.column_name})`);
   }
 
-  // 5. Create dynamic ent_* tables + columns
+  // 6. Create dynamic ent_* tables + columns
   console.log('\nCreare tabele dinamice...');
   const entities = await db('entity').select('*');
 

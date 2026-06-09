@@ -45,7 +45,7 @@ function mockField(overrides: Partial<Field> = {}): Field {
     validation_rules: null,
     id_relation_entity: null,
     relation_display_field: null,
-    group_name: 'general',
+    id_ui_tab: '00000000-0000-0000-0000-000000000001',
     rank: 1,
     grid_col: 1,
     col_span: 1,

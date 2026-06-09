@@ -81,7 +81,7 @@ export interface FieldPayload {
   validation_rules?: Record<string, any>
   id_relation_entity?: string
   relation_display_field?: string
-  group_name?: string
+  id_ui_tab?: string
   rank?: number
   grid_col?: number
   col_span?: number
@@ -104,8 +104,35 @@ export interface UpdateFieldPayload {
   visible_in_form?: boolean
   is_readonly?: boolean
   validation_rules?: Record<string, any>
-  group_name?: string
+  id_ui_tab?: string
   rank?: number
   grid_col?: number
   col_span?: number
+}
+
+// ─── Tab ───
+
+export interface AdminTab {
+  id_ui_tab: string
+  id_entity: string
+  name: string
+  slug: string
+  rank: number
+  is_system: boolean
+  date_created: string
+  date_updated: string
+  _count?: { fields: number }
+}
+
+export interface CreateTabPayload {
+  name: string
+  slug: string
+  rank?: number
+  is_system?: boolean
+}
+
+export interface UpdateTabPayload {
+  name?: string
+  slug?: string
+  rank?: number
 }

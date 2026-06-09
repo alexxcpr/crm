@@ -98,6 +98,9 @@ model Entity {
   fields          Field[]
   // Relatie 1:N - o entitate are mai multe campuri (name, email, cf_industry, etc.)
 
+  tabs            UiTab[]
+  // Relatie 1:N - o entitate are mai multe tab-uri pentru organizarea campurilor in formular
+
   relation_fields Field[]   @relation("RelationTarget")
   // Relatie inversa: toate campurile din ALTE entitati care pointeaza catre ACEASTA entitate
   // Ex: daca entitatea "contacts" are un camp "cf_company_id" de tip relation catre "companies",
@@ -106,6 +109,23 @@ model Entity {
   permissions    RolePermission[]
 
   @@map("entity")
+}
+
+model UiTab {
+  id_ui_tab    String    @id @default(uuid())
+  id_entity    String
+  name         String    @db.VarChar(100)
+  slug         String    @db.VarChar(100)
+  rank         Int       @default(0)
+  is_system    Boolean   @default(false)
+  date_created DateTime  @default(now())
+  date_updated DateTime  @updatedAt
+
+  entity       Entity    @relation(fields: [id_entity], references: [id_entity], onDelete: Cascade)
+  fields       Field[]
+
+  @@unique([id_entity, slug])
+  @@map("ui_tab")
 }
 
 model Field {
@@ -146,8 +166,8 @@ model Field {
   relation_display_field  String?   @db.VarChar(100)     // Slug-ul campului din entitatea tinta care se afiseaza ca label in dropdown
                                                          // Ex: "name" - cand selectezi o companie, vezi numele ei, nu UUID-ul. Populat DOAR cand ui_type = "relation"
 
-  group_name              String    @default("general") @db.VarChar(100)  //Sectiunea/tab-ul in care apare campul in DynamicForm. Ex: "general", "contact_info", "detalii_financiare". Frontend grupeaza campurile dupa aceasta valoare si randeaza cate o sectiune per grup
-  rank                    Int       @default(1)          // Ordinea de afisare a campului IN CADRUL GRUPULUI - 1 = primul
+  id_ui_tab               String?                        // FK catre ui_tab — tab-ul in care apare campul in DynamicForm. Null doar daca tab-ul a fost sters fortat.
+  rank                    Int       @default(1)          // Ordinea de afisare a campului IN CADRUL TAB-ULUI - 1 = primul
 
   grid_col                Int       @default(1)          // Coloana in care apare campul in DynamicForm (1, 2 sau 3). Formularul foloseste un CSS Grid cu 3 coloane.
   col_span                Int       @default(1)          // Peste cate coloane se intinde campul (1, 2 sau 3). Ex: textarea cu col_span=3 ocupa toata latimea.
@@ -157,7 +177,10 @@ model Field {
 
   entity                  Entity    @relation(fields: [id_entity], references: [id_entity], onDelete: Cascade)
   // Relatie N:1 catre Entity - daca entitatea e stearsa, toate campurile ei se sterg automat (Cascade)
-  
+
+  ui_tab                  UiTab?    @relation(fields: [id_ui_tab], references: [id_ui_tab], onDelete: Restrict)
+  // Relatie N:1 catre UiTab — tab-ul in care apare campul. Restrict: nu poti sterge un tab care are campuri.
+
   relation_entity         Entity?   @relation("RelationTarget", fields: [id_relation_entity], references: [id_entity], onDelete: SetNull)
   // Relatie N:1 optionala catre Entity - folosita DOAR pe campuri de tip relation
   // "RelationTarget" = alias care diferentiaza aceasta relatie de relatia principala (entity)
