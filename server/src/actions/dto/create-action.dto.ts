@@ -49,4 +49,9 @@ export class CreateActionDto {
   @IsOptional()
   @IsInt()
   rank?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  description?: string;
 }

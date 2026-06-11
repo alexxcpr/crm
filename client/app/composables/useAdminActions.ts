@@ -11,6 +11,7 @@ interface ActionDefinition {
   config: Record<string, any>
   is_active: boolean
   rank: number
+  description: string | null
   date_created: string
   date_updated: string
 }
@@ -32,6 +33,7 @@ export interface CreateActionPayload {
   config?: Record<string, any>
   is_active?: boolean
   rank?: number
+  description?: string
 }
 
 export interface UpdateActionPayload {
@@ -43,6 +45,7 @@ export interface UpdateActionPayload {
   config?: Record<string, any>
   is_active?: boolean
   rank?: number
+  description?: string
 }
 
 export function useAdminActions() {

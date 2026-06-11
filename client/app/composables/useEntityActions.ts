@@ -11,6 +11,7 @@ interface EntityAction {
   config: Record<string, any>
   is_active: boolean
   rank: number
+  description: string | null
 }
 
 interface ApiResponse<T> {

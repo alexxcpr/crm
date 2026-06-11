@@ -121,6 +121,7 @@ export class ActionService {
         config: JSON.stringify(dto.config ?? {}),
         is_active: dto.is_active ?? true,
         rank: dto.rank ?? 0,
+        description: dto.description ?? null,
       })
       .returning('*');
 
@@ -161,6 +162,7 @@ export class ActionService {
     if (dto.config !== undefined) patch.config = JSON.stringify(dto.config);
     if (dto.is_active !== undefined) patch.is_active = dto.is_active;
     if (dto.rank !== undefined) patch.rank = dto.rank;
+    if (dto.description !== undefined) patch.description = dto.description;
 
     const [row] = await this.knex(this.TABLE)
       .where('id_action', id)

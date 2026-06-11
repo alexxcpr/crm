@@ -43,4 +43,9 @@ export class UpdateActionDto {
   @IsOptional()
   @IsInt()
   rank?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  description?: string;
 }

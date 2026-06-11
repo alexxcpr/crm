@@ -5,8 +5,8 @@ export interface Field {
   slug: string
   name: string
   column_name: string
-  data_type: 'varchar' | 'text' | 'integer' | 'numeric' | 'boolean' | 'date' | 'timestamp' | 'uuid' | 'jsonb'
-  ui_type: 'text' | 'textarea' | 'number' | 'select' | 'multi-select' | 'datepicker' | 'checkbox' | 'radio' | 'relation' | 'email' | 'phone' | 'currency' | 'file'
+  data_type: 'varchar' | 'text' | 'integer' | 'numeric' | 'boolean' | 'datetime' | 'uuid'
+  ui_type: 'text' | 'textarea' | 'number' | 'select' | 'datepicker' | 'datetimepicker' | 'checkbox' | 'relation' | 'email' | 'phone' | 'currency' | 'file'
   default_value: string | null
   placeholder: string | null
   help_text: string | null

@@ -202,6 +202,7 @@ const columns = computed<TableColumn<Record<string, any>>[]>(() => {
                   { type: 'separator' as const },
                   ...visibleActions.value.map(action => ({
                     label: action.name,
+                    description: action.description,
                     icon: 'i-lucide-zap',
                     onSelect() {
                       executeAction(action.slug, record.id)

@@ -28,7 +28,6 @@ export class DynamicSchemaService {
       table.timestamp('date_created', { useTz: true }).notNullable().defaultTo(this.knex.fn.now());
       table.timestamp('date_updated', { useTz: true }).notNullable().defaultTo(this.knex.fn.now());
       table.uuid('id_owner').nullable();
-      table.jsonb('extra_data').defaultTo('{}');
     });
 
     this.logger.log(`Tabela "${tableName}" a fost creata cu succes.`);
@@ -181,10 +180,8 @@ export class DynamicSchemaService {
       case 'integer':   return 0;
       case 'numeric':   return 0;
       case 'boolean':   return false;
-      case 'date':      return new Date().toISOString().split('T')[0];
-      case 'timestamp': return new Date().toISOString();
+      case 'datetime': return new Date().toISOString();
       case 'uuid':      return '00000000-0000-0000-0000-000000000000';
-      case 'jsonb':     return '{}';
       default:          return '';
     }
   }
@@ -200,10 +197,8 @@ export class DynamicSchemaService {
       case 'integer':   return table.integer(columnName);
       case 'numeric':   return table.decimal(columnName, 15, 2);
       case 'boolean':   return table.boolean(columnName);
-      case 'date':      return table.date(columnName);
-      case 'timestamp': return table.timestamp(columnName, { useTz: true });
+      case 'datetime': return table.timestamp(columnName, { useTz: true });
       case 'uuid':      return table.uuid(columnName);
-      case 'jsonb':     return table.jsonb(columnName);
       default:          return table.string(columnName, 255);
     }
   }

@@ -431,19 +431,33 @@ async function confirmDelete() {
             Actiuni workflow
           </h3>
           <div class="space-y-2">
-            <UButton
+            <div
               v-for="action in visibleActions"
               :key="action.id_action"
-              :label="action.name"
-              icon="i-lucide-zap"
-              color="primary"
-              variant="soft"
-              size="sm"
-              block
-              class="text-left justify-start"
-              :loading="executingAction === action.slug"
-              @click="handleAction(action.slug, action.name)"
-            />
+              class="flex items-center gap-1"
+            >
+              <UButton
+                :label="action.name"
+                icon="i-lucide-zap"
+                color="primary"
+                variant="soft"
+                size="sm"
+                block
+                class="flex-1 text-left justify-start"
+                :loading="executingAction === action.slug"
+                @click="handleAction(action.slug, action.name)"
+              />
+              <UTooltip
+                v-if="action.description"
+                :text="action.description"
+                :ui="{ text: 'whitespace-normal overflow-visible text-sm', content: 'h-auto max-w-96' }"
+              >
+                <UIcon
+                  name="i-lucide-info"
+                  class="size-4 text-muted shrink-0 cursor-help hover:text-primary transition-colors"
+                />
+              </UTooltip>
+            </div>
           </div>
         </div>
       </div>

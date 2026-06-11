@@ -55,7 +55,7 @@ function getOptionLabel(options: { label: string, value: string }[] | null, val:
     {{ formatCurrency(Number(value)) }}
   </span>
 
-  <span v-else-if="field.ui_type === 'datepicker' && field.data_type === 'timestamp'">
+  <span v-else-if="field.ui_type === 'datetimepicker'">
     {{ formatTimestamp(value) }}
   </span>
 

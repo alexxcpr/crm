@@ -31,17 +31,11 @@ export function applyColumn(
     case 'boolean':
       column = table.boolean(col.columnName);
       break;
-    case 'date':
-      column = table.date(col.columnName);
-      break;
-    case 'timestamp':
+    case 'datetime':
       column = table.timestamp(col.columnName, { useTz: true });
       break;
     case 'uuid':
       column = table.uuid(col.columnName);
-      break;
-    case 'jsonb':
-      column = table.jsonb(col.columnName);
       break;
     default:
       column = table.string(col.columnName, 255);
@@ -72,8 +66,6 @@ function castDefault(dataType: string, value: string): any {
       return parseInt(value, 10);
     case 'numeric':
       return parseFloat(value);
-    case 'jsonb':
-      return JSON.parse(value);
     default:
       return value;
   }

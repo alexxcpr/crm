@@ -23,43 +23,38 @@ const { apiFetch } = useApi()
 
 // ─── data_type → ui_type mapping ───
 const dataTypeUiTypeMap: Record<string, string[]> = {
-  varchar: ['text', 'select', 'radio', 'email', 'phone'],
+  varchar: ['text', 'select', 'email', 'phone'],
   text: ['textarea', 'text'],
   integer: ['number'],
   numeric: ['number', 'currency'],
   boolean: ['checkbox'],
-  date: ['datepicker'],
-  timestamp: ['datepicker'],
-  uuid: ['relation'],
-  jsonb: ['multi-select']
+  datetime: ['datepicker', 'datetimepicker'],
+  uuid: ['relation']
 }
 
 const dataTypeOptions = [
-  { label: 'VARCHAR (text scurt)', value: 'varchar' },
-  { label: 'TEXT (text lung)', value: 'text' },
-  { label: 'INTEGER (numar intreg)', value: 'integer' },
-  { label: 'NUMERIC (numar decimal)', value: 'numeric' },
-  { label: 'BOOLEAN (da/nu)', value: 'boolean' },
-  { label: 'DATE (data)', value: 'date' },
-  { label: 'TIMESTAMP (data + ora)', value: 'timestamp' },
-  { label: 'UUID (relatie)', value: 'uuid' },
-  { label: 'JSONB (JSON)', value: 'jsonb' }
+  { label: 'Text scurt (varchar)', value: 'varchar' },
+  { label: 'Text lung (text)', value: 'text' },
+  { label: 'Numar intreg (integer)', value: 'integer' },
+  { label: 'Numar decimal (numeric)', value: 'numeric' },
+  { label: 'Da/Nu (boolean)', value: 'boolean' },
+  { label: 'Data si ora (datetime)', value: 'datetime' },
+  { label: 'Relatie (uuid)', value: 'uuid' }
 ]
 
 const allUiTypeOptions = [
   { label: 'Text', value: 'text' },
   { label: 'Textarea', value: 'textarea' },
-  { label: 'Number', value: 'number' },
+  { label: 'Numar', value: 'number' },
   { label: 'Select', value: 'select' },
-  { label: 'Multi-select', value: 'multi-select' },
-  { label: 'Datepicker', value: 'datepicker' },
-  { label: 'Checkbox', value: 'checkbox' },
-  { label: 'Radio', value: 'radio' },
+  { label: 'Data', value: 'datepicker' },
+  { label: 'Data si ora', value: 'datetimepicker' },
+  { label: 'Da/Nu', value: 'checkbox' },
   { label: 'Relatie', value: 'relation' },
   { label: 'Email', value: 'email' },
-  { label: 'Phone', value: 'phone' },
-  { label: 'Currency', value: 'currency' },
-  { label: 'File', value: 'file' }
+  { label: 'Telefon', value: 'phone' },
+  { label: 'Suma (RON)', value: 'currency' },
+  { label: 'Fisier', value: 'file' }
 ]
 
 // ─── Form State ───
@@ -136,7 +131,7 @@ watch(() => state.id_ui_tab, (newTabId) => {
 
 // ─── Computed: show sections ───
 const showOptionsEditor = computed(() =>
-  ['select', 'multi-select', 'radio'].includes(state.ui_type)
+  state.ui_type === 'select'
 )
 
 const showRelationFields = computed(() => state.ui_type === 'relation')

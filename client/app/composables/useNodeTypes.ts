@@ -99,10 +99,10 @@ export function getOperatorsForType(dataType?: string): OperatorDef[] {
 
 export function dataTypeCategory(dataType: string): string {
   switch (dataType) {
-    case 'varchar': case 'text': case 'uuid': case 'jsonb': return 'string'
+    case 'varchar': case 'text': case 'uuid': return 'string'
     case 'integer': case 'numeric': return 'number'
     case 'boolean': return 'boolean'
-    case 'date': case 'timestamp': return 'date'
+    case 'datetime': return 'date'
     default: return 'string'
   }
 }

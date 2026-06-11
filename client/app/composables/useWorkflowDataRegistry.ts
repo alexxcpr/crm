@@ -149,8 +149,8 @@ export function useWorkflowDataRegistry(
       // System columns are not in the field table but are real columns available to reference
       const systemFields: Field[] = [
         { column_name: 'id', name: 'ID (sistem)', slug: '_sys_id', data_type: 'uuid', ui_type: 'text' },
-        { column_name: 'date_created', name: 'Data creare (sistem)', slug: '_sys_date_created', data_type: 'timestamp', ui_type: 'datepicker' },
-        { column_name: 'date_updated', name: 'Data actualizare (sistem)', slug: '_sys_date_updated', data_type: 'timestamp', ui_type: 'datepicker' },
+        { column_name: 'date_created', name: 'Data creare (sistem)', slug: '_sys_date_created', data_type: 'datetime', ui_type: 'datetimepicker' },
+        { column_name: 'date_updated', name: 'Data actualizare (sistem)', slug: '_sys_date_updated', data_type: 'datetime', ui_type: 'datetimepicker' },
         { column_name: 'id_owner', name: 'Owner (sistem)', slug: '_sys_id_owner', data_type: 'uuid', ui_type: 'text' },
       ] as Field[]
       const fields = [...systemFields, ...customFields]

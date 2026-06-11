@@ -92,8 +92,7 @@ const typeLabel = computed(() => {
     varchar: 'text', text: 'text', uuid: 'text',
     integer: 'număr', numeric: 'număr',
     boolean: 'boolean',
-    date: 'dată', timestamp: 'dată',
-    jsonb: 'json',
+    datetime: 'dată',
   }
   return map[field.data_type] ?? field.data_type
 })

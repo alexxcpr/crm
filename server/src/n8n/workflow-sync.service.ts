@@ -432,10 +432,10 @@ export class WorkflowSyncService {
 
   private mapDataTypeToN8nGroup(dataType: string): 'string' | 'number' | 'boolean' | 'dateTime' {
     switch (dataType) {
-      case 'varchar': case 'text': case 'uuid': case 'jsonb': return 'string'
+      case 'varchar': case 'text': case 'uuid': return 'string'
       case 'integer': case 'numeric': return 'number'
       case 'boolean': return 'boolean'
-      case 'date': case 'timestamp': return 'dateTime'
+      case 'datetime': return 'dateTime'
       default: return 'string'
     }
   }

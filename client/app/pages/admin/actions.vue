@@ -44,6 +44,7 @@ const formName = ref('')
 const formSlug = ref('')
 const formEntityId = ref('')
 const formWorkflowId = ref('')
+const formDescription = ref('')
 const formShowInUi = ref(true)
 const formIsActive = ref(true)
 const formTriggerEvents = ref<string[]>([])
@@ -72,6 +73,7 @@ function openCreate() {
   formSlug.value = ''
   formEntityId.value = selectedEntityId.value || ''
   formWorkflowId.value = 'none'
+  formDescription.value = ''
   formShowInUi.value = true
   formIsActive.value = true
   formTriggerEvents.value = []
@@ -84,6 +86,7 @@ function openEdit(action: any) {
   formSlug.value = action.slug
   formEntityId.value = action.id_entity
   formWorkflowId.value = action.id_workflow ?? 'none'
+  formDescription.value = action.description || ''
   formShowInUi.value = action.show_in_ui
   formIsActive.value = action.is_active
   formTriggerEvents.value = parseTriggerEvents(action.trigger_events)
@@ -112,7 +115,8 @@ async function onSubmit() {
       show_in_ui: formShowInUi.value,
       is_active: formIsActive.value,
       id_workflow: formWorkflowId.value === 'none' ? undefined : (formWorkflowId.value || undefined),
-      trigger_events: formTriggerEvents.value
+      trigger_events: formTriggerEvents.value,
+      description: formDescription.value || undefined,
     })
     if (result) {
       toast.add({ title: 'Actiune actualizata', color: 'success' })
@@ -128,7 +132,8 @@ async function onSubmit() {
       show_in_ui: formShowInUi.value,
       is_active: formIsActive.value,
       id_workflow: formWorkflowId.value === 'none' ? undefined : (formWorkflowId.value || undefined),
-      trigger_events: formTriggerEvents.value
+      trigger_events: formTriggerEvents.value,
+      description: formDescription.value || undefined,
     })
     if (result) {
       toast.add({ title: 'Actiune creata', color: 'success' })
@@ -405,6 +410,11 @@ function getDropdownItems(action: any) {
                 <span class="text-xs">{{ opt.label }}</span>
               </label>
             </div>
+          </div>
+
+          <div>
+            <label class="text-xs font-medium mb-1 block">Descriere (optional)</label>
+            <UTextarea v-model="formDescription" placeholder="Explica ce face actiunea..." size="sm" :rows="2" />
           </div>
 
           <div class="flex items-center gap-6">

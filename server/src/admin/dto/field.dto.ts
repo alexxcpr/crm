@@ -3,10 +3,10 @@ import {
     IsString, IsUUID, Matches, MaxLength, ValidateIf, IsObject, IsArray, Max, Min,
 } from 'class-validator';
 
-const DATA_TYPES = ['varchar', 'text', 'integer', 'numeric', 'boolean', 'date', 'timestamp', 'uuid', 'jsonb'];
+const DATA_TYPES = ['varchar', 'text', 'integer', 'numeric', 'boolean', 'datetime', 'uuid'];
 const UI_TYPES = [
-    'text', 'textarea', 'number', 'select', 'multi-select',
-    'datepicker', 'checkbox', 'radio', 'relation',
+    'text', 'textarea', 'number', 'select',
+    'datepicker', 'datetimepicker', 'checkbox', 'relation',
     'email', 'phone', 'currency', 'file',
 ];
 

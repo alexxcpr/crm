@@ -51,15 +51,15 @@ const parseToCalendarDate = (val: string): DateValue | undefined => {
   }
 }
 
-// Watch pentru sincronizare date
+// Watch pentru sincronizare date (date-only)
 watch(() => props.modelValue, (newValue) => {
-  if (props.field.ui_type !== 'datepicker' || props.field.data_type !== 'date') return
+  if (props.field.ui_type !== 'datepicker') return
   calendarDate.value = newValue ? parseToCalendarDate(newValue) : undefined
 }, { immediate: true })
 
-// Watch pentru emitere date
+// Watch pentru emitere date (date-only)
 watch(calendarDate, (newValue) => {
-  if (props.field.ui_type !== 'datepicker' || props.field.data_type !== 'date') return
+  if (props.field.ui_type !== 'datepicker') return
   emit('update:modelValue', newValue ? newValue.toString() : null)
 })
 
@@ -83,7 +83,7 @@ const parseToCalendarDateTime = (val: string): DateValue | undefined => {
 
 // Watch pentru sincronizare datetime
 watch(() => props.modelValue, (newValue) => {
-  if (props.field.ui_type !== 'datepicker' || props.field.data_type !== 'timestamp') return
+  if (props.field.ui_type !== 'datetimepicker') return
   if (newValue) {
     const parsed = parseToCalendarDateTime(newValue)
     calendarDateTime.value = parsed
@@ -219,18 +219,6 @@ const displayDateTime = computed(() => {
       class="w-full"
     />
 
-    <!-- multi-select -->
-    <USelectMenu
-      v-else-if="field.ui_type === 'multi-select'"
-      v-model="value"
-      multiple
-      :items="selectItems"
-      :disabled="field.is_readonly"
-      value-key="value"
-      :placeholder="field.placeholder ?? `Selecteaza ${field.name.toLowerCase()}`"
-      class="w-full"
-    />
-
     <!-- checkbox (boolean) -->
     <USwitch
       v-else-if="field.ui_type === 'checkbox'"
@@ -238,18 +226,9 @@ const displayDateTime = computed(() => {
       :disabled="field.is_readonly"
     />
 
-    <!-- radio -->
-    <URadioGroup
-      v-else-if="field.ui_type === 'radio'"
-      v-model="value"
-      :items="selectItems"
-      :disabled="field.is_readonly"
-      orientation="horizontal"
-    />
-
-    <!-- datepicker (date) - Popover + Calendar -->
+    <!-- datepicker (date-only) - Popover + Calendar -->
     <div
-      v-else-if="field.ui_type === 'datepicker' && field.data_type === 'date'"
+      v-else-if="field.ui_type === 'datepicker'"
       class="flex items-center gap-2 w-full"
     >
       <UPopover
@@ -291,7 +270,7 @@ const displayDateTime = computed(() => {
 
     <!-- datepicker (timestamp) - Popover + Calendar + Time -->
     <div
-      v-else-if="field.ui_type === 'datepicker' && field.data_type === 'timestamp'"
+      v-else-if="field.ui_type === 'datetimepicker'"
       class="flex items-center gap-2 w-full"
     >
       <UPopover

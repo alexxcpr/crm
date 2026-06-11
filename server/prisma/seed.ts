@@ -206,7 +206,6 @@ async function seedCRM() {
         table.timestamp('date_created', { useTz: true }).notNullable().defaultTo(db.fn.now());
         table.timestamp('date_updated', { useTz: true }).notNullable().defaultTo(db.fn.now());
         table.uuid('id_owner').nullable();
-        table.jsonb('extra_data').defaultTo('{}');
       });
       console.log(`  Tabela "${entity.table_name}" creata.`);
     }

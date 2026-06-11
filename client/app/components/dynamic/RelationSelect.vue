@@ -128,7 +128,7 @@ function onUpdate(val: string | string[] | undefined) {
       :search-input="{ placeholder: 'Cauta...' }"
       :disabled="disabled"
       class="w-full"
-      clear
+      :clear="!disabled"
       @update:model-value="onUpdate"
       @update:search-term="onSearch"
     />

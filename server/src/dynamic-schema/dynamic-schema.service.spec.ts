@@ -76,13 +76,11 @@ describe('DynamicSchemaService', () => {
     mockTableBuilder = {
       uuid: jest.fn().mockReturnValue(mockColumnBuilder),
       timestamp: jest.fn().mockReturnValue(mockColumnBuilder),
-      jsonb: jest.fn().mockReturnValue(mockColumnBuilder),
       string: jest.fn().mockReturnValue(mockColumnBuilder),
       text: jest.fn().mockReturnValue(mockColumnBuilder),
       integer: jest.fn().mockReturnValue(mockColumnBuilder),
       decimal: jest.fn().mockReturnValue(mockColumnBuilder),
       boolean: jest.fn().mockReturnValue(mockColumnBuilder),
-      date: jest.fn().mockReturnValue(mockColumnBuilder),
       index: jest.fn(),
       dropColumn: jest.fn(),
       unique: jest.fn(),
@@ -156,7 +154,6 @@ describe('DynamicSchemaService', () => {
       expect(mockTableBuilder.timestamp).toHaveBeenCalledWith('date_created', { useTz: true });
       expect(mockTableBuilder.timestamp).toHaveBeenCalledWith('date_updated', { useTz: true });
       expect(mockTableBuilder.uuid).toHaveBeenCalledWith('id_owner');
-      expect(mockTableBuilder.jsonb).toHaveBeenCalledWith('extra_data');
     });
 
     it('skip daca tabela exista deja', async () => {
@@ -305,23 +302,8 @@ describe('DynamicSchemaService', () => {
     testDataType('integer', 'integer');
     testDataType('numeric', 'decimal', 15, 2);
     testDataType('boolean', 'boolean');
-    testDataType('date', 'date');
+    testDataType('datetime', 'timestamp', { useTz: true });
     testDataType('uuid', 'uuid');
-    testDataType('jsonb', 'jsonb');
-
-    it('mapeaza data_type="timestamp" la table.timestamp() cu useTz', async () => {
-      mockSchema.hasColumn.mockResolvedValue(false);
-      const field = mockField({
-        slug: 'started_at',
-        column_name: 'cf_started_at',
-        data_type: 'timestamp',
-        is_filterable: false,
-      });
-
-      await service.addColumn(mockEntity(), field);
-
-      expect(mockTableBuilder.timestamp).toHaveBeenCalledWith('cf_started_at', { useTz: true });
-    });
 
     it('fallback la string(255) pentru data_type necunoscut', async () => {
       mockSchema.hasColumn.mockResolvedValue(false);

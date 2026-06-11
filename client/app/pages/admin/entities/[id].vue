@@ -58,9 +58,10 @@ function openEditField(field: Field) {
   showFieldSlideover.value = true
 }
 
-function onFieldSaved() {
+async function onFieldSaved() {
   showFieldSlideover.value = false
   editingField.value = null
+  await fetchFields()
 }
 
 // ─── Field delete ───

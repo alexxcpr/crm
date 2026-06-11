@@ -32,32 +32,23 @@ function buildFieldRule(field: Field): ZodType {
       rule = z.coerce.boolean()
       break
 
-    case 'date':
+    case 'datetime':
       rule = z.string({ message: `"${field.name}" este obligatoriu` })
         .transform((val) => {
-          // Dacă e deja format YYYY-MM-DD, returnează direct
-          if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val
-          // Altfel, convertește din format ISO (YYYY-MM-DDTHH:mm:ss.sssZ)
+          // Deja un ISO datetime complet cu timezone offset
+          if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}:\d{2}|Z)$/.test(val)) return val
+          // Date-only format (YYYY-MM-DD) — adaugă T00:00:00Z
+          if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return `${val}T00:00:00.000Z`
+          // Fallback: parse nativ Date
           const date = new Date(val)
-          if (isNaN(date.getTime())) return val // Lasă să eșueze validarea
-          const year = date.getFullYear()
-          const month = String(date.getMonth() + 1).padStart(2, '0')
-          const day = String(date.getDate()).padStart(2, '0')
-          return `${year}-${month}-${day}`
+          if (isNaN(date.getTime())) return val
+          return date.toISOString()
         })
-        .pipe(z.string().date({ message: 'Format dată invalid (YYYY-MM-DD)' }))
-      break
-
-    case 'timestamp':
-      rule = z.string({ message: `"${field.name}" este obligatoriu` }).datetime({ offset: true, message: 'Format dată/oră invalid' })
+        .pipe(z.string().datetime({ offset: true, message: 'Format dată/oră invalid' }))
       break
 
     case 'uuid':
       rule = z.string({ message: `"${field.name}" este obligatoriu` }).uuid({ message: 'Valoare invalidă' })
-      break
-
-    case 'jsonb':
-      rule = z.any()
       break
 
     default:
