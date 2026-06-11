@@ -400,14 +400,8 @@ async function confirmDelete() {
             type="submit"
             :label="isEditMode ? 'Salveaza' : 'Creeaza'"
             icon="i-lucide-check"
+            size="md"
             :loading="submitting"
-          />
-          <UButton
-            label="Anuleaza"
-            color="neutral"
-            variant="outline"
-            icon="i-lucide-x"
-            @click="router.back()"
           />
           <UButton
             v-if="isEditMode"
@@ -415,6 +409,7 @@ async function confirmDelete() {
             icon="i-lucide-trash-2"
             color="error"
             variant="outline"
+            size="md"
             class="ml-auto"
             @click="showDeleteConfirm = true"
           />

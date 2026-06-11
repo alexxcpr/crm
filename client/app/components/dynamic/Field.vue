@@ -137,13 +137,20 @@ const displayDateTime = computed(() => {
 </script>
 
 <template>
-  <UFormField
-    :name="field.slug"
-    :label="field.name"
-    :required="field.is_required"
-    :help="field.help_text ?? undefined"
-    :description="undefined"
+  <div
+    :class="[
+      'dynamic-field-wrapper',
+      { 'dynamic-field-wrapper--checkbox': field.ui_type === 'checkbox' },
+      { 'dynamic-field-wrapper--readonly': field.is_readonly }
+    ]"
   >
+    <UFormField
+      :name="field.slug"
+      :label="field.name"
+      :required="field.is_required"
+      :help="field.help_text ?? undefined"
+      :description="undefined"
+    >
     <!-- text -->
     <UInput
       v-if="field.ui_type === 'text'"
@@ -220,10 +227,12 @@ const displayDateTime = computed(() => {
     />
 
     <!-- checkbox (boolean) -->
-    <USwitch
+    <UCheckbox
       v-else-if="field.ui_type === 'checkbox'"
       v-model="value"
+      :label="field.placeholder ?? 'Da'"
       :disabled="field.is_readonly"
+      size="lg"
     />
 
     <!-- datepicker (date-only) - Popover + Calendar -->
@@ -363,9 +372,51 @@ const displayDateTime = computed(() => {
       class="w-full"
     />
   </UFormField>
+  </div>
 </template>
 
 <style scoped>
+.dynamic-field-wrapper {
+  background: var(--ui-bg-elevated, hsl(var(--muted) / 0.15));
+  border: 1px solid var(--ui-border, hsl(var(--border) / 0.3));
+  border-radius: 0.5rem;
+  padding: 0.375rem 0.625rem;
+  transition: border-color 0.15s;
+}
+
+.dynamic-field-wrapper:focus-within {
+  border-color: var(--ui-border-accent, hsl(var(--ring)));
+}
+
+/* Checkbox: tratament subtire — doar border-bottom */
+.dynamic-field-wrapper--checkbox {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--ui-border, hsl(var(--border) / 0.3));
+  border-radius: 0;
+  padding: 0.25rem 0;
+}
+
+.dynamic-field-wrapper--checkbox:focus-within {
+  border-bottom-color: var(--ui-border-accent, hsl(var(--ring)));
+}
+
+/* Readonly: fundal estompat */
+.dynamic-field-wrapper--readonly {
+  background: hsl(var(--muted) / 0.08);
+  border-style: dashed;
+}
+
+/* Input-uri transparente doar pe readonly — wrapper-ul preia rolul vizual */
+.dynamic-field-wrapper--readonly :deep(input),
+.dynamic-field-wrapper--readonly :deep(textarea),
+.dynamic-field-wrapper--readonly :deep(select),
+.dynamic-field-wrapper--readonly :deep(.select-trigger),
+.dynamic-field-wrapper--readonly :deep(.menu-trigger) {
+  background: transparent !important;
+  --ui-bg: transparent;
+}
+
 /* Ascunde săgețile native ale input-ului number pentru câmpul currency */
 .currency-input :deep(input[type="number"]) {
   -moz-appearance: textfield;
