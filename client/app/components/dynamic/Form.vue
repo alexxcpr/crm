@@ -1,6 +1,6 @@
 ﻿<script setup lang="ts">
 import type { Field, UiTab } from '~/types/schema'
-import type { TabsItem, FormSubmitEvent } from '@nuxt/ui'
+import type { Form, TabsItem, FormSubmitEvent } from '@nuxt/ui'
 import { buildZodSchema } from '~/utils/buildZodSchema'
 
 const props = defineProps<{
@@ -61,7 +61,7 @@ function captureInitialState() {
 }
 
 // ─── Form ref for error handling ───
-const formRef = ref(null)
+const formRef = ref<Form<any> | null>(null)
 const activeTab = ref('')
 
 // Initialize activeTab when groups are loaded
