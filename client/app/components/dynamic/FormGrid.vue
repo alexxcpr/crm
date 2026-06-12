@@ -48,7 +48,7 @@ function getDesktopStyle(placedField: PlacedField) {
 <template>
   <div class="space-y-4">
     <!-- Mobile: stack vertical -->
-    <div class="flex flex-col gap-4 md:hidden">
+    <div class="flex flex-col gap-3 md:hidden">
       <DynamicField
         v-for="(placedField, idx) in layout.placed"
         :key="placedField.field.id_field"
@@ -62,7 +62,7 @@ function getDesktopStyle(placedField: PlacedField) {
     <!-- Desktop: grid fluid -->
     <div
       ref="gridContainer"
-      class="hidden md:grid md:gap-x-4 md:gap-y-6"
+      class="hidden md:grid md:gap-x-4 md:gap-y-4"
       :style="{ gridTemplateColumns: `repeat(${layout.columns}, minmax(0, 1fr))` }"
     >
       <div

@@ -589,34 +589,64 @@ const applyDateTime = () => {
 
 <style scoped>
 .dynamic-field-wrapper {
-  background: var(--ui-bg-elevated, hsl(var(--muted) / 0.15));
-  border: 1px solid var(--ui-border, hsl(var(--border) / 0.3));
-  border-radius: 0.5rem;
-  padding: 0.375rem 0.625rem;
-  transition: border-color 0.15s;
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--ui-bg-elevated) 72%, transparent), var(--ui-bg));
+  border: 1px solid color-mix(in oklab, var(--ui-border) 78%, transparent);
+  border-radius: 0.75rem;
+  padding: 0.625rem 0.75rem 0.75rem;
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--ui-text) 8%, transparent);
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    box-shadow 0.15s,
+    transform 0.15s;
+}
+
+.dynamic-field-wrapper:hover {
+  border-color: color-mix(in oklab, var(--ui-primary) 26%, var(--ui-border));
+  box-shadow: 0 6px 18px color-mix(in oklab, var(--ui-text) 8%, transparent);
 }
 
 .dynamic-field-wrapper:focus-within {
-  border-color: var(--ui-border-accent, hsl(var(--ring)));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--ui-primary) 10%, var(--ui-bg-elevated)),
+      color-mix(in oklab, var(--ui-primary) 4%, var(--ui-bg-elevated))
+    );
+  border-color: color-mix(in oklab, var(--ui-primary) 58%, var(--ui-border));
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, var(--ui-primary) 14%, transparent),
+    0 8px 24px color-mix(in oklab, var(--ui-text) 10%, transparent);
+}
+
+.dynamic-field-wrapper :deep(label) {
+  color: var(--ui-text-highlighted);
+  font-weight: 650;
+}
+
+.dynamic-field-wrapper :deep(p) {
+  color: var(--ui-text-muted);
 }
 
 /* Checkbox: tratament subtire — doar border-bottom */
 .dynamic-field-wrapper--checkbox {
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid var(--ui-border, hsl(var(--border) / 0.3));
-  border-radius: 0;
-  padding: 0.25rem 0;
+  background: color-mix(in oklab, var(--ui-bg-elevated) 42%, transparent);
+  border: 1px solid color-mix(in oklab, var(--ui-border) 72%, transparent);
+  border-radius: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  box-shadow: none;
 }
 
 .dynamic-field-wrapper--checkbox:focus-within {
-  border-bottom-color: var(--ui-border-accent, hsl(var(--ring)));
+  border-color: color-mix(in oklab, var(--ui-primary) 58%, var(--ui-border));
 }
 
 /* Readonly: fundal estompat */
 .dynamic-field-wrapper--readonly {
-  background: hsl(var(--muted) / 0.08);
+  background: color-mix(in oklab, var(--ui-bg-muted) 55%, transparent);
   border-style: dashed;
+  box-shadow: none;
 }
 
 /* Input-uri transparente doar pe readonly — wrapper-ul preia rolul vizual */

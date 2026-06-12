@@ -44,7 +44,7 @@ const currentPage = ref(1)
 const pageSize = ref(25)
 const currentSort = ref('-date_created')
 const filters = ref<Record<string, any>>({})
-const rowSelection = ref({})
+const rowSelection = ref<Record<string, boolean>>({})
 
 const loading = computed(() => schemaLoading.value || dataLoading.value)
 const error = computed(() => schemaError.value || dataError.value)
@@ -239,15 +239,41 @@ const columns = computed<TableColumn<Record<string, any>>[]>(() => {
   return cols
 })
 
-const selectedCount = computed(() => Object.keys(rowSelection.value).length)
+const activeFilterCount = computed(() => Object.keys(filters.value).length)
+const selectedIds = computed(() =>
+  Object.entries(rowSelection.value)
+    .filter(([, selected]) => selected)
+    .map(([id]) => id)
+)
+const selectedCount = computed(() => selectedIds.value.length)
+
+const pageRangeStart = computed(() => {
+  if (meta.value.total === 0) return 0
+  return (currentPage.value - 1) * pageSize.value + 1
+})
+
+const pageRangeEnd = computed(() =>
+  Math.min(currentPage.value * pageSize.value, meta.value.total)
+)
+
+const emptyStateTitle = computed(() =>
+  activeFilterCount.value > 0 ? 'Nu am gasit rezultate' : 'Inca nu exista inregistrari'
+)
+
+const emptyStateDescription = computed(() => {
+  const label = (entityMeta.value?.label_plural ?? 'inregistrari').toLowerCase()
+  if (activeFilterCount.value > 0) {
+    return `Filtrele active nu returneaza ${label}. Ajusteaza cautarea sau reseteaza filtrele.`
+  }
+  return `Creeaza prima inregistrare pentru ${label} si lista va incepe sa se populeze automat.`
+})
 
 // ─── Bulk delete ───
 const showBulkDeleteConfirm = ref(false)
 const bulkDeleting = ref(false)
 
 async function confirmBulkDelete() {
-  const selectedIndices = Object.keys(rowSelection.value).map(Number)
-  const ids = selectedIndices.map(i => items.value[i]?.id).filter((id): id is string => !!id)
+  const ids = selectedIds.value
   if (ids.length === 0) return
   bulkDeleting.value = true
   let deleted = 0
@@ -265,134 +291,179 @@ async function confirmBulkDelete() {
 
 <template>
   <!-- Schema loading -->
-  <div v-if="schemaLoading && !schema" class="space-y-4">
-    <div class="flex gap-2">
-      <USkeleton class="h-9 w-64" />
-      <USkeleton class="h-9 w-32" />
+  <div v-if="schemaLoading && !schema" class="space-y-4 p-3 sm:p-6">
+    <div class="rounded-2xl border border-primary/15 bg-primary/5 p-4 shadow-sm">
+      <div class="flex items-center gap-3">
+        <USkeleton class="size-10 rounded-xl" />
+        <div class="min-w-0 flex-1 space-y-2">
+          <USkeleton class="h-3 w-24" />
+          <USkeleton class="h-5 w-48" />
+        </div>
+        <USkeleton class="h-9 w-28 rounded-full" />
+      </div>
     </div>
-    <USkeleton class="h-96 w-full" />
+    <USkeleton class="h-[56vh] w-full rounded-2xl" />
   </div>
 
   <!-- Error state -->
-  <div v-else-if="error && !items.length" class="py-12">
-    <UEmpty icon="i-lucide-alert-triangle" title="Eroare" :description="error">
-      <template #actions>
-        <UButton label="Reincearca" icon="i-lucide-refresh-cw" @click="loadData" />
-      </template>
-    </UEmpty>
+  <div v-else-if="error && !items.length" class="p-3 sm:p-6">
+    <div class="rounded-2xl border border-error/20 bg-error/5 py-12 shadow-sm">
+      <UEmpty icon="i-lucide-alert-triangle" title="Eroare" :description="error">
+        <template #actions>
+          <UButton label="Reincearca" icon="i-lucide-refresh-cw" variant="outline" @click="loadData" />
+        </template>
+      </UEmpty>
+    </div>
   </div>
 
   <!-- Main content -->
-  <div v-else>
-    <!-- Toolbar -->
-    <div class="flex flex-wrap items-center justify-between gap-1.5 mb-4">
-      <DynamicFilters :fields="filterFields" @change="handleFilterChange" />
+  <div v-else class="flex min-h-0 flex-1 flex-col p-3 sm:p-3">
+    <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-default bg-white shadow-sm dark:bg-gray-900">
+      <!-- Toolbar -->
+      <div class="border-b border-default bg-linear-to-r from-primary/10 via-primary/5 to-transparent p-3">
+        <div class="rounded-xl border border-primary/15 bg-white/85 p-2 shadow-sm backdrop-blur dark:bg-gray-900/85">
+          <div class="flex flex-col gap-2 2xl:flex-row 2xl:items-center 2xl:justify-between">
+            <DynamicFilters :fields="filterFields" @change="handleFilterChange" />
 
-      <div class="flex flex-wrap items-center gap-1.5">
-        <UButton
-          v-if="selectedCount > 0"
-          :label="`Sterge (${selectedCount})`"
-          color="error"
-          variant="subtle"
-          icon="i-lucide-trash"
-          size="sm"
-          @click="showBulkDeleteConfirm = true"
-        />
+            <div class="flex flex-wrap items-center gap-1.5 2xl:justify-end">
+              <UBadge color="primary" variant="soft" size="lg" class="px-3 py-1 text-sm font-semibold">
+                {{ meta.total }} total
+              </UBadge>
+              <UBadge v-if="activeFilterCount > 0" color="warning" variant="soft" size="lg" class="px-3 py-1 text-sm font-semibold">
+                {{ activeFilterCount }} filtre
+              </UBadge>
+              <UBadge v-if="selectedCount > 0" color="error" variant="soft" size="lg" class="px-3 py-1 text-sm font-semibold">
+                {{ selectedCount }} selectate
+              </UBadge>
 
-        <UDropdownMenu
-          :items="
-            table?.tableApi
-              ?.getAllColumns()
-              .filter((column: any) => column.getCanHide())
-              .map((column: any) => ({
-                label: columnLabels.get(column.id) ?? upperFirst(column.id),
-                type: 'checkbox' as const,
-                checked: column.getIsVisible(),
-                onUpdateChecked(checked: boolean) {
-                  table?.tableApi?.getColumn(column.id)?.toggleVisibility(!!checked)
-                },
-                onSelect(e?: Event) {
-                  e?.preventDefault()
-                }
-              }))
-          "
-          :content="{ align: 'end' }"
-        >
-          <UButton
-            label="Coloane"
-            color="neutral"
-            variant="outline"
-            trailing-icon="i-lucide-settings-2"
-            size="sm"
-          />
-        </UDropdownMenu>
-
-        <UButton
-          :label="`Adauga ${entityMeta?.label_singular ?? ''}`"
-          icon="i-lucide-plus"
-          size="sm"
-          @click="$emit('add')"
-        />
-      </div>
-    </div>
-
-    <!-- Table + Footer (flex container cu height fix) -->
-    <div class="flex flex-col" :style="{ height: 'calc(100vh - 200px)' }">
-      <!-- Table (scrollable) -->
-      <div class="flex-1 overflow-auto relative min-h-0 table-scroll">
-        <UTable
-          ref="table"
-          v-model:row-selection="rowSelection"
-          :data="items"
-          :columns="columns"
-          :get-row-id="(row: any) => row.id"
-          :loading="dataLoading"
-          size="sm"
-          :ui="{
-            root: 'relative !overflow-visible',
-            base: 'table-fixed border-separate border-spacing-0',
-            thead: 'sticky top-0 z-10 [&>tr]:bg-elevated/50 [&>tr]:after:content-none',
-            tbody: '[&>tr:nth-child(odd)]:bg-elevated/50 [&>tr]:last:[&>td]:border-b-0',
-            tr: 'data-[selected=true]:bg-primary/10',
-            th: 'py-1.5 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r text-sm font-medium',
-            td: 'py-1.5 border-b border-default whitespace-normal wrap-break-down max-w-xs text-sm',
-            separator: 'h-0'
-          }"
-        />
-
-        <!-- Empty state -->
-        <div v-if="!dataLoading && items.length === 0" class="py-12">
-          <UEmpty
-            icon="i-lucide-database"
-            title="Nicio inregistrare"
-            :description="`Nu exista ${(entityMeta?.label_plural ?? 'inregistrari').toLowerCase()} de afisat.`"
-          >
-            <template #actions>
               <UButton
-                :label="`Adauga ${entityMeta?.label_singular ?? 'inregistrare'}`"
-                icon="i-lucide-plus"
-                @click="$emit('add')"
+                v-if="selectedCount > 0"
+                :label="`Sterge (${selectedCount})`"
+                color="error"
+                variant="subtle"
+                icon="i-lucide-trash"
+                size="sm"
+                class="rounded-full"
+                @click="showBulkDeleteConfirm = true"
               />
-            </template>
-          </UEmpty>
+
+              <UDropdownMenu
+                :items="
+                  table?.tableApi
+                    ?.getAllColumns()
+                    .filter((column: any) => column.getCanHide())
+                    .map((column: any) => ({
+                      label: columnLabels.get(column.id) ?? upperFirst(column.id),
+                      type: 'checkbox' as const,
+                      checked: column.getIsVisible(),
+                      onUpdateChecked(checked: boolean) {
+                        table?.tableApi?.getColumn(column.id)?.toggleVisibility(!!checked)
+                      },
+                      onSelect(e?: Event) {
+                        e?.preventDefault()
+                      }
+                    }))
+                "
+                :content="{ align: 'end' }"
+              >
+                <UButton
+                  label="Coloane"
+                  color="neutral"
+                  variant="outline"
+                  trailing-icon="i-lucide-settings-2"
+                  size="sm"
+                  class="rounded-full"
+                />
+              </UDropdownMenu>
+
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Footer: total + paginare (fix in partea de jos) -->
-      <div v-if="meta.total > 0" class="flex items-center justify-between gap-3 border-t border-default pt-4 shrink-0">
-        <div class="text-sm text-muted">
-          {{ meta.total }} {{ (entityMeta?.label_plural ?? 'inregistrari').toLowerCase() }}
+      <!-- Table + Footer -->
+      <div class="flex min-h-0 flex-1 flex-col bg-elevated/30">
+        <div class="relative min-h-0 flex-1 overflow-auto table-scroll">
+          <UTable
+            ref="table"
+            v-model:row-selection="rowSelection"
+            :data="items"
+            :columns="columns"
+            :get-row-id="(row: any) => row.id"
+            :loading="dataLoading"
+            size="sm"
+            :ui="{
+              root: 'relative min-w-full overflow-visible!',
+              base: 'table-fixed border-separate border-spacing-0',
+              thead: 'sticky top-0 z-10 [&>tr]:bg-white/95 dark:[&>tr]:bg-gray-900/95 [&>tr]:backdrop-blur [&>tr]:after:content-none',
+              tbody: '[&>tr:nth-child(odd)]:bg-white dark:[&>tr:nth-child(odd)]:bg-gray-900 [&>tr:nth-child(even)]:bg-elevated/5 dark:[&>tr:nth-child(even)]:bg-white/1.5 [&>tr]:transition-colors [&>tr:hover]:bg-primary/8! dark:[&>tr:hover]:bg-primary/12! [&>tr]:last:[&>td]:border-b-0',
+              tr: 'data-[selected=true]:bg-primary/12! dark:data-[selected=true]:bg-primary/18! data-[selected=true]:shadow-[inset_3px_0_0_var(--ui-primary)]',
+              th: 'h-11 border-b border-default px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted first:pl-4 last:pr-4',
+              td: 'border-b border-default/70 px-3 py-2.5 text-sm whitespace-normal wrap-break-down max-w-xs align-middle first:pl-4 last:pr-4',
+              separator: 'h-0'
+            }"
+          />
+
+          <!-- Empty state -->
+          <div v-if="!dataLoading && items.length === 0" class="grid min-h-[46vh] place-items-center p-6">
+            <div class="relative w-full max-w-xl overflow-hidden rounded-3xl border border-dashed border-primary/30 bg-white/90 p-8 text-center shadow-sm dark:bg-gray-900/90">
+              <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,var(--ui-primary)_0,transparent_34%)] opacity-[0.08]" />
+
+              <div class="relative mx-auto flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/15">
+                <UIcon :name="activeFilterCount > 0 ? 'i-lucide-search-x' : 'i-lucide-sparkles'" class="size-6" />
+              </div>
+
+              <div class="relative mt-4 space-y-2">
+                <h3 class="text-base font-semibold text-highlighted">
+                  {{ emptyStateTitle }}
+                </h3>
+                <p class="mx-auto max-w-md text-sm text-muted">
+                  {{ emptyStateDescription }}
+                </p>
+              </div>
+
+              <div class="relative mt-5 flex flex-wrap items-center justify-center gap-2">
+                <UBadge v-if="activeFilterCount > 0" color="warning" variant="soft">
+                  {{ activeFilterCount }} filtre active
+                </UBadge>
+                <UButton
+                  :label="`Adauga ${entityMeta?.label_singular ?? 'inregistrare'}`"
+                  icon="i-lucide-plus"
+                  class="rounded-full shadow-sm"
+                  @click="$emit('add')"
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
-        <UPagination
-          v-if="meta.totalPages > 1"
-          size="xs"
-          :page="currentPage"
-          :items-per-page="pageSize"
-          :total="meta.total"
-          :ui="{ base: 'text-xs gap-0.5' }"
-          @update:page="(p: number) => { currentPage = p }"
-        />
+        <!-- Footer: total + paginare -->
+        <div class="shrink-0 border-t border-default bg-white px-3 py-2 dark:bg-gray-900">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex flex-wrap items-center gap-3 text-[13px] text-muted">
+              <div class="flex items-center gap-1.5">
+                <UIcon name="i-lucide-list-checks" class="size-3.5" />
+                <span v-if="meta.total > 0">
+                  {{ pageRangeStart }}-{{ pageRangeEnd }} din {{ meta.total }}
+                </span>
+                <span v-else>0 inregistrari</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <UIcon name="i-lucide-columns-3" class="size-3.5" />
+                <span>{{ tableFields.length }} coloane</span>
+              </div>
+            </div>
+
+            <UPagination
+              v-if="meta.totalPages > 1"
+              size="xs"
+              :page="currentPage"
+              :items-per-page="pageSize"
+              :total="meta.total"
+              @update:page="(p: number) => { currentPage = p }"
+            />
+          </div>
+        </div>
       </div>
     </div>
   </div>

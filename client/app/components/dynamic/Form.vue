@@ -360,7 +360,8 @@ async function confirmDelete() {
 // ─── Shortcuts ───
 defineShortcuts({
   alt_s: {
-    handler: () => {
+    handler: (e: KeyboardEvent) => {
+      if (!e.altKey) return
       if (submitting.value) return
       if (!isDirty.value) return
       if (showDeleteConfirm.value || showLeaveConfirm.value) return
@@ -405,11 +406,11 @@ defineShortcuts({
     ref="formRef"
     :state="formState"
     :schema="zodSchema"
-    class="space-y-6"
+    class="flex flex-col flex-1"
     @submit="onSubmit"
     @error="onFormError"
   >
-    <div class="flex gap-6">
+    <div class="flex gap-6 flex-1 pt-6">
       <!-- Left: form fields + actions -->
       <div class="flex-1 min-w-0 space-y-6">
         <!-- Single group: render directly -->
@@ -426,8 +427,9 @@ defineShortcuts({
           class="w-full"
           :ui="{
             root: 'flex flex-col md:flex-row items-start gap-6',
-            list: 'w-full md:w-48 shrink-0 max-h-[20vh] md:max-h-[70vh] overflow-y-auto',
-            trigger: 'justify-start w-full text-left snap-center shrink-0 text-xs',
+            list: 'w-full md:w-52 shrink-0 max-w-full max-h-[20vh] md:max-h-[70vh] overflow-x-auto md:overflow-x-hidden md:overflow-y-auto rounded-xl border border-primary/20 bg-primary/5 p-1 md:p-1.5 gap-1 shadow-sm',
+            indicator: 'hidden',
+            trigger: 'relative min-w-48 shrink-0 md:w-full justify-center md:justify-start text-center md:text-left rounded-lg px-3 py-2 text-[13px] font-semibold text-muted transition-all hover:bg-white/80 hover:text-highlighted hover:shadow-xs dark:hover:bg-white/10 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-primary/30 before:content-[\'\'] before:hidden md:before:block before:absolute before:left-1 before:top-1/2 before:h-5 before:w-1 before:-translate-y-1/2 before:rounded-full before:bg-transparent data-[state=active]:before:bg-white/80',
             content: 'w-full flex-1 min-w-0'
           }"
         >
@@ -438,72 +440,111 @@ defineShortcuts({
           </template>
         </UTabs>
 
-        <!-- Metadate - collapsable pe mobil -->
-        <template v-if="isEditMode">
-          <UCollapsible
-            class="flex flex-col gap-2 w-full"
-            :default-open="!isMobile"
-          >
-            <template #default="{ open }">
-              <UButton
-                color="neutral"
-                variant="ghost"
-                class="w-full justify-between"
+      </div>
+
+      <!-- Right: Entity Actions sidebar (doar pe desktop) -->
+      <div
+        v-if="isEditMode && visibleActions.length > 0"
+        class="hidden lg:block w-72 shrink-0"
+      >
+        <div class="sticky top-2 rounded-2xl border border-primary/20 bg-primary/5 p-3 shadow-sm">
+          <div class="mb-3 flex items-center gap-2">
+            <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-sm">
+              <UIcon name="i-lucide-command" class="size-4" />
+            </div>
+            <div class="min-w-0 flex-1">
+              <h3 class="text-sm font-semibold text-highlighted">
+                Actiuni
+              </h3>
+              <p class="text-xs text-muted">
+                Procese disponibile pentru record
+              </p>
+            </div>
+            <UBadge color="primary" variant="soft" size="sm">
+              {{ visibleActions.length }}
+            </UBadge>
+          </div>
+
+          <div class="space-y-2">
+            <div
+              v-for="action in visibleActions"
+              :key="action.id_action"
+              class="group flex w-full items-center gap-2 rounded-xl border border-default bg-white/80 p-2 text-left shadow-xs transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:bg-white hover:shadow-md dark:bg-gray-900/80 dark:hover:bg-gray-900"
+            >
+              <button
+                type="button"
+                class="flex min-w-0 flex-1 items-center gap-3 rounded-lg p-1 text-left disabled:pointer-events-none disabled:opacity-70"
+                :disabled="executingAction === action.slug"
+                @click="handleAction(action.slug, action.name)"
               >
-                <USeparator class="w-full">
-                  <span class="text-xs text-muted uppercase tracking-wider flex items-center gap-2">
-                    <span>Metadate</span>
-                    <UIcon
-                      name="i-lucide-chevron-down"
-                      class="size-4 transition-transform duration-200"
-                      :class="{ 'rotate-180': open }"
-                    />
+                <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-white">
+                  <UIcon
+                    :name="executingAction === action.slug ? 'i-lucide-loader-circle' : 'i-lucide-zap'"
+                    class="size-4"
+                    :class="{ 'animate-spin': executingAction === action.slug }"
+                  />
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-sm font-semibold text-highlighted">
+                    {{ action.name }}
                   </span>
-                </USeparator>
-              </UButton>
-            </template>
+                </span>
+                <UIcon
+                  name="i-lucide-chevron-right"
+                  class="size-4 shrink-0 text-muted transition-transform group-hover:translate-x-0.5 group-hover:text-primary"
+                />
+              </button>
 
-            <template #content>
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 text-sm">
-                <div class="bg-elevated/50 rounded-lg p-3 text-center sm:text-left">
-                  <div class="text-xs text-muted uppercase mb-1">
-                    Creat
+              <UPopover
+                v-if="action.description"
+                :content="{ align: 'end' }"
+              >
+                <UButton
+                  icon="i-lucide-info"
+                  color="neutral"
+                  variant="ghost"
+                  size="xs"
+                  class="self-center shrink-0 rounded-full text-muted hover:text-primary hover:bg-primary/10"
+                />
+                <template #content>
+                  <div class="max-w-72 p-3 text-sm">
+                    {{ action.description }}
                   </div>
-                  <div class="font-medium">
-                    {{ formatDate(systemData.date_created) }}
-                  </div>
-                </div>
-                <div class="bg-elevated/50 rounded-lg p-3 text-center sm:text-left">
-                  <div class="text-xs text-muted uppercase mb-1">
-                    Modificat
-                  </div>
-                  <div class="font-medium">
-                    {{ formatDate(systemData.date_updated) }}
-                  </div>
-                </div>
-                <div class="bg-elevated/50 rounded-lg p-3 text-center sm:text-left">
-                  <div class="text-xs text-muted uppercase mb-1">
-                    Deținător
-                  </div>
-                  <div class="flex items-center justify-center sm:justify-start gap-2">
-                    <UIcon name="i-lucide-user" class="text-muted" />
-                    <span v-if="systemData.owner_email" class="font-medium">
-                      {{ systemData.owner_email }}
-                    </span>
-                    <span v-else class="text-muted">-</span>
-                  </div>
-                </div>
-              </div>
-            </template>
-          </UCollapsible>
-        </template>
+                </template>
+              </UPopover>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-        <!-- Actions -->
-        <div class="flex flex-wrap items-center gap-2 pt-4 border-t border-default">
+    <!-- Sticky bottom bar — mereu vizibil -->
+    <div class="sticky bottom-0 z-20 -mx-3 -mb-3 px-3 pb-0 bg-white dark:bg-gray-900 border-t border-default overflow-visible after:content-[''] after:absolute after:inset-x-0 after:top-full after:h-4 after:bg-white dark:after:bg-gray-900">
+      <div class="space-y-1 pt-1.5 pb-0">
+        <!-- Linia 1: Metadate -->
+        <div v-if="isEditMode" class="flex items-center gap-4 text-[13px] text-muted">
+          <div class="flex items-center gap-1.5">
+            <UIcon name="i-lucide-calendar-plus" class="size-3.5" />
+            <span>Creat {{ formatDate(systemData.date_created) }}</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <UIcon name="i-lucide-calendar-check" class="size-3.5" />
+            <span>Modificat {{ formatDate(systemData.date_updated) }}</span>
+          </div>
+          <div class="flex items-center gap-1.5 ml-auto">
+            <UIcon name="i-lucide-user" class="size-3.5" />
+            <span v-if="systemData.owner_email">{{ systemData.owner_email }}</span>
+            <span v-else class="text-muted">-</span>
+          </div>
+        </div>
+
+        <!-- Linia 2: Butoane -->
+        <div class="flex flex-wrap sm:flex-nowrap items-center gap-2">
           <UButton
             type="submit"
-            :label="isEditMode ? 'Salveaza' : 'Creeaza'"
+            :label="isEditMode ? 'Salvează' : 'Creează'"
             icon="i-lucide-check"
+            variant="outline"
             :size="isMobile ? 'sm' : 'md'"
             :loading="submitting"
             :disabled="!isDirty"
@@ -517,9 +558,11 @@ defineShortcuts({
             :size="isMobile ? 'sm' : 'md'"
             @click="revertForm"
           />
+
+          <!-- Acțiuni workflow (mobil) -->
           <UButton
             v-if="isEditMode && visibleActions.length > 0"
-            :label="isMobile ? '' : 'Actiuni'"
+            :label="isMobile ? '' : 'Acțiuni'"
             icon="i-lucide-zap"
             color="primary"
             variant="soft"
@@ -527,66 +570,22 @@ defineShortcuts({
             class="lg:hidden"
             @click="showActionsSlideover = true"
           />
+
+          <!-- Șterge — împins în dreapta -->
           <UButton
             v-if="isEditMode"
-            :label="isMobile ? '' : 'Sterge'"
+            :label="isMobile ? '' : 'Șterge'"
             icon="i-lucide-trash-2"
             color="error"
             variant="outline"
             :size="isMobile ? 'sm' : 'md'"
-            :class="isMobile ? '' : 'ml-auto'"
+            class="ml-auto"
             @click="showDeleteConfirm = true"
           />
         </div>
       </div>
-
-      <!-- Right: Entity Actions sidebar (doar pe desktop) -->
-      <div
-        v-if="isEditMode && visibleActions.length > 0"
-        class="hidden lg:block w-64 shrink-0"
-      >
-        <div class="sticky top-2 border border-gray-200 dark:border-gray-800 rounded-lg p-4 bg-white dark:bg-gray-900 space-y-3">
-          <h3 class="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 tracking-wider">
-            Actiuni
-          </h3>
-          <div class="space-y-2">
-            <div
-              v-for="action in visibleActions"
-              :key="action.id_action"
-              class="flex items-center gap-1"
-            >
-              <UTooltip :text="action.name" :ui="{ content: 'max-w-64' }">
-                <UButton
-                  :label="action.name"
-                  icon="i-lucide-zap"
-                  color="primary"
-                  variant="soft"
-                  size="sm"
-                  block
-                  class="flex-1 text-left justify-start"
-                  :loading="executingAction === action.slug"
-                  @click="handleAction(action.slug, action.name)"
-                />
-              </UTooltip>
-              <UPopover
-                v-if="action.description"
-                :content="{ align: 'end' }"
-              >
-                <UIcon
-                  name="i-lucide-info"
-                  class="size-4 text-muted shrink-0 cursor-pointer hover:text-primary transition-colors"
-                />
-                <template #content>
-                  <div class="p-3 max-w-72 text-sm">
-                    {{ action.description }}
-                  </div>
-                </template>
-              </UPopover>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
+
   </UForm>
 
   <!-- Delete Confirm Modal -->
@@ -633,36 +632,70 @@ defineShortcuts({
   >
     <template #body>
       <div class="space-y-3">
-        <div
-          v-for="action in visibleActions"
-          :key="action.id_action"
-          class="flex items-center gap-2"
-        >
-          <UButton
-            :label="action.name"
-            icon="i-lucide-zap"
-            color="primary"
-            variant="soft"
-            size="md"
-            block
-            class="flex-1 text-left justify-start"
-            :loading="executingAction === action.slug"
-            @click="handleAction(action.slug, action.name)"
-          />
-          <UPopover
-            v-if="action.description"
-            :content="{ align: 'end' }"
-          >
-            <UIcon
-              name="i-lucide-info"
-              class="size-5 text-muted shrink-0 cursor-pointer hover:text-primary transition-colors"
-            />
-            <template #content>
-              <div class="p-3 max-w-72 text-sm">
-                {{ action.description }}
-              </div>
-            </template>
-          </UPopover>
+        <div class="rounded-2xl border border-primary/20 bg-primary/5 p-3">
+          <div class="mb-3 flex items-center gap-2">
+            <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-sm">
+              <UIcon name="i-lucide-command" class="size-4" />
+            </div>
+            <div class="min-w-0 flex-1">
+              <h3 class="text-sm font-semibold text-highlighted">
+                Actiuni disponibile
+              </h3>
+              <p class="text-xs text-muted">
+                {{ visibleActions.length }} workflow-uri pentru record
+              </p>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <div
+              v-for="action in visibleActions"
+              :key="action.id_action"
+              class="group flex w-full items-center gap-2 rounded-xl border border-default bg-white/80 p-2 text-left shadow-xs transition-all active:scale-[0.99] hover:border-primary/35 hover:bg-white dark:bg-gray-900/80 dark:hover:bg-gray-900"
+            >
+              <button
+                type="button"
+                class="flex min-w-0 flex-1 items-center gap-3 rounded-lg p-1 text-left disabled:pointer-events-none disabled:opacity-70"
+                :disabled="executingAction === action.slug"
+                @click="handleAction(action.slug, action.name)"
+              >
+                <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-white">
+                  <UIcon
+                    :name="executingAction === action.slug ? 'i-lucide-loader-circle' : 'i-lucide-zap'"
+                    class="size-4"
+                    :class="{ 'animate-spin': executingAction === action.slug }"
+                  />
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-sm font-semibold text-highlighted">
+                    {{ action.name }}
+                  </span>
+                </span>
+                <UIcon
+                  name="i-lucide-chevron-right"
+                  class="size-4 shrink-0 text-muted transition-transform group-hover:translate-x-0.5 group-hover:text-primary"
+                />
+              </button>
+
+              <UPopover
+                v-if="action.description"
+                :content="{ align: 'end' }"
+              >
+                <UButton
+                  icon="i-lucide-info"
+                  color="neutral"
+                  variant="ghost"
+                  size="xs"
+                  class="self-center shrink-0 rounded-full text-muted hover:text-primary hover:bg-primary/10"
+                />
+                <template #content>
+                  <div class="max-w-72 p-3 text-sm">
+                    {{ action.description }}
+                  </div>
+                </template>
+              </UPopover>
+            </div>
+          </div>
         </div>
       </div>
     </template>

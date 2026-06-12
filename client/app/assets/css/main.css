@@ -30,3 +30,8 @@
   --color-violet-900: #26085b;
   --color-violet-950: #17043d;
 }
+
+::selection {
+  background: var(--ui-primary);
+  color: white;
+}

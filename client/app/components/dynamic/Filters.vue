@@ -68,14 +68,15 @@ function clearAll() {
 </script>
 
 <template>
-  <div class="flex flex-wrap items-center gap-1.5">
+  <div class="flex w-full flex-wrap items-center gap-1.5">
     <UInput
       v-if="searchField"
       v-model="searchText"
       icon="i-lucide-search"
       :placeholder="`Cauta dupa ${searchField.name.toLowerCase()}...`"
       size="sm"
-      class="max-w-sm"
+      class="w-full sm:w-72"
+      :ui="{ base: 'rounded-full' }"
     />
 
     <USelect
@@ -85,8 +86,11 @@ function clearAll() {
       :items="getFilterItems(field)"
       :placeholder="field.name"
       size="sm"
-      class="min-w-28"
-      :ui="{ trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200' }"
+      class="min-w-32"
+      :ui="{
+        base: 'rounded-full',
+        trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200'
+      }"
       @update:model-value="(val: string) => { selectFilters[field.column_name] = val }"
     />
 
@@ -97,6 +101,7 @@ function clearAll() {
       variant="ghost"
       size="sm"
       label="Reseteaza"
+      class="rounded-full"
       @click="clearAll"
     />
   </div>
