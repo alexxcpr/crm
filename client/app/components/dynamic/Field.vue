@@ -339,6 +339,7 @@ const applyDateTime = () => {
       :required="field.is_required"
       :help="field.help_text ?? undefined"
       :description="undefined"
+      size="sm"
     >
     <!-- text -->
     <UInput
@@ -347,6 +348,7 @@ const applyDateTime = () => {
       type="text"
       :placeholder="field.placeholder ?? undefined"
       :disabled="field.is_readonly"
+      size="sm"
       class="w-full"
     />
 
@@ -357,6 +359,7 @@ const applyDateTime = () => {
       :placeholder="field.placeholder ?? undefined"
       :rows="4"
       :disabled="field.is_readonly"
+      size="sm"
       class="w-full"
     />
 
@@ -367,6 +370,7 @@ const applyDateTime = () => {
       type="number"
       :placeholder="field.placeholder ?? undefined"
       :disabled="field.is_readonly"
+      size="sm"
       class="w-full"
     />
 
@@ -377,6 +381,7 @@ const applyDateTime = () => {
       type="number"
       :placeholder="field.placeholder ?? '0.00'"
       :disabled="field.is_readonly"
+      size="sm"
       class="w-full currency-input"
     >
       <template #trailing>
@@ -391,6 +396,7 @@ const applyDateTime = () => {
       type="email"
       :placeholder="field.placeholder ?? 'email@exemplu.ro'"
       :disabled="field.is_readonly"
+      size="sm"
       class="w-full"
     />
 
@@ -401,6 +407,7 @@ const applyDateTime = () => {
       type="tel"
       :placeholder="field.placeholder ?? '+40 XXX XXX XXX'"
       :disabled="field.is_readonly"
+      size="sm"
       class="w-full"
     />
 
@@ -412,6 +419,7 @@ const applyDateTime = () => {
       :placeholder="field.placeholder ?? `Selecteaza ${field.name.toLowerCase()}`"
       :disabled="field.is_readonly"
       value-key="value"
+      size="sm"
       class="w-full"
     />
 
@@ -421,7 +429,7 @@ const applyDateTime = () => {
       v-model="value"
       :label="field.placeholder ?? 'Da'"
       :disabled="field.is_readonly"
-      size="lg"
+      size="md"
     />
 
     <!-- datepicker (date-only) — Input text + buton calendar -->
@@ -434,6 +442,7 @@ const applyDateTime = () => {
         type="text"
         :placeholder="datePlaceholder"
         :disabled="field.is_readonly"
+        size="sm"
         class="flex-1"
         @blur="onDateTextBlur"
         @keydown.enter="($event.target as HTMLInputElement).blur()"
@@ -478,6 +487,7 @@ const applyDateTime = () => {
         type="text"
         :placeholder="dateTimePlaceholder"
         :disabled="field.is_readonly"
+        size="sm"
         class="flex-1"
         @blur="onDateTimeTextBlur"
         @keydown.enter="($event.target as HTMLInputElement).blur()"
@@ -570,6 +580,7 @@ const applyDateTime = () => {
       type="text"
       :placeholder="field.placeholder ?? undefined"
       :disabled="field.is_readonly"
+      size="sm"
       class="w-full"
     />
   </UFormField>

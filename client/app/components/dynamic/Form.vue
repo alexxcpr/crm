@@ -426,8 +426,8 @@ defineShortcuts({
           class="w-full"
           :ui="{
             root: 'flex flex-col md:flex-row items-start gap-6',
-            list: 'w-full md:w-56 shrink-0 max-h-[20vh] md:max-h-[70vh] overflow-y-auto',
-            trigger: 'justify-start w-full text-left snap-center shrink-0',
+            list: 'w-full md:w-48 shrink-0 max-h-[20vh] md:max-h-[70vh] overflow-y-auto',
+            trigger: 'justify-start w-full text-left snap-center shrink-0 text-xs',
             content: 'w-full flex-1 min-w-0'
           }"
         >
@@ -547,7 +547,7 @@ defineShortcuts({
       >
         <div class="sticky top-2 border border-gray-200 dark:border-gray-800 rounded-lg p-4 bg-white dark:bg-gray-900 space-y-3">
           <h3 class="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 tracking-wider">
-            Actiuni workflow
+            Actiuni
           </h3>
           <div class="space-y-2">
             <div
@@ -555,17 +555,19 @@ defineShortcuts({
               :key="action.id_action"
               class="flex items-center gap-1"
             >
-              <UButton
-                :label="action.name"
-                icon="i-lucide-zap"
-                color="primary"
-                variant="soft"
-                size="sm"
-                block
-                class="flex-1 text-left justify-start"
-                :loading="executingAction === action.slug"
-                @click="handleAction(action.slug, action.name)"
-              />
+              <UTooltip :text="action.name" :ui="{ content: 'max-w-64' }">
+                <UButton
+                  :label="action.name"
+                  icon="i-lucide-zap"
+                  color="primary"
+                  variant="soft"
+                  size="sm"
+                  block
+                  class="flex-1 text-left justify-start"
+                  :loading="executingAction === action.slug"
+                  @click="handleAction(action.slug, action.name)"
+                />
+              </UTooltip>
               <UPopover
                 v-if="action.description"
                 :content="{ align: 'end' }"

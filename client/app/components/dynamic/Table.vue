@@ -291,16 +291,13 @@ async function confirmBulkDelete() {
       <div class="flex flex-wrap items-center gap-1.5">
         <UButton
           v-if="selectedCount > 0"
-          label="Sterge"
+          :label="`Sterge (${selectedCount})`"
           color="error"
           variant="subtle"
           icon="i-lucide-trash"
+          size="sm"
           @click="showBulkDeleteConfirm = true"
-        >
-          <template #trailing>
-            <UKbd>{{ selectedCount }}</UKbd>
-          </template>
-        </UButton>
+        />
 
         <UDropdownMenu
           :items="
@@ -326,73 +323,77 @@ async function confirmBulkDelete() {
             color="neutral"
             variant="outline"
             trailing-icon="i-lucide-settings-2"
+            size="sm"
           />
         </UDropdownMenu>
 
         <UButton
           :label="`Adauga ${entityMeta?.label_singular ?? ''}`"
           icon="i-lucide-plus"
+          size="sm"
           @click="$emit('add')"
         />
       </div>
     </div>
 
-    <!-- Table -->
-    <UTable
-      ref="table"
-      v-model:row-selection="rowSelection"
-      :data="items"
-      :columns="columns"
-      :loading="dataLoading"
-      :ui="{
-        base: 'table-fixed border-separate border-spacing-0',
-        thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
-        tbody: '[&>tr]:last:[&>td]:border-b-0',
-        th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
-        td: 'border-b border-default whitespace-normal wrap-break-down max-w-xs',
-        separator: 'h-0'
-      }"
-    />
+    <!-- Table + Footer (flex container cu height fix) -->
+    <div class="flex flex-col" :style="{ height: 'calc(100vh - 200px)' }">
+      <!-- Table (scrollable) -->
+      <div class="flex-1 overflow-auto relative min-h-0 table-scroll">
+        <UTable
+          ref="table"
+          v-model:row-selection="rowSelection"
+          :data="items"
+          :columns="columns"
+          :get-row-id="(row: any) => row.id"
+          :loading="dataLoading"
+          size="sm"
+          :ui="{
+            root: 'relative !overflow-visible',
+            base: 'table-fixed border-separate border-spacing-0',
+            thead: 'sticky top-0 z-10 [&>tr]:bg-elevated/50 [&>tr]:after:content-none',
+            tbody: '[&>tr:nth-child(odd)]:bg-elevated/50 [&>tr]:last:[&>td]:border-b-0',
+            tr: 'data-[selected=true]:bg-primary/10',
+            th: 'py-1.5 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r text-sm font-medium',
+            td: 'py-1.5 border-b border-default whitespace-normal wrap-break-down max-w-xs text-sm',
+            separator: 'h-0'
+          }"
+        />
 
-    <!-- Adauga temporar in template, dupa UTable, ca sa vezi starea -->
-    <!-- <pre class="text-xs mt-4 p-2 bg-elevated rounded">
-        Schema: {{ !!schema }}
-        Items: {{ items.length }}
-        Meta: {{ meta }}
-        Loading: {{ dataLoading }}
-        Error: {{ dataError }}
-    </pre> -->
-
-    <!-- Empty state -->
-    <div v-if="!dataLoading && items.length === 0" class="py-12">
-      <UEmpty
-        icon="i-lucide-database"
-        title="Nicio inregistrare"
-        :description="`Nu exista ${(entityMeta?.label_plural ?? 'inregistrari').toLowerCase()} de afisat.`"
-      >
-        <template #actions>
-          <UButton
-            :label="`Adauga ${entityMeta?.label_singular ?? 'inregistrare'}`"
-            icon="i-lucide-plus"
-            @click="$emit('add')"
-          />
-        </template>
-      </UEmpty>
-    </div>
-
-    <!-- Footer: total + paginare -->
-    <div v-if="meta.total > 0" class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto">
-      <div class="text-sm text-muted">
-        {{ meta.total }} {{ (entityMeta?.label_plural ?? 'inregistrari').toLowerCase() }}
+        <!-- Empty state -->
+        <div v-if="!dataLoading && items.length === 0" class="py-12">
+          <UEmpty
+            icon="i-lucide-database"
+            title="Nicio inregistrare"
+            :description="`Nu exista ${(entityMeta?.label_plural ?? 'inregistrari').toLowerCase()} de afisat.`"
+          >
+            <template #actions>
+              <UButton
+                :label="`Adauga ${entityMeta?.label_singular ?? 'inregistrare'}`"
+                icon="i-lucide-plus"
+                @click="$emit('add')"
+              />
+            </template>
+          </UEmpty>
+        </div>
       </div>
 
-      <UPagination
-        v-if="meta.totalPages > 1"
-        :page="currentPage"
-        :items-per-page="pageSize"
-        :total="meta.total"
-        @update:page="(p: number) => { currentPage = p }"
-      />
+      <!-- Footer: total + paginare (fix in partea de jos) -->
+      <div v-if="meta.total > 0" class="flex items-center justify-between gap-3 border-t border-default pt-4 shrink-0">
+        <div class="text-sm text-muted">
+          {{ meta.total }} {{ (entityMeta?.label_plural ?? 'inregistrari').toLowerCase() }}
+        </div>
+
+        <UPagination
+          v-if="meta.totalPages > 1"
+          size="xs"
+          :page="currentPage"
+          :items-per-page="pageSize"
+          :total="meta.total"
+          :ui="{ base: 'text-xs gap-0.5' }"
+          @update:page="(p: number) => { currentPage = p }"
+        />
+      </div>
     </div>
   </div>
 
@@ -425,3 +426,28 @@ async function confirmBulkDelete() {
     </template>
   </UModal>
 </template>
+
+<style scoped>
+.table-scroll {
+  scrollbar-color: var(--ui-primary) transparent;
+  scrollbar-width: thin;
+}
+
+.table-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.table-scroll::-webkit-scrollbar-thumb {
+  background: var(--ui-primary);
+  border-radius: 3px;
+}
+
+.table-scroll::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--ui-primary) 80%, transparent);
+}
+</style>

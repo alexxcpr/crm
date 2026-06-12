@@ -74,6 +74,7 @@ function clearAll() {
       v-model="searchText"
       icon="i-lucide-search"
       :placeholder="`Cauta dupa ${searchField.name.toLowerCase()}...`"
+      size="sm"
       class="max-w-sm"
     />
 
@@ -83,6 +84,7 @@ function clearAll() {
       :model-value="selectFilters[field.column_name] ?? ''"
       :items="getFilterItems(field)"
       :placeholder="field.name"
+      size="sm"
       class="min-w-28"
       :ui="{ trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200' }"
       @update:model-value="(val: string) => { selectFilters[field.column_name] = val }"

@@ -9,7 +9,7 @@ const props = defineProps<{
   autofocusFirst?: boolean
 }>()
 
-const MIN_COLUMN_WIDTH = 240
+const MIN_COLUMN_WIDTH = 280
 const gridContainer = ref<HTMLElement>()
 const containerWidth = ref(0)
 const measured = ref(false)

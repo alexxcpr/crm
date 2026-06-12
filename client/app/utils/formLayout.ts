@@ -73,10 +73,10 @@ export function computeFieldLayout(fields: Field[], availableColumns: number): F
     }
   })
 
-  // 2. Sortare: după mappedCol, apoi rank, apoi origCol, apoi index
+  // 2. Sortare: după rank, apoi mappedCol, apoi origCol, apoi index
   entries.sort((a, b) => {
-    if (a.mappedCol !== b.mappedCol) return a.mappedCol - b.mappedCol
     if (a.rank !== b.rank) return a.rank - b.rank
+    if (a.mappedCol !== b.mappedCol) return a.mappedCol - b.mappedCol
     if (a.origCol !== b.origCol) return a.origCol - b.origCol
     return a.index - b.index
   })
@@ -110,13 +110,8 @@ export function computeFieldLayout(fields: Field[], availableColumns: number): F
     }
   }
 
-  // 4. Calculează coloanele efectiv folosite
-  let maxColUsed = 0
-  for (const p of placed) {
-    const colEnd = p.colStart + p.colSpan - 1
-    if (colEnd > maxColUsed) maxColUsed = colEnd
-  }
-  const effectiveColumns = Math.max(1, Math.min(maxColUsed, maxCols))
-
-  return { placed, columns: effectiveColumns }
+  // 4. Folosește toate coloanele disponibile — astfel câmpurile
+  //    cu col_span=1 nu se întind pe toată lățimea când există
+  //    doar grid_col=1, ci își păstrează proporția.
+  return { placed, columns: maxCols }
 }

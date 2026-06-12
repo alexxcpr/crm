@@ -11,7 +11,7 @@ const { entity: entityMeta } = useEntitySchema(entitySlug)
 </script>
 
 <template>
-  <UDashboardPanel :id="`${entitySlug}-edit`">
+  <UDashboardPanel :id="`${entitySlug}-edit`" :ui="{ body: 'p-3 sm:p-3' }">
     <template #header>
       <UDashboardNavbar :title="`Editare ${entityMeta?.label_singular ?? entitySlug}`">
         <template #leading>
@@ -31,7 +31,7 @@ const { entity: entityMeta } = useEntitySchema(entitySlug)
     </template>
 
     <template #body>
-      <div class="max-w-[95%] px-4 py-6">
+      <div class="py-6">
         <DynamicForm
           :entity="entitySlug"
           :record-id="recordId"

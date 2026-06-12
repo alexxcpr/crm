@@ -35,11 +35,11 @@ function getOptionLabel(options: { label: string, value: string }[] | null, val:
 <template>
   <span v-if="value === null || value === undefined || value === ''" class="text-muted">-</span>
 
-  <UBadge v-else-if="field.ui_type === 'checkbox'" :color="value ? 'success' : 'warning'" variant="subtle">
+  <UBadge v-else-if="field.ui_type === 'checkbox'" :color="value ? 'success' : 'warning'" variant="subtle" size="sm">
     {{ value ? 'Da' : 'Nu' }}
   </UBadge>
 
-  <UBadge v-else-if="field.ui_type === 'select'" color="neutral" variant="subtle">
+  <UBadge v-else-if="field.ui_type === 'select'" color="neutral" variant="subtle" size="sm">
     {{ getOptionLabel(field.options, value) }}
   </UBadge>
 
@@ -51,15 +51,15 @@ function getOptionLabel(options: { label: string, value: string }[] | null, val:
     {{ value }}
   </a>
 
-  <span v-else-if="field.ui_type === 'currency'">
+  <span v-else-if="field.ui_type === 'currency'" class="text-highlighted">
     {{ formatCurrency(Number(value)) }}
   </span>
 
-  <span v-else-if="field.ui_type === 'datetimepicker'">
+  <span v-else-if="field.ui_type === 'datetimepicker'" class="text-highlighted">
     {{ formatTimestamp(value) }}
   </span>
 
-  <span v-else-if="field.ui_type === 'datepicker'">
+  <span v-else-if="field.ui_type === 'datepicker'" class="text-highlighted">
     {{ formatDate(value) }}
   </span>
 
@@ -71,5 +71,5 @@ function getOptionLabel(options: { label: string, value: string }[] | null, val:
     {{ displayValue || value }}
   </NuxtLink>
 
-  <span v-else>{{ value }}</span>
+  <span v-else class="text-highlighted">{{ value }}</span>
 </template>
