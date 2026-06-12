@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Field } from '~/types/schema'
+import { INLINE_CREATE_DEPTH_KEY, MAX_INLINE_CREATE_DEPTH } from '~/utils/inlineCreate'
 
 const props = defineProps<{
   field: Field
@@ -10,6 +11,30 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [value: string | null]
 }>()
+
+// ─── Inline-create ───
+const inlineCreateDepth = inject(INLINE_CREATE_DEPTH_KEY, 0)
+const entitySlug = computed(() => props.field.relation_entity_slug)
+const showInlineCreate = computed(() =>
+  inlineCreateDepth <= MAX_INLINE_CREATE_DEPTH &&
+  !!entitySlug.value &&
+  !props.disabled
+)
+const inlineCreateOpen = ref(false)
+// entitySlug garantat non-null când showInlineCreate e true (verificat de v-if)
+const inlineCreateEntitySlug = computed(() => entitySlug.value!)
+
+function onInlineCreated(record: Record<string, any>) {
+  const newItem = {
+    label: String(record[displayField.value] ?? record.id),
+    value: record.id
+  }
+  // Adaugă la începutul listei pentru selecție imediată
+  items.value.unshift(newItem)
+  // Selectează automat noul record
+  emit('update:modelValue', record.id)
+  hasFetchedOptions.value = true
+}
 
 const { apiFetch } = useApi()
 
@@ -25,7 +50,6 @@ watch(open, (isOpen) => {
   }
 })
 
-const entitySlug = computed(() => props.field.relation_entity_slug)
 const displayField = computed(() => props.field.relation_display_field ?? 'name')
 
 async function fetchSelectedValue() {
@@ -118,19 +142,39 @@ function onUpdate(val: string | string[] | undefined) {
 
 <template>
   <div class="w-full min-w-0">
-    <USelectMenu
-      v-model:open="open"
-      :model-value="modelValue ?? undefined"
-      :items="items"
-      value-key="value"
-      :loading="loading"
-      :placeholder="field.placeholder ?? `Selecteaza ${field.name.toLowerCase()}...`"
-      :search-input="{ placeholder: 'Cauta...' }"
-      :disabled="disabled"
-      class="w-full"
-      :clear="!disabled"
-      @update:model-value="onUpdate"
-      @update:search-term="onSearch"
+    <div class="flex items-center gap-1.5">
+      <USelectMenu
+        v-model:open="open"
+        :model-value="modelValue ?? undefined"
+        :items="items"
+        value-key="value"
+        :loading="loading"
+        :placeholder="field.placeholder ?? `Selecteaza ${field.name.toLowerCase()}...`"
+        :search-input="{ placeholder: 'Cauta...' }"
+        :disabled="disabled"
+        class="flex-1 min-w-0"
+        :clear="!disabled"
+        @update:model-value="onUpdate"
+        @update:search-term="onSearch"
+      />
+      <UButton
+        v-if="showInlineCreate"
+        icon="i-lucide-plus"
+        color="primary"
+        variant="outline"
+        size="sm"
+        class="shrink-0"
+        :title="`Crează ${field.name.toLowerCase()}`"
+        @click="inlineCreateOpen = true"
+      />
+    </div>
+
+    <DynamicInlineCreateModal
+      v-if="showInlineCreate"
+      v-model:open="inlineCreateOpen"
+      :entity-slug="inlineCreateEntitySlug"
+      :entity-label="field.name"
+      @created="onInlineCreated"
     />
   </div>
 </template>

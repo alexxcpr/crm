@@ -2,6 +2,7 @@
 import type { Field, UiTab } from '~/types/schema'
 import type { Form, TabsItem, FormSubmitEvent } from '@nuxt/ui'
 import { buildZodSchema } from '~/utils/buildZodSchema'
+import { INLINE_CREATE_DEPTH_KEY } from '~/utils/inlineCreate'
 
 const props = defineProps<{
   entity: string
@@ -34,6 +35,8 @@ const {
   update,
   remove
 } = useEntityData(props.entity)
+
+provide(INLINE_CREATE_DEPTH_KEY, 0)
 
 const isEditMode = computed(() => !!props.recordId)
 const formState = reactive<Record<string, any>>({})
@@ -328,14 +331,6 @@ const onBeforeUnload = (e: BeforeUnloadEvent) => {
   }
 }
 
-onMounted(() => {
-  window.addEventListener('beforeunload', onBeforeUnload)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('beforeunload', onBeforeUnload)
-})
-
 // ─── Delete ───
 const showDeleteConfirm = ref(false)
 const deleting = ref(false)
@@ -358,19 +353,23 @@ async function confirmDelete() {
 }
 
 // ─── Shortcuts ───
-defineShortcuts({
-  alt_s: {
-    handler: (e: KeyboardEvent) => {
-      if (!e.altKey) return
-      if (submitting.value) return
-      if (!isDirty.value) return
-      if (showDeleteConfirm.value || showLeaveConfirm.value) return
-      if (!zodSchema.value) return
-      formRef.value?.submit()
-    },
-    usingInput: true
-  },
-  escape: () => {
+// NOTĂ: Nu folosim alt_s prin defineShortcuts din cauza unui bug în Nuxt UI 4.4.0
+// care nu verifică e.altKey în bucla principală, blocând tasta "s" în input-uri.
+// Folosim un event listener manual care verifică toate modificatorele corect.
+function onFormKeydown(e: KeyboardEvent) {
+  // Alt+S: Submit formular (cu dirty check)
+  if (e.altKey && !e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 's') {
+    if (submitting.value) return
+    if (!isDirty.value) return
+    if (showDeleteConfirm.value || showLeaveConfirm.value) return
+    if (!zodSchema.value) return
+    e.preventDefault()
+    formRef.value?.submit()
+    return
+  }
+
+  // Escape: Înapoi (cu dirty check)
+  if (e.key === 'Escape') {
     if (submitting.value) return
     if (showDeleteConfirm.value || showLeaveConfirm.value) return
     if (isDirty.value) {
@@ -379,6 +378,16 @@ defineShortcuts({
     }
     router.push(`/${props.entity}`)
   }
+}
+
+onMounted(() => {
+  window.addEventListener('beforeunload', onBeforeUnload)
+  window.addEventListener('keydown', onFormKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('beforeunload', onBeforeUnload)
+  window.removeEventListener('keydown', onFormKeydown)
 })
 </script>
 
