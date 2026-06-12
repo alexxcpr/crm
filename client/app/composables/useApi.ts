@@ -2,6 +2,7 @@ export function useApi() {
   const config = useRuntimeConfig()
   const { token } = useAuth()
   const { slug } = useTenant()
+  const tenantSlug = slug.value
   const baseURL = import.meta.server
     ? (config.apiBaseInternal as string)
     : (config.public.apiBase as string)
@@ -13,8 +14,8 @@ export function useApi() {
       if (token.value) {
         headers.set('Authorization', token.value)
       }
-      if (slug.value) {
-        headers.set('X-Tenant', slug.value)
+      if (tenantSlug) {
+        headers.set('X-Tenant', tenantSlug)
       }
       options.headers = headers
     }

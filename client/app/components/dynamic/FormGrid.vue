@@ -6,9 +6,36 @@ import { computeFieldLayout } from '~/utils/formLayout'
 const props = defineProps<{
   fields: Field[]
   formState: Record<string, any>
+  autofocusFirst?: boolean
 }>()
 
-const placedFields = computed(() => computeFieldLayout(props.fields))
+const MIN_COLUMN_WIDTH = 240
+const gridContainer = ref<HTMLElement>()
+const containerWidth = ref(0)
+const measured = ref(false)
+
+onMounted(() => {
+  const el = gridContainer.value
+  if (!el) return
+
+  const observer = new ResizeObserver((entries) => {
+    const width = entries[0]?.contentRect.width ?? 0
+    if (width > 0) {
+      containerWidth.value = width
+      measured.value = true
+    }
+  })
+  observer.observe(el)
+  onUnmounted(() => observer.disconnect())
+})
+
+const availableColumns = computed(() => {
+  if (!measured.value) return 3
+  const cols = Math.floor(containerWidth.value / MIN_COLUMN_WIDTH)
+  return Math.max(1, Math.min(cols, 3))
+})
+
+const layout = computed(() => computeFieldLayout(props.fields, availableColumns.value))
 
 function getDesktopStyle(placedField: PlacedField) {
   return {
@@ -20,25 +47,33 @@ function getDesktopStyle(placedField: PlacedField) {
 
 <template>
   <div class="space-y-4">
+    <!-- Mobile: stack vertical -->
     <div class="flex flex-col gap-4 md:hidden">
       <DynamicField
-        v-for="placedField in placedFields"
+        v-for="(placedField, idx) in layout.placed"
         :key="placedField.field.id_field"
         :field="placedField.field"
         :model-value="formState[placedField.field.slug]"
+        :autofocus="autofocusFirst && idx === 0"
         @update:model-value="formState[placedField.field.slug] = $event"
       />
     </div>
 
-    <div class="hidden md:grid md:grid-cols-3 md:gap-x-4 md:gap-y-6">
+    <!-- Desktop: grid fluid -->
+    <div
+      ref="gridContainer"
+      class="hidden md:grid md:gap-x-4 md:gap-y-6"
+      :style="{ gridTemplateColumns: `repeat(${layout.columns}, minmax(0, 1fr))` }"
+    >
       <div
-        v-for="placedField in placedFields"
+        v-for="(placedField, idx) in layout.placed"
         :key="placedField.field.id_field"
         :style="getDesktopStyle(placedField)"
       >
         <DynamicField
           :field="placedField.field"
           :model-value="formState[placedField.field.slug]"
+          :autofocus="autofocusFirst && idx === 0"
           @update:model-value="formState[placedField.field.slug] = $event"
         />
       </div>

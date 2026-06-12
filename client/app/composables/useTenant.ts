@@ -16,15 +16,12 @@ export function useTenant() {
     return defaultSlug
   }
 
-  const slug = computed(() => {
-    if (import.meta.server) {
-      const headers = useRequestHeaders(['host'])
-      return slugFromHost(headers.host)
-    }
+  if (import.meta.server) {
+    const headers = useRequestHeaders(['host'])
+    const slug = computed(() => slugFromHost(headers.host))
+    return { slug }
+  }
 
-    const hostname = window.location.hostname
-    return slugFromHost(hostname)
-  })
-
+  const slug = computed(() => slugFromHost(window.location.hostname))
   return { slug }
 }

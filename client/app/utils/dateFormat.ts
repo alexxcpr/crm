@@ -110,6 +110,50 @@ export function formatMetadataDate(
   }
 }
 
+/** Offset local formatat ca +HH:MM sau -HH:MM */
+function formatLocalTimezoneOffset(date: Date): string {
+  const offset = -date.getTimezoneOffset()
+  const offsetHours = Math.abs(Math.floor(offset / 60))
+  const offsetMinutes = Math.abs(offset % 60)
+  const offsetSign = offset >= 0 ? '+' : '-'
+  return `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`
+}
+
+/**
+ * ISO datetime la miezul nopții locale (nu UTC Z).
+ * Evită afișarea 02:00/03:00 când utilizatorul introduce doar data.
+ */
+export function dateOnlyToLocalMidnightISO(dateStr: string): string {
+  const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return dateStr
+
+  const year = parseInt(match[1]!, 10)
+  const month = parseInt(match[2]!, 10)
+  const day = parseInt(match[3]!, 10)
+  return localDateTimeToISO(year, month, day, 0, 0, 0)
+}
+
+/**
+ * Construiește ISO string cu offset de timezone local din componente calendar.
+ */
+export function localDateTimeToISO(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number
+): string {
+  const date = new Date(year, month - 1, day, hour, minute, second, 0)
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  const hh = String(date.getHours()).padStart(2, '0')
+  const mm = String(date.getMinutes()).padStart(2, '0')
+  const ss = String(date.getSeconds()).padStart(2, '0')
+  return `${y}-${m}-${d}T${hh}:${mm}:${ss}${formatLocalTimezoneOffset(date)}`
+}
+
 /**
  * Convertește string ISO în obiect Date JavaScript
  * @param value - string ISO

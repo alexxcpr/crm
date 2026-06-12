@@ -1,12 +1,24 @@
 <script setup lang="ts">
 import type { Field } from '~/types/schema'
-import { CalendarDate, DateFormatter, parseDate, now, getLocalTimeZone, fromDate } from '@internationalized/date'
+import { CalendarDate, parseDate, getLocalTimeZone, fromDate } from '@internationalized/date'
 import type { DateValue } from '@internationalized/date'
+import { localDateTimeToISO } from '~/utils/dateFormat'
 
 const props = defineProps<{
   field: Field
   modelValue: any
+  autofocus?: boolean
 }>()
+
+const fieldRoot = ref<HTMLElement>()
+
+onMounted(async () => {
+  if (props.autofocus) {
+    await nextTick()
+    const target = fieldRoot.value?.querySelector('input, textarea') as HTMLElement | null
+    target?.focus()
+  }
+})
 
 const emit = defineEmits<{
   'update:modelValue': [value: any]
@@ -23,8 +35,8 @@ const selectItems = computed(() => {
 })
 
 // Placeholder texts
-const datePlaceholder = 'Selectează data'
-const dateTimePlaceholder = 'Selectează data și ora'
+const datePlaceholder = 'zz.ll.aaaa'
+const dateTimePlaceholder = 'zz.ll.aaaa hh:mm:ss'
 
 // ==================== DATE PICKER ====================
 const calendarDate = ref<DateValue | undefined>(undefined)
@@ -51,22 +63,85 @@ const parseToCalendarDate = (val: string): DateValue | undefined => {
   }
 }
 
-// Watch pentru sincronizare date (date-only)
+// ─── Date text input ───
+const dateText = ref('')
+
+function parseDateFromText(text: string): DateValue | null {
+  const trimmed = text.trim()
+  if (!trimmed) return null
+
+  // Format: dd.mm.yyyy
+  const match = trimmed.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/)
+  if (match) {
+    const day = parseInt(match[1]!, 10)
+    const month = parseInt(match[2]!, 10)
+    const year = parseInt(match[3]!, 10)
+    try {
+      return new CalendarDate(year, month, day)
+    } catch {
+      return null
+    }
+  }
+
+  // Format: yyyy-mm-dd (ISO)
+  try {
+    return parseDate(trimmed)
+  } catch {
+    return null
+  }
+}
+
+function formatDateForDisplay(dv: any): string {
+  if (!dv) return ''
+  return `${String(dv.day).padStart(2, '0')}.${String(dv.month).padStart(2, '0')}.${dv.year}`
+}
+
+function onDateTextBlur() {
+  const trimmed = dateText.value.trim()
+  if (!trimmed) {
+    calendarDate.value = undefined
+    return
+  }
+  const parsed = parseDateFromText(trimmed)
+  if (parsed) {
+    calendarDate.value = parsed
+  }
+  // Dacă textul nu e parsat, îl lăsăm așa — poate utilizatorul
+  // nu a terminat de tastat. Validarea reală e la submit prin Zod.
+}
+
+// Watch pentru sincronizare date (date-only) — model → calendar
 watch(() => props.modelValue, (newValue) => {
   if (props.field.ui_type !== 'datepicker') return
   calendarDate.value = newValue ? parseToCalendarDate(newValue) : undefined
 }, { immediate: true })
 
-// Watch pentru emitere date (date-only)
+// Watch pentru emitere date (date-only) — calendar → model
 watch(calendarDate, (newValue) => {
   if (props.field.ui_type !== 'datepicker') return
   emit('update:modelValue', newValue ? newValue.toString() : null)
 })
 
+// Sync calendar → text input
+watch(calendarDate, (newValue) => {
+  if (props.field.ui_type !== 'datepicker') return
+  dateText.value = formatDateForDisplay(newValue)
+})
+
+// Auto-commit: parsează textul pe măsură ce utilizatorul tastează
+watch(dateText, (newVal) => {
+  if (props.field.ui_type !== 'datepicker') return
+  const parsed = parseDateFromText(newVal)
+  if (parsed) {
+    calendarDate.value = parsed
+  }
+})
+
 // ==================== DATETIME PICKER ====================
 const calendarDateTime = ref<DateValue | undefined>(undefined)
-const selectedTime = ref<{ hour: number, minute: number }>({ hour: 12, minute: 0 })
+const selectedTime = ref<{ hour: number, minute: number, second: number }>({ hour: 0, minute: 0, second: 0 })
 const popoverOpen = ref(false)
+const isDateTimeTextFocused = ref(false)
 
 // Convertește ISO string la CalendarDateTime
 const parseToCalendarDateTime = (val: string): DateValue | undefined => {
@@ -81,63 +156,177 @@ const parseToCalendarDateTime = (val: string): DateValue | undefined => {
   }
 }
 
-// Watch pentru sincronizare datetime
+// ─── DateTime text input ───
+const dateTimeText = ref('')
+
+type ParsedDateTime = {
+  date: DateValue
+  time: { hour: number, minute: number, second: number }
+  dateOnly: boolean
+}
+
+function parseDateTimeFromText(text: string): ParsedDateTime | null {
+  const trimmed = text.trim()
+  if (!trimmed) return null
+
+  // Format: dd.mm.yyyy plus ora opțională (hh:mm sau hh:mm:ss)
+  const match = trimmed.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/)
+  if (match) {
+    const day = parseInt(match[1]!, 10)
+    const month = parseInt(match[2]!, 10)
+    const year = parseInt(match[3]!, 10)
+    const hasTime = match[4] !== undefined
+    const hour = hasTime ? parseInt(match[4]!, 10) : 0
+    const minute = hasTime && match[5] !== undefined ? parseInt(match[5], 10) : 0
+    const second = hasTime && match[6] !== undefined ? parseInt(match[6], 10) : 0
+
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) return null
+
+    try {
+      const d = new CalendarDate(year, month, day)
+      return {
+        date: d,
+        time: { hour, minute, second },
+        dateOnly: !hasTime
+      }
+    } catch {
+      return null
+    }
+  }
+
+  return null
+}
+
+function formatDateTimeForDisplay(dv: any, time: { hour: number, minute: number, second: number }): string {
+  if (!dv) return ''
+  const hh = String(time.hour).padStart(2, '0')
+  const mm = String(time.minute).padStart(2, '0')
+  const ss = String(time.second).padStart(2, '0')
+  return `${String(dv.day).padStart(2, '0')}.${String(dv.month).padStart(2, '0')}.${dv.year} ${hh}:${mm}:${ss}`
+}
+
+function onDateTimeTextBlur() {
+  isDateTimeTextFocused.value = false
+  const trimmed = dateTimeText.value.trim()
+  if (!trimmed) {
+    clearDateTime()
+    return
+  }
+  const parsed = parseDateTimeFromText(trimmed)
+  if (parsed) {
+    calendarDateTime.value = parsed.date
+    selectedTime.value = parsed.time
+    if (parsed.dateOnly) {
+      // Doar data — serverul completează ora la salvare; nu autocomplete în input
+      emitDateOnlyValue()
+      dateTimeText.value = formatDateForDisplay(parsed.date)
+    } else {
+      emitDateTimeValue()
+      dateTimeText.value = formatDateTimeForDisplay(parsed.date, parsed.time)
+    }
+  }
+}
+
+function clearDateTime() {
+  calendarDateTime.value = undefined
+  dateTimeText.value = ''
+  emit('update:modelValue', null)
+}
+
+/** Emite ISO la miezul nopții locale — nu YYYY-MM-DD (PG interpretează ca UTC midnight) */
+function emitDateOnlyValue() {
+  if (!calendarDateTime.value) {
+    emit('update:modelValue', null)
+    return
+  }
+  const date = calendarDateTime.value as CalendarDate
+  emit('update:modelValue', localDateTimeToISO(date.year, date.month, date.day, 0, 0, 0))
+}
+
+/** Construiește ISO string din calendarDateTime + selectedTime și emite */
+function emitDateTimeValue() {
+  if (!calendarDateTime.value) {
+    emit('update:modelValue', null)
+    return
+  }
+  const date = calendarDateTime.value as CalendarDate
+  emit('update:modelValue', localDateTimeToISO(
+    date.year,
+    date.month,
+    date.day,
+    selectedTime.value.hour,
+    selectedTime.value.minute,
+    selectedTime.value.second
+  ))
+}
+
+// Watch pentru sincronizare datetime — model → calendar + time + text (ex. după save)
 watch(() => props.modelValue, (newValue) => {
   if (props.field.ui_type !== 'datetimepicker') return
+  if (isDateTimeTextFocused.value) return
+
   if (newValue) {
-    const parsed = parseToCalendarDateTime(newValue)
-    calendarDateTime.value = parsed
-    if (parsed && 'hour' in parsed) {
-      selectedTime.value = { hour: parsed.hour, minute: parsed.minute }
+    // Date-only YYYY-MM-DD (legacy) — nu autocomplete ora în input
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(newValue))) {
+      try {
+        const dateOnly = parseDate(String(newValue))
+        calendarDateTime.value = dateOnly
+        selectedTime.value = { hour: 0, minute: 0, second: 0 }
+        dateTimeText.value = formatDateForDisplay(dateOnly)
+      } catch {
+        calendarDateTime.value = undefined
+        dateTimeText.value = String(newValue)
+      }
+    } else if (/^\d{4}-\d{2}-\d{2}T00:00:00([+-]\d{2}:\d{2}|Z)$/.test(String(newValue))) {
+      // Miezul nopții local sau UTC — afișăm doar data până la save explicit cu ora
+      const parsed = parseToCalendarDateTime(String(newValue))
+      calendarDateTime.value = parsed
+      selectedTime.value = { hour: 0, minute: 0, second: 0 }
+      if (parsed) {
+        dateTimeText.value = formatDateForDisplay(parsed)
+      }
+    } else {
+      const parsed = parseToCalendarDateTime(String(newValue))
+      calendarDateTime.value = parsed
+      if (parsed && 'hour' in parsed) {
+        selectedTime.value = {
+          hour: parsed.hour,
+          minute: parsed.minute,
+          second: (parsed as any).second ?? 0
+        }
+        dateTimeText.value = formatDateTimeForDisplay(parsed, selectedTime.value)
+      } else if (parsed) {
+        selectedTime.value = { hour: 0, minute: 0, second: 0 }
+        dateTimeText.value = formatDateForDisplay(parsed)
+      }
     }
   } else {
     calendarDateTime.value = undefined
+    dateTimeText.value = ''
   }
 }, { immediate: true })
 
-// Funcție pentru aplicarea datei și timpului
+// Funcție pentru aplicarea datei și timpului din widget
 const applyDateTime = () => {
-  if (!calendarDateTime.value) {
-    emit('update:modelValue', null)
-    popoverOpen.value = false
-    return
+  const isMidnight = selectedTime.value.hour === 0
+    && selectedTime.value.minute === 0
+    && selectedTime.value.second === 0
+
+  if (isMidnight) {
+    emitDateOnlyValue()
+    dateTimeText.value = formatDateForDisplay(calendarDateTime.value)
+  } else {
+    emitDateTimeValue()
+    dateTimeText.value = formatDateTimeForDisplay(calendarDateTime.value, selectedTime.value)
   }
-  // Extragem data - calendarDateTime poate fi CalendarDate sau CalendarDateTime
-  const date = calendarDateTime.value as CalendarDate
-  const year = date.year
-  const month = String(date.month).padStart(2, '0')
-  const day = String(date.day).padStart(2, '0')
-  const hour = String(selectedTime.value.hour).padStart(2, '0')
-  const minute = String(selectedTime.value.minute).padStart(2, '0')
-  const second = '00'
-
-  // Construim ISO string cu offset de timezone local
-  // Format: YYYY-MM-DDTHH:mm:ss+HH:mm (cu offset local, nu UTC)
-  const now = new Date()
-  const offset = -now.getTimezoneOffset() // în minute, inversat pentru semn corect
-  const offsetHours = Math.abs(Math.floor(offset / 60))
-  const offsetMinutes = Math.abs(offset % 60)
-  const offsetSign = offset >= 0 ? '+' : '-'
-  const offsetString = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`
-
-  const isoString = `${year}-${month}-${day}T${hour}:${minute}:${second}${offsetString}`
-  emit('update:modelValue', isoString)
   popoverOpen.value = false
 }
 
-// Format pentru afișare date
-const displayDate = computed(() => {
-  return formatDate(calendarDate.value as DateValue | undefined, datePlaceholder)
-})
-
-// Format pentru afișare datetime
-const displayDateTime = computed(() => {
-  return formatDateTime(calendarDateTime.value as DateValue | undefined, selectedTime.value, dateTimePlaceholder)
-})
 </script>
 
 <template>
   <div
+    ref="fieldRoot"
     :class="[
       'dynamic-field-wrapper',
       { 'dynamic-field-wrapper--checkbox': field.ui_type === 'checkbox' },
@@ -235,37 +424,39 @@ const displayDateTime = computed(() => {
       size="lg"
     />
 
-    <!-- datepicker (date-only) - Popover + Calendar -->
+    <!-- datepicker (date-only) — Input text + buton calendar -->
     <div
       v-else-if="field.ui_type === 'datepicker'"
-      class="flex items-center gap-2 w-full"
+      class="flex items-center gap-1.5 w-full"
     >
+      <UInput
+        v-model="dateText"
+        type="text"
+        :placeholder="datePlaceholder"
+        :disabled="field.is_readonly"
+        class="flex-1"
+        @blur="onDateTextBlur"
+        @keydown.enter="($event.target as HTMLInputElement).blur()"
+      />
       <UPopover
         v-model:open="popoverOpen"
         :content="{ align: 'start' }"
         :modal="true"
         :ui="{ content: 'max-h-(--reka-popover-content-available-height,100vh) max-w-[calc(100vw-16px)] overflow-y-auto overscroll-contain' }"
-        class="flex-1"
       >
         <UButton
           color="neutral"
           variant="outline"
           icon="i-lucide-calendar"
           :disabled="field.is_readonly"
-          class="w-full justify-between"
-          trailing-icon="i-lucide-chevron-down"
-        >
-          <span class="truncate">{{ displayDate }}</span>
-        </UButton>
-
+          size="sm"
+        />
         <template #content>
           <div class="p-2">
             <UCalendar :model-value="(calendarDate as any)" class="p-2" @update:model-value="calendarDate = $event as DateValue" />
           </div>
         </template>
       </UPopover>
-
-      <!-- Clear button -->
       <UButton
         v-if="calendarDate && !field.is_readonly"
         color="neutral"
@@ -277,29 +468,33 @@ const displayDateTime = computed(() => {
       />
     </div>
 
-    <!-- datepicker (timestamp) - Popover + Calendar + Time -->
+    <!-- datetimepicker (timestamp) — Input text + buton calendar -->
     <div
       v-else-if="field.ui_type === 'datetimepicker'"
-      class="flex items-center gap-2 w-full"
+      class="flex items-center gap-1.5 w-full"
     >
+      <UInput
+        v-model="dateTimeText"
+        type="text"
+        :placeholder="dateTimePlaceholder"
+        :disabled="field.is_readonly"
+        class="flex-1"
+        @blur="onDateTimeTextBlur"
+        @keydown.enter="($event.target as HTMLInputElement).blur()"
+      />
       <UPopover
         v-model:open="popoverOpen"
         :content="{ align: 'start' }"
         :modal="true"
         :ui="{ content: 'max-h-(--reka-popover-content-available-height,100vh) max-w-[calc(100vw-16px)] overflow-y-auto overscroll-contain' }"
-        class="flex-1"
       >
         <UButton
           color="neutral"
           variant="outline"
           icon="i-lucide-calendar-clock"
           :disabled="field.is_readonly"
-          class="w-full justify-between"
-          trailing-icon="i-lucide-chevron-down"
-        >
-          <span class="truncate">{{ displayDateTime }}</span>
-        </UButton>
-
+          size="sm"
+        />
         <template #content>
           <div class="p-3 space-y-3">
             <!-- Calendar -->
@@ -308,12 +503,12 @@ const displayDateTime = computed(() => {
             <!-- Time Selection -->
             <div class="flex items-center gap-3 pt-2 border-t border-default">
               <span class="text-sm text-muted">Ora:</span>
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-1.5">
                 <!-- Hour -->
                 <USelect
                   v-model="selectedTime.hour"
                   :items="Array.from({ length: 24 }, (_, i) => ({ label: String(i).padStart(2, '0'), value: i }))"
-                  class="w-20"
+                  class="w-16"
                   size="sm"
                 />
                 <span class="text-lg">:</span>
@@ -321,7 +516,15 @@ const displayDateTime = computed(() => {
                 <USelect
                   v-model="selectedTime.minute"
                   :items="Array.from({ length: 60 }, (_, i) => ({ label: String(i).padStart(2, '0'), value: i }))"
-                  class="w-20"
+                  class="w-16"
+                  size="sm"
+                />
+                <span class="text-lg">:</span>
+                <!-- Second -->
+                <USelect
+                  v-model="selectedTime.second"
+                  :items="Array.from({ length: 60 }, (_, i) => ({ label: String(i).padStart(2, '0'), value: i }))"
+                  class="w-16"
                   size="sm"
                 />
               </div>
@@ -340,8 +543,6 @@ const displayDateTime = computed(() => {
           </div>
         </template>
       </UPopover>
-
-      <!-- Clear button -->
       <UButton
         v-if="calendarDateTime && !field.is_readonly"
         color="neutral"
@@ -349,7 +550,7 @@ const displayDateTime = computed(() => {
         icon="i-lucide-x"
         size="sm"
         class="shrink-0"
-        @click="calendarDateTime = undefined"
+        @click="clearDateTime"
       />
     </div>
 
@@ -427,5 +628,12 @@ const displayDateTime = computed(() => {
 .currency-input :deep(input[type="number"]::-webkit-inner-spin-button) {
   -webkit-appearance: none;
   margin: 0;
+}
+
+/* Împiedică wrapper-ul să dubleze border-ul când conține un input readonly */
+.dynamic-field-wrapper--readonly :deep(input:focus-visible),
+.dynamic-field-wrapper--readonly :deep(textarea:focus-visible) {
+  outline: none;
+  box-shadow: none;
 }
 </style>

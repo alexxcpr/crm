@@ -1,5 +1,6 @@
 import { z, type ZodType } from 'zod'
 import type { Field } from '~/types/schema'
+import { dateOnlyToLocalMidnightISO, localDateTimeToISO } from '~/utils/dateFormat'
 
 export function buildZodSchema(fields: Field[]) {
   const shape: Record<string, ZodType> = {}
@@ -37,8 +38,23 @@ function buildFieldRule(field: Field): ZodType {
         .transform((val) => {
           // Deja un ISO datetime complet cu timezone offset
           if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}:\d{2}|Z)$/.test(val)) return val
-          // Date-only format (YYYY-MM-DD) — adaugă T00:00:00Z
-          if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return `${val}T00:00:00.000Z`
+          // Date-only (YYYY-MM-DD) — miezul nopții locale, nu UTC Z
+          if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return dateOnlyToLocalMidnightISO(val)
+          // dd.mm.yyyy (opțional cu ora) — tastat direct, fără blur
+          const roMatch = val.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/)
+          if (roMatch) {
+            const day = parseInt(roMatch[1]!, 10)
+            const month = parseInt(roMatch[2]!, 10)
+            const year = parseInt(roMatch[3]!, 10)
+            const hasTime = roMatch[4] !== undefined
+            if (hasTime) {
+              const hour = parseInt(roMatch[4]!, 10)
+              const minute = roMatch[5] !== undefined ? parseInt(roMatch[5]!, 10) : 0
+              const second = roMatch[6] !== undefined ? parseInt(roMatch[6]!, 10) : 0
+              return localDateTimeToISO(year, month, day, hour, minute, second)
+            }
+            return dateOnlyToLocalMidnightISO(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`)
+          }
           // Fallback: parse nativ Date
           const date = new Date(val)
           if (isNaN(date.getTime())) return val

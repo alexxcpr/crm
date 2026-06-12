@@ -1,6 +1,6 @@
 import type { Field } from '~/types/schema'
 
-const GRID_COLUMNS = 3
+const MAX_GRID_COLUMNS = 3
 
 export interface PlacedField {
   field: Field
@@ -9,81 +9,114 @@ export interface PlacedField {
   colSpan: number
 }
 
-interface SortableField {
-  field: Field
-  index: number
-  rank: number
-  gridCol: number
-  colSpan: number
+export interface FieldLayout {
+  placed: PlacedField[]
+  columns: number
 }
+
+// ─── Helpers ───
 
 function toPositiveInt(value: number, fallback: number): number {
   return Number.isInteger(value) && value > 0 ? value : fallback
 }
 
-function normalizeField(field: Field, index: number): SortableField {
-  const gridCol = Math.min(toPositiveInt(field.grid_col, 1), GRID_COLUMNS)
-  const requestedSpan = Math.min(toPositiveInt(field.col_span, 1), GRID_COLUMNS)
-  const colSpan = Math.min(requestedSpan, GRID_COLUMNS - gridCol + 1)
-
-  return {
-    field,
-    index,
-    rank: toPositiveInt(field.rank, 1),
-    gridCol,
-    colSpan
-  }
+function clampGridCol(raw: number): number {
+  return Math.min(toPositiveInt(raw, 1), MAX_GRID_COLUMNS)
 }
 
-function isRowSlotFree(row: boolean[], colStart: number, colSpan: number): boolean {
-  const startIndex = colStart - 1
-  const endIndex = startIndex + colSpan
-
-  for (let index = startIndex; index < endIndex; index += 1) {
-    if (row[index]) return false
-  }
-
-  return true
+function clampColSpan(raw: number, startCol: number, maxCols: number): number {
+  const requested = toPositiveInt(raw, 1)
+  // Nu poate depăși coloanele disponibile, nici MAX_GRID_COLUMNS
+  return Math.min(requested, maxCols - startCol + 1)
 }
 
-function markRowSlot(row: boolean[], colStart: number, colSpan: number) {
-  const startIndex = colStart - 1
-  const endIndex = startIndex + colSpan
+// ─── Entry sortable ───
 
-  for (let index = startIndex; index < endIndex; index += 1) {
-    row[index] = true
-  }
+interface Entry {
+  field: Field
+  index: number
+  rank: number
+  origCol: number
+  mappedCol: number
+  colSpan: number
 }
 
-export function computeFieldLayout(fields: Field[]): PlacedField[] {
-  const rows: boolean[][] = []
+// ─── Mapare grid_col → coloană reală în funcție de coloanele disponibile ───
 
-  return fields
-    .map((field, index) => normalizeField(field, index))
-    .sort((a, b) =>
-      a.rank - b.rank
-      || a.gridCol - b.gridCol
-      || a.index - b.index
-    )
-    .map((entry) => {
-      let rowStart = 1
+function mapColumn(gridCol: number, availableColumns: number): number {
+  // grid_col 1 → col 1
+  // grid_col 2 → col 2 (dacă există ≥2 coloane), altfel col 1
+  // grid_col 3 → col 3 (dacă există 3 coloane), altfel se duce pe ultima coloană
+  return Math.min(gridCol, availableColumns)
+}
 
-      while (true) {
-        const row = rows[rowStart - 1] ?? Array.from({ length: GRID_COLUMNS }, () => false)
-        rows[rowStart - 1] = row
+// ─── Algoritmul principal ───
 
-        if (isRowSlotFree(row, entry.gridCol, entry.colSpan)) {
-          markRowSlot(row, entry.gridCol, entry.colSpan)
+export function computeFieldLayout(fields: Field[], availableColumns: number): FieldLayout {
+  const maxCols = Math.max(1, Math.min(availableColumns, MAX_GRID_COLUMNS))
 
-          return {
-            field: entry.field,
-            rowStart,
-            colStart: entry.gridCol,
-            colSpan: entry.colSpan
-          }
-        }
+  if (!fields.length) return { placed: [], columns: maxCols }
 
-        rowStart += 1
-      }
+  // 1. Construiește entry-uri normalizate
+  const entries: Entry[] = fields.map((field, index) => {
+    const origCol = clampGridCol(field.grid_col)
+    const mappedCol = mapColumn(origCol, maxCols)
+    const colSpan = clampColSpan(field.col_span, mappedCol, maxCols)
+
+    return {
+      field,
+      index,
+      rank: toPositiveInt(field.rank, 1),
+      origCol,
+      mappedCol,
+      colSpan
+    }
+  })
+
+  // 2. Sortare: după mappedCol, apoi rank, apoi origCol, apoi index
+  entries.sort((a, b) => {
+    if (a.mappedCol !== b.mappedCol) return a.mappedCol - b.mappedCol
+    if (a.rank !== b.rank) return a.rank - b.rank
+    if (a.origCol !== b.origCol) return a.origCol - b.origCol
+    return a.index - b.index
+  })
+
+  // 3. Column-fill placement
+  //    Fiecare coloană are propriul cursor de rând (1-indexed)
+  const columnRows: number[] = Array.from({ length: maxCols + 1 }, () => 1)
+
+  const placed: PlacedField[] = []
+
+  for (const entry of entries) {
+    const startCol = entry.mappedCol
+    const endCol = startCol + entry.colSpan - 1
+
+    // Găsește rândul de start: maximul cursorelor coloanelor acoperite
+    let row = 1
+    for (let c = startCol; c <= endCol; c++) {
+      row = Math.max(row, columnRows[c]!)
+    }
+
+    placed.push({
+      field: entry.field,
+      rowStart: row,
+      colStart: startCol,
+      colSpan: entry.colSpan
     })
+
+    // Avansează cursoarele coloanelor ocupate
+    for (let c = startCol; c <= endCol; c++) {
+      columnRows[c] = row + 1
+    }
+  }
+
+  // 4. Calculează coloanele efectiv folosite
+  let maxColUsed = 0
+  for (const p of placed) {
+    const colEnd = p.colStart + p.colSpan - 1
+    if (colEnd > maxColUsed) maxColUsed = colEnd
+  }
+  const effectiveColumns = Math.max(1, Math.min(maxColUsed, maxCols))
+
+  return { placed, columns: effectiveColumns }
 }

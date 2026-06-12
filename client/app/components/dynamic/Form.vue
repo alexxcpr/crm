@@ -1,6 +1,6 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import type { Field, UiTab } from '~/types/schema'
-import type { TabsItem } from '@nuxt/ui'
+import type { TabsItem, FormSubmitEvent } from '@nuxt/ui'
 import { buildZodSchema } from '~/utils/buildZodSchema'
 
 const props = defineProps<{
@@ -46,6 +46,19 @@ const systemData = reactive({
 })
 const submitting = ref(false)
 const initialLoading = ref(false)
+
+// ─── Dirty tracking (protecție date nesalvate) ───
+const initialFormState = ref<string | null>(null)
+const showLeaveConfirm = ref(false)
+
+const isDirty = computed(() => {
+  if (initialFormState.value === null) return false
+  return initialFormState.value !== JSON.stringify(formState)
+})
+
+function captureInitialState() {
+  initialFormState.value = JSON.stringify(formState)
+}
 
 // ─── Form ref for error handling ───
 const formRef = ref(null)
@@ -174,19 +187,21 @@ watch(() => schema.value, async (sch) => {
       systemData.owner_email = record.owner_email || null // NOU
       systemData.owner_name = record.owner_name || null
     }
+    captureInitialState()
     initialLoading.value = false
-  } 
+  }
   else {
     initFormState()
+    captureInitialState()
   }
 }, { immediate: true })
 
 // ─── Submit ───
-async function onSubmit() {
+async function onSubmit(event: FormSubmitEvent<Record<string, unknown>>) {
   submitting.value = true
 
   try {
-    const payload = buildPayload()
+    const payload = buildPayload(event.data)
     let result: Record<string, any> | null
 
     if (isEditMode.value && props.recordId) {
@@ -197,7 +212,11 @@ async function onSubmit() {
     }
 
     if (result) {
-      // Actualizează date_updated reactiv după salvare
+      for (const field of formFields.value) {
+        if (result[field.column_name] !== undefined) {
+          formState[field.slug] = result[field.column_name]
+        }
+      }
       if (result.date_updated) {
         systemData.date_updated = result.date_updated
       }
@@ -206,10 +225,12 @@ async function onSubmit() {
         title: isEditMode.value ? 'Actualizat cu succes' : 'Creat cu succes',
         color: 'success'
       })
+      captureInitialState()
       emit('saved', result)
     } 
     else {
       toast.add({
+
         title: 'Eroare la salvare',
         description: dataError.value ?? 'A aparut o eroare neasteptata.',
         color: 'error'
@@ -221,10 +242,10 @@ async function onSubmit() {
   }
 }
 
-function buildPayload(): Record<string, any> {
+function buildPayload(validated: Record<string, unknown>): Record<string, any> {
   const payload: Record<string, any> = {}
   for (const field of formFields.value) {
-    const val = formState[field.slug]
+    const val = validated[field.slug]
     if (val !== undefined) {
       payload[field.slug] = val
     }
@@ -236,6 +257,7 @@ const loading = computed(() => schemaLoading.value || initialLoading.value)
 
 const { visibleActions, executeAction: executeEntityAction } = useEntityActions(computed(() => props.entity))
 const executingAction = ref<string | null>(null)
+const showActionsSlideover = ref(false)
 
 async function handleAction(actionSlug: string, actionName: string) {
   if (!props.recordId) return
@@ -253,8 +275,66 @@ async function handleAction(actionSlug: string, actionName: string) {
       systemData.owner_email = record.owner_email || null
       systemData.owner_name = record.owner_name || null
     }
+    captureInitialState()
   }
 }
+
+// ─── Navigare cu date nesalvate ───
+
+const leaveTarget = ref<string | null>(null)
+const bypassGuard = ref(false)
+
+// In-app navigation guard (sidebar clicks, back button)
+onBeforeRouteLeave((to, _from) => {
+  if (bypassGuard.value) {
+    bypassGuard.value = false
+    return
+  }
+  if (isDirty.value) {
+    leaveTarget.value = to.fullPath
+    showLeaveConfirm.value = true
+    return false
+  }
+})
+
+function confirmLeave() {
+  showLeaveConfirm.value = false
+  bypassGuard.value = true
+  if (leaveTarget.value) {
+    router.push(leaveTarget.value)
+  } else {
+    router.back()
+  }
+}
+
+function cancelLeave() {
+  showLeaveConfirm.value = false
+  leaveTarget.value = null
+}
+
+function revertForm() {
+  if (initialFormState.value === null) return
+  const initial = JSON.parse(initialFormState.value)
+  for (const key of Object.keys(formState)) {
+    formState[key] = initial[key] ?? null
+  }
+}
+
+// Browser-level guard (refresh, tab close)
+const onBeforeUnload = (e: BeforeUnloadEvent) => {
+  if (isDirty.value) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('beforeunload', onBeforeUnload)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('beforeunload', onBeforeUnload)
+})
 
 // ─── Delete ───
 const showDeleteConfirm = ref(false)
@@ -270,11 +350,35 @@ async function confirmDelete() {
   if (success) {
     showDeleteConfirm.value = false
     toast.add({ title: 'Inregistrare stearsa', color: 'success' })
+    bypassGuard.value = true
     router.replace(`/${props.entity}`)
   } else {
     deleteError.value = dataError.value ?? 'Stergerea a esuat.'
   }
 }
+
+// ─── Shortcuts ───
+defineShortcuts({
+  alt_s: {
+    handler: () => {
+      if (submitting.value) return
+      if (!isDirty.value) return
+      if (showDeleteConfirm.value || showLeaveConfirm.value) return
+      if (!zodSchema.value) return
+      formRef.value?.submit()
+    },
+    usingInput: true
+  },
+  escape: () => {
+    if (submitting.value) return
+    if (showDeleteConfirm.value || showLeaveConfirm.value) return
+    if (isDirty.value) {
+      showLeaveConfirm.value = true
+      return
+    }
+    router.push(`/${props.entity}`)
+  }
+})
 </script>
 
 <template>
@@ -310,7 +414,7 @@ async function confirmDelete() {
       <div class="flex-1 min-w-0 space-y-6">
         <!-- Single group: render directly -->
         <template v-if="groups.length <= 1">
-          <DynamicFormGrid :fields="getFieldsByGroup(groups[0] ?? 'general')" :form-state="formState" />
+          <DynamicFormGrid :fields="getFieldsByGroup(groups[0] ?? 'general')" :form-state="formState" :autofocus-first="!isEditMode" />
         </template>
 
         <!-- Multiple groups: use tabs -->
@@ -327,9 +431,9 @@ async function confirmDelete() {
             content: 'w-full flex-1 min-w-0'
           }"
         >
-          <template v-for="group in groups" :key="group" #[group]>
+          <template v-for="(group, idx) in groups" :key="group" #[group]>
             <div class="pt-2 md:pt-0">
-              <DynamicFormGrid :fields="getFieldsByGroup(group)" :form-state="formState" />
+              <DynamicFormGrid :fields="getFieldsByGroup(group)" :form-state="formState" :autofocus-first="!isEditMode && idx === 0" />
             </div>
           </template>
         </UTabs>
@@ -395,31 +499,51 @@ async function confirmDelete() {
         </template>
 
         <!-- Actions -->
-        <div class="flex items-center gap-3 pt-4 border-t border-default">
+        <div class="flex flex-wrap items-center gap-2 pt-4 border-t border-default">
           <UButton
             type="submit"
             :label="isEditMode ? 'Salveaza' : 'Creeaza'"
             icon="i-lucide-check"
-            size="md"
+            :size="isMobile ? 'sm' : 'md'"
             :loading="submitting"
+            :disabled="!isDirty"
+          />
+          <UButton
+            v-if="isDirty"
+            :label="isMobile ? '' : 'Revino'"
+            icon="i-lucide-undo-2"
+            color="neutral"
+            variant="outline"
+            :size="isMobile ? 'sm' : 'md'"
+            @click="revertForm"
+          />
+          <UButton
+            v-if="isEditMode && visibleActions.length > 0"
+            :label="isMobile ? '' : 'Actiuni'"
+            icon="i-lucide-zap"
+            color="primary"
+            variant="soft"
+            :size="isMobile ? 'sm' : 'md'"
+            class="lg:hidden"
+            @click="showActionsSlideover = true"
           />
           <UButton
             v-if="isEditMode"
-            label="Sterge"
+            :label="isMobile ? '' : 'Sterge'"
             icon="i-lucide-trash-2"
             color="error"
             variant="outline"
-            size="md"
-            class="ml-auto"
+            :size="isMobile ? 'sm' : 'md'"
+            :class="isMobile ? '' : 'ml-auto'"
             @click="showDeleteConfirm = true"
           />
         </div>
       </div>
 
-      <!-- Right: Entity Actions sidebar -->
+      <!-- Right: Entity Actions sidebar (doar pe desktop) -->
       <div
         v-if="isEditMode && visibleActions.length > 0"
-        class="w-64 shrink-0"
+        class="hidden lg:block w-64 shrink-0"
       >
         <div class="sticky top-2 border border-gray-200 dark:border-gray-800 rounded-lg p-4 bg-white dark:bg-gray-900 space-y-3">
           <h3 class="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 tracking-wider">
@@ -442,16 +566,20 @@ async function confirmDelete() {
                 :loading="executingAction === action.slug"
                 @click="handleAction(action.slug, action.name)"
               />
-              <UTooltip
+              <UPopover
                 v-if="action.description"
-                :text="action.description"
-                :ui="{ text: 'whitespace-normal overflow-visible text-sm', content: 'h-auto max-w-96' }"
+                :content="{ align: 'end' }"
               >
                 <UIcon
                   name="i-lucide-info"
-                  class="size-4 text-muted shrink-0 cursor-help hover:text-primary transition-colors"
+                  class="size-4 text-muted shrink-0 cursor-pointer hover:text-primary transition-colors"
                 />
-              </UTooltip>
+                <template #content>
+                  <div class="p-3 max-w-72 text-sm">
+                    {{ action.description }}
+                  </div>
+                </template>
+              </UPopover>
             </div>
           </div>
         </div>
@@ -491,6 +619,86 @@ async function confirmDelete() {
           :loading="deleting"
           @click="confirmDelete"
         />
+      </div>
+    </template>
+  </UModal>
+
+  <!-- Actions Slideover (mobil) -->
+  <USlideover
+    v-model:open="showActionsSlideover"
+    title="Acțiuni workflow"
+    :side="'right'"
+  >
+    <template #body>
+      <div class="space-y-3">
+        <div
+          v-for="action in visibleActions"
+          :key="action.id_action"
+          class="flex items-center gap-2"
+        >
+          <UButton
+            :label="action.name"
+            icon="i-lucide-zap"
+            color="primary"
+            variant="soft"
+            size="md"
+            block
+            class="flex-1 text-left justify-start"
+            :loading="executingAction === action.slug"
+            @click="handleAction(action.slug, action.name)"
+          />
+          <UPopover
+            v-if="action.description"
+            :content="{ align: 'end' }"
+          >
+            <UIcon
+              name="i-lucide-info"
+              class="size-5 text-muted shrink-0 cursor-pointer hover:text-primary transition-colors"
+            />
+            <template #content>
+              <div class="p-3 max-w-72 text-sm">
+                {{ action.description }}
+              </div>
+            </template>
+          </UPopover>
+        </div>
+      </div>
+    </template>
+  </USlideover>
+
+  <!-- Leave Confirm Modal (date nesalvate) -->
+  <UModal v-model:open="showLeaveConfirm" title="Modificari nesalvate">
+    <template #body>
+      <div class="space-y-4">
+        <div class="flex items-start gap-3">
+          <div class="bg-amber-100 dark:bg-amber-900/30 rounded-full p-2 shrink-0">
+            <UIcon name="i-lucide-triangle-alert" class="size-5 text-amber-600 dark:text-amber-400" />
+          </div>
+          <div>
+            <p class="font-medium">
+              Ai modificari care nu au fost salvate.
+            </p>
+            <p class="text-sm text-muted mt-1">
+              Daca parasesti pagina fara sa salvezi, toate datele completate vor fi pierdute.
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 justify-end">
+          <UButton
+            label="Ramai pe pagina"
+            color="primary"
+            variant="solid"
+            icon="i-lucide-pencil"
+            @click="cancelLeave"
+          />
+          <UButton
+            label="Paraseste oricum"
+            color="neutral"
+            variant="outline"
+            icon="i-lucide-log-out"
+            @click="confirmLeave"
+          />
+        </div>
       </div>
     </template>
   </UModal>

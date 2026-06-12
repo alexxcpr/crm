@@ -12,7 +12,7 @@
  * When `auth:data` is already populated, the auth plugin skips its
  * `getSession()` call, avoiding the `callWithNuxt` error entirely.
  *
- * This plugin MUST run before the auth module (hence the "00-" prefix).
+ * Runs after 00-tenant-fetch (which patches global $fetch).
  */
 import { getCookie } from 'h3'
 
@@ -22,7 +22,6 @@ export default defineNuxtPlugin(async () => {
   if (import.meta.server) {
     // --- Patch 1: force baseURL to the internal backend URL ---
     if (config.apiBaseInternal) {
-      // @ts-expect-error — mutate public auth config before the module reads it
       config.public.auth.baseURL = config.apiBaseInternal as string
     }
 
@@ -32,21 +31,21 @@ export default defineNuxtPlugin(async () => {
 
     const rawToken = getCookie(event, 'auth.token')
     if (!rawToken) {
-      console.log('[00-auth-baseurl] no auth.token cookie found in request')
+      console.log('[01-auth-baseurl] no auth.token cookie found in request')
       return
     }
 
     // Seed the raw token so useAuthState picks it up
     const tokenState = useState<string | null>('auth:raw-token', () => rawToken)
     tokenState.value = rawToken
-    console.log('[00-auth-baseurl] token seeded, length:', rawToken.length)
+    console.log('[01-auth-baseurl] token seeded, length:', rawToken.length)
 
     // Seed the refresh token from cookie so the auth module can refresh on SSR
     const rawRefreshToken = getCookie(event, 'auth.refresh-token')
     if (rawRefreshToken) {
       const refreshTokenState = useState<string | null>('auth:raw-refresh-token', () => rawRefreshToken)
       refreshTokenState.value = rawRefreshToken
-      console.log('[00-auth-baseurl] refresh token seeded, length:', rawRefreshToken.length)
+      console.log('[01-auth-baseurl] refresh token seeded, length:', rawRefreshToken.length)
     }
 
     // Fetch session directly, bypassing @sidebase/nuxt-auth's _fetch()
@@ -59,12 +58,12 @@ export default defineNuxtPlugin(async () => {
       if (userData) {
         const dataState = useState<any>('auth:data', () => userData)
         dataState.value = userData
-        console.log('[00-auth-baseurl] session seeded for user:', (userData as any).email)
+        console.log('[01-auth-baseurl] session seeded for user:', (userData as any).email)
       }
     } catch (err: any) {
       // If the backend call fails, still seed data with a stub to prevent
       // the auth plugin from calling getSession() (which would wipe rawToken).
-      console.error('[00-auth-baseurl] backend /user/me failed:', err.message)
+      console.error('[01-auth-baseurl] backend /user/me failed:', err.message)
       const dataState = useState<any>('auth:data', () => ({}))
       dataState.value = dataState.value ?? {}
     }
