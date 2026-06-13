@@ -36,6 +36,11 @@ const {
   remove
 } = useEntityData(props.entity)
 
+const {
+  prefetchRelationOptions,
+  seedSelectedRelationOptions
+} = useRelationOptionsCache()
+
 provide(INLINE_CREATE_DEPTH_KEY, 0)
 
 const isEditMode = computed(() => !!props.recordId)
@@ -186,9 +191,14 @@ function castDefault(field: Field): any {
 watch(() => schema.value, async (sch) => {
   if (!sch) return
 
+  prefetchRelationOptions(formFields.value).catch((err) => {
+    console.error('[DynamicForm] Eroare la preincarcarea relatiilor:', err)
+  })
+
   if (isEditMode.value && props.recordId) {
     initialLoading.value = true
     const record = await fetchOne(props.recordId)
+    seedSelectedRelationOptions(formFields.value, record)
     initFormState(record)
     if (record) {
       systemData.date_created = record.date_created || null
@@ -339,6 +349,7 @@ async function handleAction(actionSlug: string, actionName: string) {
 
   if (success) {
     const record = await fetchOne(props.recordId)
+    seedSelectedRelationOptions(formFields.value, record)
     initFormState(record)
     if (record) {
       systemData.date_created = record.date_created || null

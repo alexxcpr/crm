@@ -16,125 +16,73 @@ const emit = defineEmits<{
 const inlineCreateDepth = inject(INLINE_CREATE_DEPTH_KEY, 0)
 const entitySlug = computed(() => props.field.relation_entity_slug)
 const showInlineCreate = computed(() =>
-  inlineCreateDepth <= MAX_INLINE_CREATE_DEPTH &&
-  !!entitySlug.value &&
-  !props.disabled
+  inlineCreateDepth <= MAX_INLINE_CREATE_DEPTH
+  && !!entitySlug.value
+  && !props.disabled
 )
 const inlineCreateOpen = ref(false)
 // entitySlug garantat non-null când showInlineCreate e true (verificat de v-if)
 const inlineCreateEntitySlug = computed(() => entitySlug.value!)
 
-function onInlineCreated(record: Record<string, any>) {
-  const newItem = {
-    label: String(record[displayField.value] ?? record.id),
-    value: record.id
-  }
-  // Adaugă la începutul listei pentru selecție imediată
-  items.value.unshift(newItem)
-  // Selectează automat noul record
-  emit('update:modelValue', record.id)
-  hasFetchedOptions.value = true
-}
+const {
+  getRelationOptions,
+  isRelationOptionsLoading,
+  shouldRefreshRelationOptions,
+  refreshRelationOptions,
+  upsertRelationOption
+} = useRelationOptionsCache()
 
-const { apiFetch } = useApi()
-
-const items = ref<{ label: string, value: string }[]>([])
-const loading = ref(false)
 const searchQuery = ref('')
 const open = ref(false)
-const hasFetchedOptions = ref(false)
 
 watch(open, (isOpen) => {
-  if (isOpen && !hasFetchedOptions.value) {
-    fetchOptions()
+  if (!isOpen) return
+  if (shouldRefreshRelationOptions(props.field, searchQuery.value)) {
+    refreshOptions(searchQuery.value, items.value.length > 0)
   }
 })
 
-const displayField = computed(() => props.field.relation_display_field ?? 'name')
+const items = computed(() => getRelationOptions(props.field, searchQuery.value))
+const loading = computed(() => isRelationOptionsLoading(props.field, searchQuery.value))
 
-async function fetchSelectedValue() {
-  if (!props.modelValue || !entitySlug.value) return
+function onInlineCreated(record: Record<string, unknown>) {
+  if (!record.id) return
+  upsertRelationOption(props.field, record)
+  searchQuery.value = ''
+  emit('update:modelValue', String(record.id))
+}
 
-  const existing = items.value.find(i => i.value === props.modelValue)
-  if (existing && existing.label !== 'Se incarca...') return
-
-  loading.value = true
-  try {
-    const response = await apiFetch<{ data: Record<string, any> }>(`/v1/data/${entitySlug.value}/${props.modelValue}`)
-
-    if (response.data) {
-      // Daca items avea deja ceva, putem sa il adaugam in loc sa suprascriem, sau suprascriem
-      // pentru ca fetchOptions va suprascrie la deschiderea dropdown-ului
-      const newItem = {
-        label: String(response.data[displayField.value] ?? response.data.id),
-        value: response.data.id
-      }
-
-      const exists = items.value.findIndex(i => i.value === newItem.value)
-      if (exists !== -1) {
-        items.value[exists] = newItem
-      } else {
-        items.value.push(newItem)
-      }
-    }
-  } 
-  catch (err) {
-    console.error('[RelationSelect] Eroare la incarcarea valorii selectate:', err)
-  } 
-  finally {
-    loading.value = false
-  }
+function refreshOptions(search?: string, background = false) {
+  refreshRelationOptions(props.field, { search, background }).catch((err) => {
+    console.error('[RelationSelect] Eroare la incarcarea optiunilor:', err)
+  })
 }
 
 watch(() => props.modelValue, (newVal) => {
-  if (newVal) {
-    const existing = items.value.find(i => i.value === newVal)
-    if (!existing) {
-      items.value.push({ label: 'Se incarca...', value: newVal })
-    }
-    fetchSelectedValue()
+  if (newVal && open.value && shouldRefreshRelationOptions(props.field, searchQuery.value)) {
+    refreshOptions(searchQuery.value, items.value.length > 0)
   }
 }, { immediate: true })
 
-async function fetchOptions(search?: string) {
-  if (!entitySlug.value) return
-
-  loading.value = true
-  try {
-    const query: Record<string, string> = { limit: '50' }
-    if (search) {
-      query[`filter[${displayField.value}][contains]`] = search
-    }
-
-    const response = await apiFetch<{ data: Record<string, any>[] }>(`/v1/data/${entitySlug.value}`, { query })
-
-    items.value = response.data.map(record => ({
-      label: String(record[displayField.value] ?? record.id),
-      value: record.id
-    }))
-    hasFetchedOptions.value = true
-  } 
-  catch (err) {
-    console.error('[RelationSelect] Eroare la incarcarea optiunilor:', err)
-    items.value = []
-  } 
-  finally {
-    loading.value = false
-  }
-}
-
-let debounceTimer: ReturnType<typeof setTimeout>
+let debounceTimer: ReturnType<typeof setTimeout> | undefined
 function onSearch(query: string) {
   searchQuery.value = query
-  clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(() => fetchOptions(query), 300)
+  if (debounceTimer) clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(() => {
+    if (shouldRefreshRelationOptions(props.field, query)) {
+      refreshOptions(query, getRelationOptions(props.field, query).length > 0)
+    }
+  }, 300)
 }
+
+onUnmounted(() => {
+  if (debounceTimer) clearTimeout(debounceTimer)
+})
 
 function onUpdate(val: string | string[] | undefined) {
   if (Array.isArray(val)) {
     emit('update:modelValue', val[0] ?? null)
-  } 
-  else {
+  } else {
     emit('update:modelValue', val ?? null)
   }
 }

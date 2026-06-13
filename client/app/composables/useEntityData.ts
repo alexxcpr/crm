@@ -2,6 +2,7 @@ import type { PaginatedResponse, SingleResponse, FetchParams } from '~/types/sch
 
 export function useEntityData(entitySlug: MaybeRef<string>) {
   const { apiFetch } = useApi()
+  const { invalidateRelationEntity } = useRelationOptionsCache()
 
   const items = ref<Record<string, any>[]>([])
   const meta = ref<PaginatedResponse['meta']>({
@@ -84,6 +85,7 @@ export function useEntityData(entitySlug: MaybeRef<string>) {
         method: 'POST',
         body
       })
+      invalidateRelationEntity(slug)
       return response.data
     }
     catch (err: any) {
@@ -106,6 +108,7 @@ export function useEntityData(entitySlug: MaybeRef<string>) {
         method: 'PUT',
         body
       })
+      invalidateRelationEntity(slug)
       return response.data
     }
     catch (err: any) {
@@ -127,6 +130,7 @@ export function useEntityData(entitySlug: MaybeRef<string>) {
       await apiFetch(`/v1/data/${slug}/${id}`, {
         method: 'DELETE'
       })
+      invalidateRelationEntity(slug)
       items.value = items.value.filter(item => item.id !== id)
       meta.value.total--
       return true
