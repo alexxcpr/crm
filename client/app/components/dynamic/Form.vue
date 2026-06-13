@@ -48,6 +48,8 @@ const systemData = reactive({
   owner_name: null as string | null
 })
 const submitting = ref(false)
+const submitIntent = ref<'save' | 'copy'>('save')
+const copyWindow = shallowRef<Window | null>(null)
 const initialLoading = ref(false)
 
 // ─── Dirty tracking (protecție date nesalvate) ───
@@ -88,6 +90,11 @@ function findGroupWithErrors(errorFields: string[]): string | null {
 
 // ─── Handler for form validation errors ───
 function onFormError(event: { errors: Array<{ name?: string, message?: string }> }) {
+  if (submitIntent.value === 'copy') {
+    closeCopyWindow()
+    submitIntent.value = 'save'
+  }
+
   const errorFieldNames = event.errors
     .map(e => e.name)
     .filter((name): name is string => !!name)
@@ -202,12 +209,16 @@ watch(() => schema.value, async (sch) => {
 // ─── Submit ───
 async function onSubmit(event: FormSubmitEvent<Record<string, unknown>>) {
   submitting.value = true
+  const intent = submitIntent.value
 
   try {
     const payload = buildPayload(event.data)
     let result: Record<string, any> | null
 
-    if (isEditMode.value && props.recordId) {
+    if (intent === 'copy') {
+      result = await create(payload)
+    }
+    else if (isEditMode.value && props.recordId) {
       result = await update(props.recordId, payload)
     } 
     else {
@@ -215,6 +226,16 @@ async function onSubmit(event: FormSubmitEvent<Record<string, unknown>>) {
     }
 
     if (result) {
+      if (intent === 'copy') {
+        openCreatedCopy(result)
+        toast.add({
+          title: 'Copie creată cu succes',
+          description: 'Noua înregistrare a fost deschisă într-un tab nou.',
+          color: 'success'
+        })
+        return
+      }
+
       for (const field of formFields.value) {
         if (result[field.column_name] !== undefined) {
           formState[field.slug] = result[field.column_name]
@@ -232,6 +253,10 @@ async function onSubmit(event: FormSubmitEvent<Record<string, unknown>>) {
       emit('saved', result)
     } 
     else {
+      if (intent === 'copy') {
+        closeCopyWindow()
+      }
+
       toast.add({
 
         title: 'Eroare la salvare',
@@ -242,7 +267,51 @@ async function onSubmit(event: FormSubmitEvent<Record<string, unknown>>) {
   } 
   finally {
     submitting.value = false
+    submitIntent.value = 'save'
   }
+}
+
+function handleSaveCopy() {
+  if (submitting.value || !isEditMode.value || !zodSchema.value) return
+  submitIntent.value = 'copy'
+  closeCopyWindow()
+  copyWindow.value = openBlankCopyWindow()
+  formRef.value?.submit()
+}
+
+function openBlankCopyWindow(): Window | null {
+  if (import.meta.server) return null
+
+  const win = window.open('about:blank', '_blank')
+  if (!win) return null
+
+  win.document.title = 'Se creează copia...'
+  win.document.body.innerHTML = '<p style="font-family: system-ui, sans-serif; padding: 24px;">Se creează copia...</p>'
+  win.focus()
+  return win
+}
+
+function openCreatedCopy(record: Record<string, any>) {
+  if (import.meta.server || !record.id) return
+
+  const href = router.resolve(`/${props.entity}/${record.id}`).href
+  const url = new URL(href, window.location.origin).toString()
+
+  if (copyWindow.value && !copyWindow.value.closed) {
+    copyWindow.value.location.href = url
+    copyWindow.value.focus()
+    copyWindow.value = null
+    return
+  }
+
+  window.open(url, '_blank')?.focus()
+}
+
+function closeCopyWindow() {
+  if (copyWindow.value && !copyWindow.value.closed) {
+    copyWindow.value.close()
+  }
+  copyWindow.value = null
 }
 
 function buildPayload(validated: Record<string, unknown>): Record<string, any> {
@@ -553,10 +622,23 @@ onUnmounted(() => {
             type="submit"
             :label="isEditMode ? 'Salvează' : 'Creează'"
             icon="i-lucide-check"
-            variant="outline"
+            variant="solid"
             :size="isMobile ? 'sm' : 'md'"
-            :loading="submitting"
+            :loading="submitting && submitIntent === 'save'"
             :disabled="!isDirty"
+            @click="submitIntent = 'save'"
+          />
+          <UButton
+            v-if="isEditMode"
+            type="button"
+            :label="isMobile ? '' : 'Salvează copie'"
+            icon="i-lucide-copy"
+            color="primary"
+            variant="soft"
+            :size="isMobile ? 'sm' : 'md'"
+            :loading="submitting && submitIntent === 'copy'"
+            :disabled="submitting"
+            @click="handleSaveCopy"
           />
           <UButton
             v-if="isDirty"

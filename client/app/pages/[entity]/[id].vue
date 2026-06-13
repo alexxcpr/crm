@@ -40,10 +40,10 @@ const { entity: entityMeta } = useEntitySchema(entitySlug)
         <template #right>
           <UButton
             icon="i-lucide-arrow-left"
-            color="neutral"
-            variant="outline"
+            color="primary"
+            variant="solid"
             size="sm"
-            class="h-full min-h-13 shrink-0 rounded-xl border-primary/25 bg-primary/5 px-3 text-sm font-semibold text-primary hover:border-primary/40 hover:bg-primary/10 sm:px-4"
+            class="h-full min-h-13 shrink-0 rounded-xl px-3 text-sm font-semibold sm:px-4"
             @click="navigateTo(`/${entitySlug}`)"
           >
             <span class="hidden sm:inline">Inapoi la lista</span>
