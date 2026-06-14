@@ -30,7 +30,7 @@ function mockField(overrides: Partial<Field> = {}): Field {
     slug: 'industry',
     column_name: 'cf_industry',
     data_type: 'varchar',
-    ui_type: 'select',
+    ui_type: 'text',
     default_value: null,
     placeholder: null,
     help_text: null,

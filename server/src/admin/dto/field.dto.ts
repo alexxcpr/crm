@@ -5,7 +5,7 @@ import {
 
 const DATA_TYPES = ['varchar', 'text', 'integer', 'numeric', 'boolean', 'datetime', 'uuid'];
 const UI_TYPES = [
-    'text', 'textarea', 'number', 'select',
+    'text', 'textarea', 'number',
     'datepicker', 'datetimepicker', 'checkbox', 'relation',
     'email', 'phone', 'currency', 'file',
 ];

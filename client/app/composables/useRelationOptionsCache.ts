@@ -138,6 +138,19 @@ export function useRelationOptionsCache() {
     return cache.value[key]?.items ?? []
   }
 
+  function getRelationOptionLabel(field: Field, value: string): string | undefined {
+    const prefix = getFieldPrefix(field)
+    if (!prefix) return undefined
+
+    for (const [key, entry] of Object.entries(cache.value)) {
+      if (!key.startsWith(prefix)) continue
+      const option = entry.items.find(item => item.value === value)
+      if (option) return option.label
+    }
+
+    return undefined
+  }
+
   function isRelationOptionsLoading(field: Field, search?: string): boolean {
     const key = getCacheKey(field, search)
     if (!key) return false
@@ -300,6 +313,7 @@ export function useRelationOptionsCache() {
 
   return {
     getRelationOptions,
+    getRelationOptionLabel,
     isRelationOptionsLoading,
     shouldRefreshRelationOptions,
     refreshRelationOptions,

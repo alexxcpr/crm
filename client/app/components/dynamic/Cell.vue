@@ -27,9 +27,6 @@ function formatTimestamp(val: string): string {
   }
 }
 
-function getOptionLabel(options: { label: string, value: string }[] | null, val: string): string {
-  return options?.find(o => o.value === val)?.label ?? val
-}
 </script>
 
 <template>
@@ -37,10 +34,6 @@ function getOptionLabel(options: { label: string, value: string }[] | null, val:
 
   <UBadge v-else-if="field.ui_type === 'checkbox'" :color="value ? 'success' : 'warning'" variant="subtle" size="sm">
     {{ value ? 'Da' : 'Nu' }}
-  </UBadge>
-
-  <UBadge v-else-if="field.ui_type === 'select'" color="neutral" variant="subtle" size="sm">
-    {{ getOptionLabel(field.options, value) }}
   </UBadge>
 
   <a v-else-if="field.ui_type === 'email'" :href="`mailto:${value}`" class="text-primary hover:underline">

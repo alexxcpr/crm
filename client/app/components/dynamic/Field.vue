@@ -29,11 +29,6 @@ const value = computed({
   set: val => emit('update:modelValue', val)
 })
 
-const selectItems = computed(() => {
-  if (!props.field.options) return []
-  return props.field.options.map(o => ({ label: o.label, value: o.value }))
-})
-
 // Placeholder texts
 const datePlaceholder = 'zz.ll.aaaa'
 const dateTimePlaceholder = 'zz.ll.aaaa hh:mm:ss'
@@ -407,18 +402,6 @@ const applyDateTime = () => {
       type="tel"
       :placeholder="field.placeholder ?? '+40 XXX XXX XXX'"
       :disabled="field.is_readonly"
-      size="sm"
-      class="w-full"
-    />
-
-    <!-- select -->
-    <USelect
-      v-else-if="field.ui_type === 'select'"
-      v-model="value"
-      :items="selectItems"
-      :placeholder="field.placeholder ?? `Selecteaza ${field.name.toLowerCase()}`"
-      :disabled="field.is_readonly"
-      value-key="value"
       size="sm"
       class="w-full"
     />

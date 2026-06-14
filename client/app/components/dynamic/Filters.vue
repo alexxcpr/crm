@@ -1,108 +1,66 @@
 <script setup lang="ts">
 import type { Field } from '~/types/schema'
+import type { ColumnFilters, FilterCondition } from '~/types/filters'
+import { summarizeFilterConditions } from '~/utils/filterOperators'
 
 const props = defineProps<{
   fields: Field[]
+  modelValue: ColumnFilters
 }>()
 
 const emit = defineEmits<{
-  change: [filters: Record<string, any>]
+  'update:modelValue': [filters: ColumnFilters]
 }>()
 
-const searchText = ref('')
-const selectFilters = ref<Record<string, string>>({})
+const { getRelationOptionLabel } = useRelationOptionsCache()
 
-const searchField = computed(() =>
-  props.fields.find(f => ['text', 'email', 'phone'].includes(f.ui_type))
-)
-
-const dropdownFields = computed(() =>
-  props.fields.filter(f => f.ui_type === 'select' || f.ui_type === 'checkbox')
-)
-
-function getFilterItems(field: Field) {
-  const allOption = { label: 'Toate', value: '__all__' }
-
-  if (field.ui_type === 'select' && field.options) {
-    return [allOption, ...field.options]
-  }
-  if (field.ui_type === 'checkbox') {
-    return [allOption, { label: 'Da', value: 'true' }, { label: 'Nu', value: 'false' }]
-  }
-  return [allOption]
+function updateFieldFilter(field: Field, conditions: FilterCondition[]) {
+  emit('update:modelValue', {
+    ...props.modelValue,
+    [field.column_name]: conditions
+  })
 }
 
-function buildAndEmitFilters() {
-  const filters: Record<string, any> = {}
-
-  if (searchText.value && searchField.value) {
-    filters[searchField.value.column_name] = { contains: searchText.value }
-  }
-
-  for (const [columnName, value] of Object.entries(selectFilters.value)) {
-    if (value && value !== '__all__') {
-      filters[columnName] = value
-    }
-  }
-
-  emit('change', filters)
-}
-
-let debounceTimer: ReturnType<typeof setTimeout>
-watch(searchText, () => {
-  clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(buildAndEmitFilters, 300)
-})
-
-watch(selectFilters, buildAndEmitFilters, { deep: true })
-
-const hasActiveFilters = computed(() =>
-  searchText.value !== '' || Object.values(selectFilters.value).some(v => v !== '' && v !== '__all__')
-)
-
-function clearAll() {
-  searchText.value = ''
-  selectFilters.value = {}
-  emit('change', {})
+function getFilterSummary(field: Field): string {
+  return summarizeFilterConditions(props.modelValue[field.column_name] ?? [], field, {
+    resolveValueLabel: (_field, value) => getRelationOptionLabel(field, value)
+  })
 }
 </script>
 
 <template>
-  <div class="flex w-full flex-wrap items-center gap-1.5">
-    <UInput
-      v-if="searchField"
-      v-model="searchText"
-      icon="i-lucide-search"
-      :placeholder="`Cauta dupa ${searchField.name.toLowerCase()}...`"
-      size="sm"
-      class="w-full sm:w-72"
-      :ui="{ base: 'rounded-full' }"
-    />
+  <div v-if="fields.length > 0" class="flex w-full flex-wrap items-center gap-1.5">
+    <span class="mr-1 text-xs font-medium uppercase tracking-wide text-muted">
+      Filtre rapide
+    </span>
 
-    <USelect
-      v-for="field in dropdownFields"
+    <div
+      v-for="field in fields"
       :key="field.id_field"
-      :model-value="selectFilters[field.column_name] ?? ''"
-      :items="getFilterItems(field)"
-      :placeholder="field.name"
-      size="sm"
-      class="min-w-32"
-      :ui="{
-        base: 'rounded-full',
-        trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200'
-      }"
-      @update:model-value="(val: string) => { selectFilters[field.column_name] = val }"
-    />
-
-    <UButton
-      v-if="hasActiveFilters"
-      icon="i-lucide-x"
-      color="neutral"
-      variant="ghost"
-      size="sm"
-      label="Reseteaza"
-      class="rounded-full"
-      @click="clearAll"
-    />
+      :class="[
+        'flex items-center gap-1 rounded-full border bg-white px-2 py-1 shadow-xs dark:bg-gray-900',
+        getFilterSummary(field)
+          ? 'border-primary/40 bg-primary/5 ring-1 ring-primary/15'
+          : 'border-default'
+      ]"
+    >
+      <span class="max-w-32 truncate text-xs font-medium text-highlighted">
+        {{ field.name }}
+      </span>
+      <UBadge
+        v-if="getFilterSummary(field)"
+        color="primary"
+        variant="subtle"
+        size="sm"
+        class="max-w-48 truncate rounded-full normal-case"
+      >
+        {{ getFilterSummary(field) }}
+      </UBadge>
+      <DynamicColumnFilter
+        :field="field"
+        :model-value="modelValue[field.column_name] ?? []"
+        @update:model-value="(conditions) => updateFieldFilter(field, conditions)"
+      />
+    </div>
   </div>
 </template>

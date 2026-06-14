@@ -25,7 +25,17 @@ export function useEntityData(entitySlug: MaybeRef<string>) {
       for (const [key, value] of Object.entries(params.filter)) {
         if (value === null || value === undefined || value === '') continue
 
-        if (typeof value === 'object' && !Array.isArray(value)) {
+        if (Array.isArray(value)) {
+          value.forEach((condition, index) => {
+            if (typeof condition !== 'object' || condition === null) return
+            const op = condition.op ?? condition.operator
+            const val = condition.value
+            if (!op || val === null || val === undefined || val === '') return
+            query[`filter[${key}][${index}][op]`] = String(op)
+            query[`filter[${key}][${index}][value]`] = String(val)
+          })
+        }
+        else if (typeof value === 'object') {
           for (const [op, val] of Object.entries(value)) {
             query[`filter[${key}][${op}]`] = String(val)
           }

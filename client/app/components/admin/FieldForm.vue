@@ -23,7 +23,7 @@ const { apiFetch } = useApi()
 
 // ─── data_type → ui_type mapping ───
 const dataTypeUiTypeMap: Record<string, string[]> = {
-  varchar: ['text', 'select', 'email', 'phone'],
+  varchar: ['text', 'email', 'phone'],
   text: ['textarea', 'text'],
   integer: ['number'],
   numeric: ['number', 'currency'],
@@ -46,7 +46,6 @@ const allUiTypeOptions = [
   { label: 'Text', value: 'text' },
   { label: 'Textarea', value: 'textarea' },
   { label: 'Numar', value: 'number' },
-  { label: 'Select', value: 'select' },
   { label: 'Data', value: 'datepicker' },
   { label: 'Data si ora', value: 'datetimepicker' },
   { label: 'Da/Nu', value: 'checkbox' },
@@ -130,10 +129,6 @@ watch(() => state.id_ui_tab, (newTabId) => {
 })
 
 // ─── Computed: show sections ───
-const showOptionsEditor = computed(() =>
-  state.ui_type === 'select'
-)
-
 const showRelationFields = computed(() => state.ui_type === 'relation')
 
 const showStringValidation = computed(() =>
@@ -150,29 +145,6 @@ const tabOptions = computed(() =>
     value: t.id_ui_tab
   }))
 )
-
-// ─── Options editor ───
-function addOption() {
-  state.options.push({ label: '', value: '' })
-}
-
-function removeOption(index: number) {
-  state.options.splice(index, 1)
-}
-
-function autoFillOptionValue(index: number) {
-  const opt = state.options[index]
-  if (opt && opt.label && !opt.value) {
-    opt.value = opt.label
-      .toLowerCase()
-      .replace(/[șş]/g, 's')
-      .replace(/[țţ]/g, 't')
-      .replace(/[ăâ]/g, 'a')
-      .replace(/î/g, 'i')
-      .replace(/[^a-z0-9\s_]/g, '')
-      .replace(/\s+/g, '_')
-  }
-}
 
 // ─── Entity options for relation ───
 const entityOptions = computed(() =>
@@ -299,7 +271,7 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
         placeholder: state.placeholder || undefined,
         help_text: state.help_text || undefined,
         default_value: state.default_value || undefined,
-        options: showOptionsEditor.value ? state.options.filter(o => o.label && o.value) : undefined,
+        options: undefined,
         id_relation_entity: showRelationFields.value ? state.id_relation_entity || undefined : undefined,
         relation_display_field: showRelationFields.value ? state.relation_display_field || undefined : undefined,
         is_required: state.is_required,
@@ -326,7 +298,7 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
         placeholder: state.placeholder || undefined,
         help_text: state.help_text || undefined,
         default_value: state.default_value || undefined,
-        options: showOptionsEditor.value ? state.options.filter(o => o.label && o.value) : undefined,
+        options: undefined,
         id_relation_entity: showRelationFields.value ? state.id_relation_entity || undefined : undefined,
         relation_display_field: showRelationFields.value ? state.relation_display_field || undefined : undefined,
         is_required: state.is_required,
@@ -436,48 +408,6 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
       <UFormField label="Valoare implicita" name="default_value">
         <UInput v-model="state.default_value" placeholder="Valoare default" class="w-full" />
       </UFormField>
-    </div>
-
-    <!-- Section 2b: Options editor -->
-    <div v-if="showOptionsEditor" class="space-y-4">
-      <USeparator />
-      <h4 class="text-sm font-semibold text-muted uppercase tracking-wider">
-        Optiuni
-      </h4>
-
-      <div
-        v-for="(opt, idx) in state.options"
-        :key="idx"
-        class="flex items-center gap-2"
-      >
-        <UInput
-          v-model="opt.label"
-          placeholder="Label"
-          class="flex-1"
-          @blur="autoFillOptionValue(idx)"
-        />
-        <UInput
-          v-model="opt.value"
-          placeholder="Value"
-          class="flex-1"
-        />
-        <UButton
-          icon="i-lucide-x"
-          color="error"
-          variant="ghost"
-          size="xs"
-          @click="removeOption(idx)"
-        />
-      </div>
-
-      <UButton
-        label="Adauga optiune"
-        icon="i-lucide-plus"
-        variant="outline"
-        color="neutral"
-        size="sm"
-        @click="addOption"
-      />
     </div>
 
     <!-- Section 3: Relation -->

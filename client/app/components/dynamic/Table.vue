@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 import type { Field } from '~/types/schema'
+import type { ColumnFilters, FilterCondition } from '~/types/filters'
+import { buildApiFilters, countActiveFilterConditions, summarizeFilterConditions } from '~/utils/filterOperators'
 import { upperFirst } from 'scule'
 
 const props = defineProps<{
@@ -14,11 +16,13 @@ const emit = defineEmits<{
 
 const toast = useToast()
 const table = useTemplateRef('table')
+const { getRelationOptionLabel } = useRelationOptionsCache()
 
 const UButton = resolveComponent('UButton')
 const UDropdownMenu = resolveComponent('UDropdownMenu')
 const UCheckbox = resolveComponent('UCheckbox')
 const DynamicCellComp = resolveComponent('DynamicCell')
+const DynamicColumnFilterComp = resolveComponent('DynamicColumnFilter')
 
 // ─── Schema & Data ───
 const {
@@ -43,13 +47,27 @@ const {
 const currentPage = ref(1)
 const pageSize = ref(25)
 const currentSort = ref('-date_created')
-const filters = ref<Record<string, any>>({})
+const filters = ref<ColumnFilters>({})
 const rowSelection = ref<Record<string, boolean>>({})
 
-const loading = computed(() => schemaLoading.value || dataLoading.value)
 const error = computed(() => schemaError.value || dataError.value)
 
 const { visibleActions, executeAction } = useEntityActions(computed(() => props.entity))
+
+const filterableFields = computed(() => {
+  const byColumn = new Map<string, Field>()
+  for (const field of tableFields.value) {
+    byColumn.set(field.column_name, field)
+  }
+  for (const field of filterFields.value) {
+    byColumn.set(field.column_name, field)
+  }
+  return Array.from(byColumn.values())
+})
+
+const apiFilters = computed(() =>
+  buildApiFilters(filters.value, filterableFields.value)
+)
 
 // ─── Data loading (reactiv pe toate dependintele) ───
 async function loadData() {
@@ -57,7 +75,7 @@ async function loadData() {
     page: currentPage.value,
     limit: pageSize.value,
     sort: currentSort.value,
-    filter: filters.value
+    filter: apiFilters.value
   })
 }
 
@@ -88,8 +106,21 @@ function getSortState(columnName: string): 'asc' | 'desc' | false {
 }
 
 // ─── Filtre ───
-function handleFilterChange(newFilters: Record<string, any>) {
+function updateColumnFilter(columnName: string, conditions: FilterCondition[]) {
+  filters.value = {
+    ...filters.value,
+    [columnName]: conditions
+  }
+  currentPage.value = 1
+}
+
+function updateFilters(newFilters: ColumnFilters) {
   filters.value = newFilters
+  currentPage.value = 1
+}
+
+function clearAllFilters() {
+  filters.value = {}
   currentPage.value = 1
 }
 
@@ -103,8 +134,10 @@ const columnLabels = computed(() => {
 })
 
 // ─── Coloane generate dinamic ───
-const columns = computed<TableColumn<Record<string, any>>[]>(() => {
-  const cols: TableColumn<Record<string, any>>[] = []
+type TableRow = Record<string, unknown> & { id: string }
+
+const columns = computed<TableColumn<TableRow>[]>(() => {
+  const cols: TableColumn<TableRow>[] = []
 
   // Checkbox column
   cols.push({
@@ -136,13 +169,13 @@ const columns = computed<TableColumn<Record<string, any>>[]>(() => {
       color: 'neutral',
       variant: 'ghost',
       size: 'xs',
-      onClick: () => emit('edit', row.original.id)
+      onClick: () => emit('edit', String(row.original.id))
     })
   })
 
   // Dynamic field columns
   for (const field of tableFields.value) {
-    const col: TableColumn<Record<string, any>> = {
+    const col: TableColumn<TableRow> = {
       accessorKey: field.column_name,
       cell: ({ row }) => h(DynamicCellComp, {
         value: row.original[field.column_name],
@@ -151,24 +184,40 @@ const columns = computed<TableColumn<Record<string, any>>[]>(() => {
       })
     }
 
-    if (field.is_sortable) {
-      col.header = () => {
-        const sortState = getSortState(field.column_name)
-        return h(UButton, {
-          color: 'neutral',
-          variant: 'ghost',
-          label: field.name,
-          icon: sortState === 'asc'
-            ? 'i-lucide-arrow-up-narrow-wide'
-            : sortState === 'desc'
-              ? 'i-lucide-arrow-down-wide-narrow'
-              : 'i-lucide-arrow-up-down',
-          class: '-mx-2.5',
-          onClick: () => handleSort(field.column_name)
-        })
-      }
-    } else {
-      col.header = field.name
+    col.header = () => {
+      const sortState = getSortState(field.column_name)
+      const filterSummary = summarizeFilterConditions(filters.value[field.column_name] ?? [], field, {
+        resolveValueLabel: (_field, value) => getRelationOptionLabel(field, value)
+      })
+      const sortButton = field.is_sortable
+        ? h(UButton, {
+            color: 'neutral',
+            variant: 'ghost',
+            label: field.name,
+            icon: sortState === 'asc'
+              ? 'i-lucide-arrow-up-narrow-wide'
+              : sortState === 'desc'
+                ? 'i-lucide-arrow-down-wide-narrow'
+                : 'i-lucide-arrow-up-down',
+            class: '-mx-2.5 min-w-0',
+            onClick: () => handleSort(field.column_name)
+          })
+        : h('span', { class: 'truncate' }, field.name)
+
+      return h('div', { class: 'flex min-w-0 items-center gap-1' }, [
+        sortButton,
+        h(DynamicColumnFilterComp, {
+          'field': field,
+          'modelValue': filters.value[field.column_name] ?? [],
+          'onUpdate:modelValue': (conditions: FilterCondition[]) => updateColumnFilter(field.column_name, conditions)
+        }),
+        filterSummary
+          ? h('span', {
+              title: filterSummary,
+              class: 'min-w-0 max-w-32 truncate rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold normal-case tracking-normal text-primary ring-1 ring-primary/20'
+            }, filterSummary)
+          : null
+      ])
     }
 
     cols.push(col)
@@ -205,9 +254,9 @@ const columns = computed<TableColumn<Record<string, any>>[]>(() => {
                     description: action.description,
                     icon: 'i-lucide-zap',
                     onSelect() {
-                      executeAction(action.slug, record.id)
-                    },
-                  })),
+                      executeAction(action.slug, String(record.id))
+                    }
+                  }))
                 ]
               : []),
             { type: 'separator' },
@@ -216,7 +265,7 @@ const columns = computed<TableColumn<Record<string, any>>[]>(() => {
               icon: 'i-lucide-trash',
               color: 'error',
               onSelect: async () => {
-                const success = await remove(record.id)
+                const success = await remove(String(record.id))
                 if (success) {
                   toast.add({ title: 'Inregistrare stearsa', color: 'success' })
                   await loadData()
@@ -239,7 +288,9 @@ const columns = computed<TableColumn<Record<string, any>>[]>(() => {
   return cols
 })
 
-const activeFilterCount = computed(() => Object.keys(filters.value).length)
+const activeFilterCount = computed(() =>
+  countActiveFilterConditions(filters.value, filterableFields.value)
+)
 const selectedIds = computed(() =>
   Object.entries(rowSelection.value)
     .filter(([, selected]) => selected)
@@ -310,7 +361,12 @@ async function confirmBulkDelete() {
     <div class="rounded-2xl border border-error/20 bg-error/5 py-12 shadow-sm">
       <UEmpty icon="i-lucide-alert-triangle" title="Eroare" :description="error">
         <template #actions>
-          <UButton label="Reincearca" icon="i-lucide-refresh-cw" variant="outline" @click="loadData" />
+          <UButton
+            label="Reincearca"
+            icon="i-lucide-refresh-cw"
+            variant="outline"
+            @click="loadData"
+          />
         </template>
       </UEmpty>
     </div>
@@ -323,16 +379,43 @@ async function confirmBulkDelete() {
       <div class="border-b border-default bg-linear-to-r from-primary/10 via-primary/5 to-transparent p-3">
         <div class="rounded-xl border border-primary/15 bg-white/85 p-2 shadow-sm backdrop-blur dark:bg-gray-900/85">
           <div class="flex flex-col gap-2 2xl:flex-row 2xl:items-center 2xl:justify-between">
-            <DynamicFilters :fields="filterFields" @change="handleFilterChange" />
+            <DynamicFilters :model-value="filters" :fields="filterFields" @update:model-value="updateFilters" />
 
             <div class="flex flex-wrap items-center gap-1.5 2xl:justify-end">
-              <UBadge color="primary" variant="soft" size="lg" class="px-3 py-1 text-sm font-semibold">
+              <UBadge
+                color="primary"
+                variant="soft"
+                size="lg"
+                class="px-3 py-1 text-sm font-semibold"
+              >
                 {{ meta.total }} total
               </UBadge>
-              <UBadge v-if="activeFilterCount > 0" color="warning" variant="soft" size="lg" class="px-3 py-1 text-sm font-semibold">
+              <UBadge
+                v-if="activeFilterCount > 0"
+                color="warning"
+                variant="soft"
+                size="lg"
+                class="px-3 py-1 text-sm font-semibold"
+              >
                 {{ activeFilterCount }} filtre
               </UBadge>
-              <UBadge v-if="selectedCount > 0" color="error" variant="soft" size="lg" class="px-3 py-1 text-sm font-semibold">
+              <UButton
+                v-if="activeFilterCount > 0"
+                label="Reseteaza filtre"
+                icon="i-lucide-x"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                class="rounded-full"
+                @click="clearAllFilters"
+              />
+              <UBadge
+                v-if="selectedCount > 0"
+                color="error"
+                variant="soft"
+                size="lg"
+                class="px-3 py-1 text-sm font-semibold"
+              >
                 {{ selectedCount }} selectate
               </UBadge>
 
@@ -375,7 +458,6 @@ async function confirmBulkDelete() {
                   class="rounded-full"
                 />
               </UDropdownMenu>
-
             </div>
           </div>
         </div>

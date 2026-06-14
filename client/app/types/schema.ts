@@ -6,7 +6,7 @@ export interface Field {
   name: string
   column_name: string
   data_type: 'varchar' | 'text' | 'integer' | 'numeric' | 'boolean' | 'datetime' | 'uuid'
-  ui_type: 'text' | 'textarea' | 'number' | 'select' | 'datepicker' | 'datetimepicker' | 'checkbox' | 'relation' | 'email' | 'phone' | 'currency' | 'file'
+  ui_type: 'text' | 'textarea' | 'number' | 'datepicker' | 'datetimepicker' | 'checkbox' | 'relation' | 'email' | 'phone' | 'currency' | 'file'
   default_value: string | null
   placeholder: string | null
   help_text: string | null
