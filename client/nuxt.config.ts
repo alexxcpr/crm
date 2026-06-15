@@ -17,7 +17,8 @@ export default defineNuxtConfig({
     apiBaseInternal: process.env.NUXT_API_BASE_INTERNAL || 'http://localhost:4000/api',
     public: {
       apiBase: process.env.NUXT_PUBLIC_API_BASE || '/api',
-      defaultTenantSlug: process.env.NUXT_PUBLIC_DEFAULT_TENANT_SLUG || 'dev'
+      defaultTenantSlug: process.env.NUXT_PUBLIC_DEFAULT_TENANT_SLUG || 'dev',
+      signupEnabled: process.env.NUXT_PUBLIC_SIGNUP_ENABLED === 'true'
     }
   },
 
