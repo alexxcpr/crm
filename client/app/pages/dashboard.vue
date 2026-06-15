@@ -8,7 +8,7 @@
 
       <!-- data contine utilizatorul returnat de NestJS din /api/user/me -->
       <div v-if="user" class="mb-6">
-        <p>Bun venit, <strong>{{ user.email }}</strong>!</p>
+        <p>Bun venit, <strong>{{ user.profile?.display_name || user.profile?.username || user.profile?.email }}</strong>!</p>
         <p class="text-sm text-gray-500">
           ID Utilizator: {{ user.id }}
         </p>
@@ -25,7 +25,7 @@
 // data contine tot ce returneaza getProfile din NestJS
 const { data, signOut } = useAuth()
 
-const user = computed(() => data.value as { id: number, email: string } | null)
+const user = computed(() => data.value as { id: string, profile?: { display_name?: string, username?: string, email?: string } } | null)
 
 async function handleLogout() {
   // Apeleaza automat NestJS pentru logout si sterge cookie-ul local

@@ -92,6 +92,15 @@ export function useNavigation() {
 
   fetchNavigation()
 
+  watch(
+    () => (session.value as { profileId?: string } | null)?.profileId,
+    (newProfileId, oldProfileId) => {
+      if (newProfileId && newProfileId !== oldProfileId) {
+        fetchNavigation()
+      }
+    }
+  )
+
   return {
     staticLinks,
     entityLinks,

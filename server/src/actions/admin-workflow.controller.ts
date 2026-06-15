@@ -9,12 +9,15 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Roles } from 'src/guards/roles.decorator';
+import { RolesGuard } from 'src/guards/roles.guard';
 import { returnValidResponse } from 'src/utils/crud.utils';
 import { WorkflowService } from './workflow.service';
 import { CreateWorkflowDto, UpdateWorkflowDto } from './dto';
 
 @Controller('v1/admin/workflows')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles('admin')
 export class AdminWorkflowController {
   constructor(private readonly workflowService: WorkflowService) {}
 

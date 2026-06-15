@@ -12,6 +12,8 @@ import { EntityEvent } from 'src/events/entity-event.enum';
 import type { EntityEventPayload } from 'src/events/entity-event.payload';
 import { WorkflowSyncService } from 'src/n8n/workflow-sync.service';
 import { CreateActionDto, UpdateActionDto } from './dto';
+import { AuthorizationService } from 'src/security/authorization.service';
+import { AuthenticatedUser } from 'src/security/security.types';
 
 @Injectable()
 export class ActionService {
@@ -22,6 +24,7 @@ export class ActionService {
     private readonly tenantContext: TenantContext,
     private readonly eventEmitter: EventEmitter2,
     private readonly workflowSync: WorkflowSyncService,
+    private readonly authorization: AuthorizationService,
   ) {}
 
   private get knex() {
@@ -48,11 +51,12 @@ export class ActionService {
     return { data: rows };
   }
 
-  async findByEntitySlug(entitySlug: string) {
+  async findByEntitySlug(entitySlug: string, actor: AuthenticatedUser) {
     const entity = await this.knex('entity').where('slug', entitySlug).first();
     if (!entity) {
       throw new NotFoundException(`Entitatea "${entitySlug}" nu exista.`);
     }
+    await this.authorization.require(actor, entity.id_entity, 'update');
 
     const rows = await this.knex(this.TABLE)
       .select('action_definition.*', 'workflow_definition.name as workflow_name')
@@ -204,12 +208,13 @@ export class ActionService {
     entitySlug: string,
     actionSlug: string,
     recordId: string,
-    userId: string,
+    actor: AuthenticatedUser,
   ) {
     const entity = await this.knex('entity').where('slug', entitySlug).first();
     if (!entity) {
       throw new NotFoundException(`Entitatea "${entitySlug}" nu exista.`);
     }
+    const scope = await this.authorization.require(actor, entity.id_entity, 'update');
 
     const action = await this.knex(this.TABLE)
       .where('slug', actionSlug)
@@ -223,9 +228,9 @@ export class ActionService {
       );
     }
 
-    const record = await this.knex(entity.table_name)
-      .where('id', recordId)
-      .first();
+    const recordQuery = this.knex(entity.table_name).where('id', recordId);
+    this.authorization.applyScope(recordQuery, entity.table_name, scope, actor.profileId);
+    const record = await recordQuery.first();
     if (!record) {
       throw new NotFoundException(
         `Inregistrarea "${recordId}" nu exista in "${entitySlug}".`,
@@ -233,7 +238,7 @@ export class ActionService {
     }
 
     this.logger.log(
-      `Executare manuala: ${actionSlug} pe ${entitySlug}#${recordId} de ${userId}`,
+      `Executare manuala: ${actionSlug} pe ${entitySlug}#${recordId} de profilul ${actor.profileId}`,
     );
 
     if (!action.id_workflow) {
@@ -252,7 +257,8 @@ export class ActionService {
           entityId: entity.id_entity,
           recordId,
           record,
-          userId,
+          userId: actor.id,
+          profileId: actor.profileId,
           tenant: this.tenantContext.slug,
           dbName: this.tenantContext.dbName,
           timestamp: new Date().toISOString(),
@@ -418,6 +424,7 @@ export class ActionService {
           recordId: payload.recordId,
           record: payload.data,
           userId: payload.userId,
+          profileId: payload.profileId,
         });
       }
     }
@@ -436,6 +443,7 @@ export class ActionService {
       record: payload.data,
       previousData: payload.previousData,
       userId: payload.userId,
+      profileId: payload.profileId,
       tenant: this.tenantContext.slug,
       dbName: this.tenantContext.dbName,
       timestamp: new Date().toISOString(),
@@ -450,6 +458,7 @@ export class ActionService {
       recordId: string | null;
       record: Record<string, any>;
       userId: string | null;
+      profileId: string | null;
     },
   ) {
     await this.eventEmitter.emitAsync('action.executed', {
@@ -461,6 +470,7 @@ export class ActionService {
       recordId: context.recordId,
       record: context.record,
       userId: context.userId,
+      profileId: context.profileId,
       tenantSlug: this.tenantContext.slug,
       tenantDb: this.tenantContext.dbName,
       timestamp: new Date(),

@@ -3,10 +3,9 @@ import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
 import { returnValidResponse } from 'src/utils/crud.utils';
 import { DynamicDataService } from './dynamic-data.service';
+import { AuthenticatedUser } from 'src/security/security.types';
 
-interface RequestWithUser extends Request {
-    user: { id: string; email: string };
-}
+interface RequestWithUser extends Request { user: AuthenticatedUser }
 
 @Controller('v1/data')
 @UseGuards(AuthGuard('jwt'))
@@ -17,16 +16,18 @@ export class DynamicDataController {
     findAll(
         @Param('entitySlug') entitySlug: string,
         @Query() query: Record<string, any>,
+        @Req() req: RequestWithUser,
     ) {
-        return this.dataService.findAll(entitySlug, query);
+        return this.dataService.findAll(entitySlug, query, req.user);
     }
 
     @Get(':entitySlug/:id')
     findOne(
         @Param('entitySlug') entitySlug: string,
         @Param('id') id: string,
+        @Req() req: RequestWithUser,
     ) {
-        return this.dataService.findOne(entitySlug, id);
+        return this.dataService.findOne(entitySlug, id, req.user);
     }
 
     @Post(':entitySlug')
@@ -35,7 +36,7 @@ export class DynamicDataController {
         @Body() body: Record<string, any>,
         @Req() req: RequestWithUser,
     ) {
-        const result = await this.dataService.create(entitySlug, body, req.user.id);
+        const result = await this.dataService.create(entitySlug, body, req.user);
         return returnValidResponse('Inregistrarea a fost creata cu succes.', result.data);
     }
 
@@ -46,7 +47,7 @@ export class DynamicDataController {
         @Body() body: Record<string, any>,
         @Req() req: RequestWithUser,
     ) {
-        const result = await this.dataService.update(entitySlug, id, body, req.user.id);
+        const result = await this.dataService.update(entitySlug, id, body, req.user);
         return returnValidResponse('Inregistrarea a fost actualizata cu succes.', result.data);
     }
 
@@ -56,7 +57,7 @@ export class DynamicDataController {
         @Param('id') id: string,
         @Req() req: RequestWithUser,
     ) {
-        await this.dataService.remove(entitySlug, id, req.user.id);
+        await this.dataService.remove(entitySlug, id, req.user);
         return returnValidResponse('Inregistrarea a fost stearsa cu succes.', null);
     }
 }

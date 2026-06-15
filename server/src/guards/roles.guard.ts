@@ -26,6 +26,9 @@ import {
       if (!user || !user.roles) {
         throw new ForbiddenException('Acces interzis. Autentificare necesara.');
       }
+      if (user.must_change_password) {
+        throw new ForbiddenException('Parola temporara trebuie schimbata inainte de a continua.');
+      }
   
       // "admin" cu permisiune "manage" are acces la orice
       if (user.roles.includes('admin')) {

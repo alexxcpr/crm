@@ -31,7 +31,8 @@ const {
   filterFields,
   loading: schemaLoading,
   error: schemaError,
-  schema
+  schema,
+  capabilities
 } = useEntitySchema(props.entity)
 
 const {
@@ -140,7 +141,7 @@ const columns = computed<TableColumn<TableRow>[]>(() => {
   const cols: TableColumn<TableRow>[] = []
 
   // Checkbox column
-  cols.push({
+  if (capabilities.value.delete) cols.push({
     id: 'select',
     meta: { class: { th: 'w-4', td: 'w-4' } },
     header: ({ table }) => h(UCheckbox, {
@@ -165,7 +166,7 @@ const columns = computed<TableColumn<TableRow>[]>(() => {
     meta: { class: { th: 'w-10', td: 'w-10' } },
     cell: ({ row }) => h(UButton, {
       icon: 'i-lucide-pencil',
-      label: 'Edit',
+      label: capabilities.value.update ? 'Edit' : 'Vezi',
       color: 'neutral',
       variant: 'ghost',
       size: 'xs',
@@ -234,8 +235,8 @@ const columns = computed<TableColumn<TableRow>[]>(() => {
           items: [
             { type: 'label', label: 'Actiuni' },
             {
-              label: 'Editeaza',
-              icon: 'i-lucide-pencil',
+              label: capabilities.value.update ? 'Editeaza' : 'Vezi',
+              icon: capabilities.value.update ? 'i-lucide-pencil' : 'i-lucide-eye',
               onSelect: () => emit('edit', record.id)
             },
             {
@@ -246,7 +247,7 @@ const columns = computed<TableColumn<TableRow>[]>(() => {
                 toast.add({ title: 'ID copiat', color: 'success' })
               }
             },
-            ...(visibleActions.value.length > 0
+            ...(capabilities.value.update && visibleActions.value.length > 0
               ? [
                   { type: 'separator' as const },
                   ...visibleActions.value.map(action => ({
@@ -259,8 +260,7 @@ const columns = computed<TableColumn<TableRow>[]>(() => {
                   }))
                 ]
               : []),
-            { type: 'separator' },
-            {
+            ...(capabilities.value.delete ? [{ type: 'separator' as const }, {
               label: 'Sterge',
               icon: 'i-lucide-trash',
               color: 'error',
@@ -273,7 +273,7 @@ const columns = computed<TableColumn<TableRow>[]>(() => {
                   toast.add({ title: 'Eroare la stergere', color: 'error' })
                 }
               }
-            }
+            }] : [])
           ]
         }, () => h(UButton, {
           icon: 'i-lucide-ellipsis-vertical',
@@ -420,7 +420,7 @@ async function confirmBulkDelete() {
               </UBadge>
 
               <UButton
-                v-if="selectedCount > 0"
+                v-if="capabilities.delete && selectedCount > 0"
                 :label="`Sterge (${selectedCount})`"
                 color="error"
                 variant="subtle"
@@ -450,6 +450,7 @@ async function confirmBulkDelete() {
                 :content="{ align: 'end' }"
               >
                 <UButton
+                  v-if="capabilities.create"
                   label="Coloane"
                   color="neutral"
                   variant="outline"

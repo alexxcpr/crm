@@ -11,13 +11,11 @@ const appConfig = useAppConfig()
 const colors = ['red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose']
 const neutrals = ['slate', 'gray', 'zinc', 'neutral', 'stone']
 
-const { data: session, signOut } = useAuth()
-
-type SessionUser = { id?: number, email?: string, name?: string } | null
+const { signOut } = useAuth()
+const { session, label: profileLabel, switchProfile } = useProfiles()
 
 const user = computed(() => {
-  const u = session.value as SessionUser
-  const userName = u?.email ?? u?.name ?? 'User Anonim'
+  const userName = profileLabel(session.value?.profile)
   return {
     name: userName,
     avatar: {
@@ -31,13 +29,16 @@ const items = computed<DropdownMenuItem[][]>(() => ([[{
   label: user.value.name,
   avatar: user.value.avatar
 }], [{
-  label: 'Profile',
-  icon: 'i-lucide-user'
+  label: 'Schimba profilul',
+  icon: 'i-lucide-users',
+  children: (session.value?.profiles ?? []).map(profile => ({
+    label: profileLabel(profile),
+    icon: profile.id_profile === session.value?.profileId ? 'i-lucide-check' : 'i-lucide-user',
+    disabled: profile.id_profile === session.value?.profileId,
+    onSelect: () => switchProfile(profile.id_profile)
+  }))
 }, {
-  label: 'Billing',
-  icon: 'i-lucide-credit-card'
-}, {
-  label: 'Settings',
+  label: 'Setari',
   icon: 'i-lucide-settings',
   to: '/settings'
 }], [{

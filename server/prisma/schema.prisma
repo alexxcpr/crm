@@ -18,13 +18,11 @@ model User {
   date_created DateTime  @default(now())
   date_updated DateTime  @updatedAt
 
-  email        String    @unique
+  login_username String  @unique @db.VarChar(100)
   hash         String
-
-  first_name   String?
-  last_name    String?
-
-  roles         UserRole[]
+  must_change_password Boolean @default(false)
+  is_active Boolean @default(true)
+  profiles Profile[]
   refreshTokens RefreshToken[]
 
   @@map("user")
@@ -34,11 +32,13 @@ model RefreshToken {
   id           String   @id @default(uuid())
   jti          String   @unique
   user_id      String
+  profile_id   String
   expires_at   DateTime
   is_revoked   Boolean  @default(false)
   date_created DateTime @default(now())
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profile_id], references: [id_profile], onDelete: Cascade)
 
   @@map("refresh_token")
 }
@@ -73,7 +73,6 @@ model Module {
   date_updated  DateTime  @updatedAt
 
   entities      Entity[]                           // Relatie 1:N - un modul contine mai multe entitati (Contacte, Companii, etc.)
-  permissions   RolePermission[]
 
   @@map("module")                                  // Numele real al tabelei in Postgres va fi "module", nu "Module"
 }
@@ -196,6 +195,22 @@ model Field {
   @@map("field")
 }
 
+model Profile {
+  id_profile String @id @default(uuid())
+  id_user String
+  username String @unique @db.VarChar(100)
+  email String @unique
+  display_name String? @db.VarChar(200)
+  is_default Boolean @default(false)
+  is_active Boolean @default(true)
+  date_created DateTime @default(now())
+  date_updated DateTime @updatedAt
+  user User @relation(fields: [id_user], references: [id], onDelete: Cascade)
+  roles ProfileRole[]
+  refreshTokens RefreshToken[]
+  @@map("profile")
+}
+
 model Role {
   id_role         String    @id @default(uuid())
   name            String    @db.VarChar(100)   //Administrator, Sales Rep, Viewer
@@ -205,7 +220,7 @@ model Role {
   date_created    DateTime  @default(now())
   date_updated    DateTime  @updatedAt
 
-  users           UserRole[]
+  profiles        ProfileRole[]
   permissions     RolePermission[]
 
   @@map("role")
@@ -213,28 +228,25 @@ model Role {
 
 //un user poate avea mai multe roluri
 //permisiunile se aduna (union), daca rolul A permite READ pe contacts si rolul B permite CREATE pe contacts, userul poate face ambele
-model UserRole {
-  id_user     String
+model ProfileRole {
+  id_profile  String
   id_role     String
-
-  user        User @relation(fields: [id_user], references: [id], onDelete: Cascade)
+  profile     Profile @relation(fields: [id_profile], references: [id_profile], onDelete: Cascade)
   role        Role @relation(fields: [id_role], references: [id_role], onDelete: Cascade)
-
-  @@id([id_user, id_role])
-  @@map("user_role")        
+  @@id([id_profile, id_role])
+  @@map("profile_role")
 }
 
 model RolePermission {
   id_permission   String   @id @default(uuid())
   id_role         String
-  id_module       String?                       // NULL = global
-  id_entity       String?                       // NULL = tot modulul / global
+  id_entity       String
   action          String   @db.VarChar(50)      // 'create', 'read', 'update', 'delete', 'manage'
+  scope           String?  @db.VarChar(20)
 
   role            Role     @relation(fields: [id_role], references: [id_role], onDelete: Cascade)
-  module          Module?  @relation(fields: [id_module], references: [id_module], onDelete: Cascade)
-  entity          Entity?  @relation(fields: [id_entity], references: [id_entity], onDelete: Cascade)
+  entity          Entity   @relation(fields: [id_entity], references: [id_entity], onDelete: Cascade)
 
-  @@unique([id_role, id_module, id_entity, action])
+  @@unique([id_role, id_entity, action])
   @@map("role_permission")
 }

@@ -16,28 +16,37 @@ const db = knex({
 });
 
 async function main() {
-  const { adminRoleId } = await seedRoles();
+  const { adminRoleId, userRoleId } = await seedRoles();
   await seedUser(adminRoleId);
   await seedCRM();
+  const entities = await db('entity').select('id_entity');
+  for (const entity of entities) {
+    await upsertPermission(adminRoleId, entity.id_entity, 'manage', 'all');
+    await upsertPermission(userRoleId, entity.id_entity, 'read', 'owner');
+    await upsertPermission(userRoleId, entity.id_entity, 'create', null);
+    await upsertPermission(userRoleId, entity.id_entity, 'update', 'owner');
+  }
 }
 
 async function seedUser(adminRoleId: string) {
   const hash = await argon2.hash('1234');
 
-  let user = await db('user').where('email', 'root@gmail.com').first();
+  let user = await db('user').where('login_username', 'root').first();
   if (!user) {
     [user] = await db('user')
-      .insert({ email: 'root@gmail.com', hash, first_name: 'Root', last_name: 'Admin' })
+      .insert({ login_username: 'root', hash, must_change_password: false, is_active: true })
       .returning('*');
+    await db('profile').insert({ id_profile: user.id, id_user: user.id, username: 'root', email: 'root@gmail.com', display_name: 'Root Admin', is_default: true });
   } else {
     await db('user').where('id', user.id).update({ hash });
   }
 
-  const exists = await db('user_role')
-    .where({ id_user: user.id, id_role: adminRoleId })
+  const profile = await db('profile').where('id_user', user.id).first();
+  const exists = await db('profile_role')
+    .where({ id_profile: profile.id_profile, id_role: adminRoleId })
     .first();
   if (!exists) {
-    await db('user_role').insert({ id_user: user.id, id_role: adminRoleId });
+    await db('profile_role').insert({ id_profile: profile.id_profile, id_role: adminRoleId });
   }
 
   console.log('Utilizator root creat si asociat cu rolul de admin.');
@@ -50,12 +59,7 @@ async function seedRoles() {
   console.log('Roluri create:', adminRole.name, userRole.name);
 
 
-  //Admin: permisiune globala "manage" (poate totul)
-  await upsertPermission(adminRole.id_role, 'manage');
-  await upsertPermission(userRole.id_role, 'read');
-
-  console.log('Permisiuni create pentru admin si user');
-  return { adminRoleId: adminRole.id_role };
+  return { adminRoleId: adminRole.id_role, userRoleId: userRole.id_role };
 }
 
 async function upsertRole(slug: string, name: string, description: string, isSystem: boolean) {
@@ -68,14 +72,12 @@ async function upsertRole(slug: string, name: string, description: string, isSys
   return role;
 }
 
-async function upsertPermission(idRole: string, action: string, idModule?: string, idEntity?: string) {
-  const where: Record<string, any> = { id_role: idRole, action };
-  where.id_module = idModule ?? null;
-  where.id_entity = idEntity ?? null;
+async function upsertPermission(idRole: string, idEntity: string, action: string, scope: 'all' | 'owner' | null) {
+  const where = { id_role: idRole, id_entity: idEntity, action };
 
   const exists = await db('role_permission').where(where).first();
   if (!exists) {
-    await db('role_permission').insert(where);
+    await db('role_permission').insert({ ...where, scope });
   }
 }
 
@@ -205,7 +207,7 @@ async function seedCRM() {
         table.uuid('id').primary().defaultTo(db.fn.uuid());
         table.timestamp('date_created', { useTz: true }).notNullable().defaultTo(db.fn.now());
         table.timestamp('date_updated', { useTz: true }).notNullable().defaultTo(db.fn.now());
-        table.uuid('id_owner').nullable();
+        table.uuid('id_profile').nullable().references('id_profile').inTable('profile').onDelete('RESTRICT');
       });
       console.log(`  Tabela "${entity.table_name}" creata.`);
     }

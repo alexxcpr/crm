@@ -1,6 +1,9 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { Request } from 'express';
 import { AuthService } from './auth.service';
-import { AuthDto } from './dto';
+import { AuthDto, SwitchProfileDto } from './dto';
+import { AuthenticatedUser } from 'src/security/security.types';
 
 @Controller('auth')
 export class AuthController {
@@ -27,5 +30,14 @@ export class AuthController {
   @Post('signout')
   signout(@Body('refreshToken') refreshToken: string) {
     return this.authService.signout(refreshToken);
+  }
+
+  @Post('switch-profile')
+  @UseGuards(AuthGuard('jwt'))
+  switchProfile(
+    @Req() req: Request & { user: AuthenticatedUser },
+    @Body() dto: SwitchProfileDto,
+  ) {
+    return this.authService.switchProfile(req.user.id, dto.profileId, dto.refreshToken);
   }
 }

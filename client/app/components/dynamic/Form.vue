@@ -15,6 +15,7 @@ const emit = defineEmits<{
 
 const toast = useToast()
 const router = useRouter()
+const { apiFetch } = useApi()
 
 // ─── Schema & Data ───
 const {
@@ -24,7 +25,8 @@ const {
   tabs,
   loading: schemaLoading,
   error: schemaError,
-  schema
+  schema,
+  capabilities
 } = useEntitySchema(props.entity)
 
 const {
@@ -48,10 +50,15 @@ const formState = reactive<Record<string, any>>({})
 const systemData = reactive({
   date_created: null as string | null,
   date_updated: null as string | null,
-  id_owner: null as string | null,
-  owner_email: null as string | null,
-  owner_name: null as string | null
+  id_profile: undefined as string | undefined,
+  profile_display: null as string | null
 })
+const originalProfileId = ref<string | null>(null)
+const activeProfiles = ref<Array<{ id_profile: string, display_name: string | null, username: string, email: string }>>([])
+const profileOptions = computed(() => activeProfiles.value.map(profile => ({
+  label: profile.display_name || profile.username || profile.email,
+  value: profile.id_profile
+})))
 const submitting = ref(false)
 const submitIntent = ref<'save' | 'copy'>('save')
 const copyWindow = shallowRef<Window | null>(null)
@@ -64,10 +71,12 @@ const showLeaveConfirm = ref(false)
 const isDirty = computed(() => {
   if (initialFormState.value === null) return false
   return initialFormState.value !== JSON.stringify(formState)
+    || originalProfileId.value !== (systemData.id_profile ?? null)
 })
 
 function captureInitialState() {
   initialFormState.value = JSON.stringify(formState)
+  originalProfileId.value = systemData.id_profile ?? null
 }
 
 // ─── Form ref for error handling ───
@@ -203,9 +212,12 @@ watch(() => schema.value, async (sch) => {
     if (record) {
       systemData.date_created = record.date_created || null
       systemData.date_updated = record.date_updated || null
-      systemData.id_owner = record.id_owner || null
-      systemData.owner_email = record.owner_email || null // NOU
-      systemData.owner_name = record.owner_name || null
+      systemData.id_profile = record.id_profile || undefined
+      originalProfileId.value = systemData.id_profile ?? null
+      systemData.profile_display = record.profile_display || null
+      if (capabilities.value.change_ownership) {
+        activeProfiles.value = await apiFetch('/user/profiles/active')
+      }
     }
     captureInitialState()
     initialLoading.value = false
@@ -223,6 +235,9 @@ async function onSubmit(event: FormSubmitEvent<Record<string, unknown>>) {
 
   try {
     const payload = buildPayload(event.data)
+    if (isEditMode.value && systemData.id_profile !== originalProfileId.value) {
+      payload.id_profile = systemData.id_profile
+    }
     let result: Record<string, any> | null
 
     if (intent === 'copy') {
@@ -253,6 +268,9 @@ async function onSubmit(event: FormSubmitEvent<Record<string, unknown>>) {
       }
       if (result.date_updated) {
         systemData.date_updated = result.date_updated
+      }
+      if (result.id_profile) {
+        systemData.id_profile = result.id_profile
       }
 
       toast.add({
@@ -354,9 +372,9 @@ async function handleAction(actionSlug: string, actionName: string) {
     if (record) {
       systemData.date_created = record.date_created || null
       systemData.date_updated = record.date_updated || null
-      systemData.id_owner = record.id_owner || null
-      systemData.owner_email = record.owner_email || null
-      systemData.owner_name = record.owner_name || null
+      systemData.id_profile = record.id_profile || undefined
+      originalProfileId.value = systemData.id_profile ?? null
+      systemData.profile_display = record.profile_display || null
     }
     captureInitialState()
   }
@@ -401,6 +419,7 @@ function revertForm() {
   for (const key of Object.keys(formState)) {
     formState[key] = initial[key] ?? null
   }
+  systemData.id_profile = originalProfileId.value ?? undefined
 }
 
 // Browser-level guard (refresh, tab close)
@@ -622,7 +641,15 @@ onUnmounted(() => {
           </div>
           <div class="flex items-center gap-1.5 ml-auto">
             <UIcon name="i-lucide-user" class="size-3.5" />
-            <span v-if="systemData.owner_email">{{ systemData.owner_email }}</span>
+            <USelectMenu
+              v-if="capabilities.change_ownership"
+              v-model="systemData.id_profile"
+              :items="profileOptions"
+              value-key="value"
+              size="xs"
+              class="min-w-44"
+            />
+            <span v-else-if="systemData.profile_display">{{ systemData.profile_display }}</span>
             <span v-else class="text-muted">-</span>
           </div>
         </div>
@@ -630,6 +657,7 @@ onUnmounted(() => {
         <!-- Linia 2: Butoane -->
         <div class="flex flex-wrap sm:flex-nowrap items-center gap-2">
           <UButton
+            v-if="isEditMode ? capabilities.update : capabilities.create"
             type="submit"
             :label="isEditMode ? 'Salvează' : 'Creează'"
             icon="i-lucide-check"
@@ -640,7 +668,7 @@ onUnmounted(() => {
             @click="submitIntent = 'save'"
           />
           <UButton
-            v-if="isEditMode"
+            v-if="isEditMode && capabilities.create"
             type="button"
             :label="isMobile ? '' : 'Salvează copie'"
             icon="i-lucide-copy"
@@ -663,7 +691,7 @@ onUnmounted(() => {
 
           <!-- Acțiuni workflow (mobil) -->
           <UButton
-            v-if="isEditMode && visibleActions.length > 0"
+            v-if="isEditMode && capabilities.update && visibleActions.length > 0"
             :label="isMobile ? '' : 'Acțiuni'"
             icon="i-lucide-zap"
             color="primary"
@@ -675,7 +703,7 @@ onUnmounted(() => {
 
           <!-- Șterge — împins în dreapta -->
           <UButton
-            v-if="isEditMode"
+            v-if="isEditMode && capabilities.delete"
             :label="isMobile ? '' : 'Șterge'"
             icon="i-lucide-trash-2"
             color="error"

@@ -27,7 +27,8 @@ export class DynamicSchemaService {
       table.uuid('id').primary().defaultTo(this.knex.fn.uuid());
       table.timestamp('date_created', { useTz: true }).notNullable().defaultTo(this.knex.fn.now());
       table.timestamp('date_updated', { useTz: true }).notNullable().defaultTo(this.knex.fn.now());
-      table.uuid('id_owner').nullable();
+      table.uuid('id_profile').nullable().references('id_profile').inTable('profile').onDelete('RESTRICT');
+      table.index('id_profile', `idx_${tableName}_id_profile`);
     });
 
     this.logger.log(`Tabela "${tableName}" a fost creata cu succes.`);

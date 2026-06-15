@@ -1,30 +1,39 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { ModuleDto } from '../dto/module.dto';
+import { AuthorizationService } from 'src/security/authorization.service';
+import { AuthenticatedUser } from 'src/security/security.types';
 
 @Injectable()
 export class AdminModulesService {
-  constructor(private readonly tenantContext: TenantContext) {}
+  constructor(private readonly tenantContext: TenantContext, private readonly authorization: AuthorizationService) {}
 
   private get knex() { return this.tenantContext.knex; }
 
-  async findAll() {
+  async findAll(user?: AuthenticatedUser) {
     const modules = await this.knex('module')
       .select('*')
       .orderBy('rank', 'asc');
 
     const result: any[] = [];
     for (const mod of modules) {
-      const entities = await this.knex('entity')
+      let entities = await this.knex('entity')
         .select('id_entity', 'name', 'slug', 'icon', 'label_plural', 'rank')
         .where('id_module', mod.id_module)
         .orderBy('rank', 'asc');
+      if (user && !user.roles.includes('admin')) {
+        const visible: any[] = [];
+        for (const entity of entities) {
+          if (await this.authorization.getScope(user, entity.id_entity, 'read')) visible.push(entity);
+        }
+        entities = visible;
+      }
 
       const [{ count }] = await this.knex('entity')
         .where('id_module', mod.id_module)
         .count('* as count');
 
-      result.push({
+      if (entities.length || user?.roles.includes('admin') || !user) result.push({
         ...mod,
         entities,
         _count: { entities: Number(count) },

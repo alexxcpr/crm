@@ -71,6 +71,9 @@ describe('DynamicSchemaService', () => {
       nullable: jest.fn().mockReturnThis(),
       unique: jest.fn().mockReturnThis(),
       alter: jest.fn().mockReturnThis(),
+      references: jest.fn().mockReturnThis(),
+      inTable: jest.fn().mockReturnThis(),
+      onDelete: jest.fn().mockReturnThis(),
     };
 
     mockTableBuilder = {
@@ -153,7 +156,7 @@ describe('DynamicSchemaService', () => {
       expect(mockTableBuilder.uuid).toHaveBeenCalledWith('id');
       expect(mockTableBuilder.timestamp).toHaveBeenCalledWith('date_created', { useTz: true });
       expect(mockTableBuilder.timestamp).toHaveBeenCalledWith('date_updated', { useTz: true });
-      expect(mockTableBuilder.uuid).toHaveBeenCalledWith('id_owner');
+      expect(mockTableBuilder.uuid).toHaveBeenCalledWith('id_profile');
     });
 
     it('skip daca tabela exista deja', async () => {

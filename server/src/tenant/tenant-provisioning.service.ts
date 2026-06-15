@@ -78,14 +78,17 @@ export class TenantProvisioningService {
     const tenantDb = this.createTenantConnection(dbName);
     try {
       const hash = await argon.hash(password || this.randomPassword());
-      await tenantDb('user')
-        .where({ email: 'admin@moduvis.local' })
-        .update({
-          email,
-          hash,
-          first_name: 'Admin',
-          last_name: 'Admin',
+      const user = await tenantDb('user').where({ login_username: 'admin' }).first();
+      if (!user) return;
+      const loginUsername = (email.split('@')[0] || 'admin').toLowerCase();
+      await tenantDb.transaction(async (trx) => {
+        await trx('user').where('id', user.id).update({ login_username: loginUsername, hash, must_change_password: true });
+        await trx('profile').where('id_user', user.id).update({
+          username: loginUsername,
+          email: email.toLowerCase(),
+          display_name: 'Admin',
         });
+      });
     } finally {
       await tenantDb.destroy();
     }

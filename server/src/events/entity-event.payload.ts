@@ -34,6 +34,9 @@ export interface EntityEventPayload {
   /** ID-ul utilizatorului care a inițiat operația */
   userId: string | null;
 
+  /** Profilul activ care a initiat operatia */
+  profileId: string | null;
+
   /** Timestamp-ul evenimentului */
   timestamp: Date;
 }

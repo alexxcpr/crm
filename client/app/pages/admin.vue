@@ -11,6 +11,10 @@ const links = [[{
   icon: 'i-lucide-database',
   to: '/admin/entities'
 }, {
+  label: 'Securitate',
+  icon: 'i-lucide-shield-check',
+  to: '/admin/security'
+}, {
   label: 'Workflow-uri',
   icon: 'i-lucide-workflow',
   to: '/admin/workflows'

@@ -27,12 +27,12 @@
         </h2>
 
         <form class="flex flex-col gap-4" @submit.prevent="handleLogin">
-          <UFormField label="Email" name="email" class="w-full">
+          <UFormField label="Username" name="loginUsername" class="w-full">
             <UInput
-              v-model="email"
-              type="email"
-              placeholder="email@exemplu.com"
-              icon="i-heroicons-envelope"
+              v-model="loginUsername"
+              type="text"
+              placeholder="username"
+              icon="i-heroicons-user"
               class="w-full"
               required
             />
@@ -65,7 +65,7 @@
           </p>
         </form>
 
-        <div class="text-center text-sm text-gray-500 dark:text-gray-400 mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
+        <div v-if="signupEnabled" class="text-center text-sm text-gray-500 dark:text-gray-400 mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
           Nu ai cont?
           <NuxtLink to="/register" class="text-primary-500 hover:text-primary-600 font-medium hover:underline">
             Creează unul
@@ -81,7 +81,8 @@
 const { signIn } = useAuth()
 
 // State-ul formularului
-const email = ref('')
+const loginUsername = ref('')
+const signupEnabled = useRuntimeConfig().public.signupEnabled
 const password = ref('')
 const isLoading = ref(false)
 const errorMessage = ref('')
@@ -94,7 +95,7 @@ async function handleLogin() {
   try {
     // Apelam metoda signIn (astfel, Nuxt face automat un POST spre http://localhost:4000/api/auth/signin)
     await signIn(
-      { email: email.value, password: password.value },
+      { loginUsername: loginUsername.value, password: password.value },
       { callbackUrl: '/' } // Unde sa ne redirectioneze daca login-ul are succes
     )
   } catch (error: any) {

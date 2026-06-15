@@ -58,7 +58,7 @@ export default defineNuxtPlugin(async () => {
       if (userData) {
         const dataState = useState<any>('auth:data', () => userData)
         dataState.value = userData
-        console.log('[01-auth-baseurl] session seeded for user:', (userData as any).email)
+        console.log('[01-auth-baseurl] session seeded for user:', (userData as any).login_username)
       }
     } catch (err: any) {
       // If the backend call fails, still seed data with a stub to prevent

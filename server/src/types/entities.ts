@@ -2,10 +2,10 @@ export interface User {
   id: string;
   date_created: Date;
   date_updated: Date;
-  email: string;
+  login_username: string;
   hash: string;
-  first_name: string | null;
-  last_name: string | null;
+  must_change_password: boolean;
+  is_active: boolean;
 }
 
 export interface UserWithRoles extends Omit<User, 'hash'> {
@@ -22,17 +22,17 @@ export interface Role {
   date_updated: Date;
 }
 
-export interface UserRole {
-  id_user: string;
+export interface ProfileRole {
+  id_profile: string;
   id_role: string;
 }
 
 export interface RolePermission {
   id_permission: string;
   id_role: string;
-  id_module: string | null;
-  id_entity: string | null;
+  id_entity: string;
   action: string;
+  scope: 'all' | 'owner' | null;
 }
 
 export interface Module {
@@ -117,7 +117,7 @@ export interface TenantInfo {
 
 export interface JwtPayload {
   sub: string;
-  email: string;
+  profileId: string;
   tenant: string;
   dbName: string;
 }

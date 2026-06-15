@@ -6,52 +6,34 @@ import { Request } from 'express';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { JwtPayload } from 'src/types/entities';
 
-const cookieExtractor = (req: Request): string | null => {
-  if (req.cookies?.['auth.token']) {
-    return req.cookies['auth.token'];
-  }
-  return null;
-};
+const cookieExtractor = (req: Request): string | null => req.cookies?.['auth.token'] ?? null;
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
-  constructor(
-    config: ConfigService,
-    private readonly tenantContext: TenantContext,
-  ) {
+  constructor(config: ConfigService, private readonly tenantContext: TenantContext) {
     super({
-      jwtFromRequest: ExtractJwt.fromExtractors([
-        cookieExtractor,
-        ExtractJwt.fromAuthHeaderAsBearerToken(),
-      ]),
+      jwtFromRequest: ExtractJwt.fromExtractors([cookieExtractor, ExtractJwt.fromAuthHeaderAsBearerToken()]),
       ignoreExpiration: false,
       secretOrKey: config.get<string>('JWT_SECRET') as string,
     });
   }
 
-  // Daca token-ul este valid, Passport apeleaza automat aceasta functie
-  // cu payload-ul decriptat
   async validate(payload: JwtPayload) {
+    if (!payload.profileId) throw new UnauthorizedException('Sesiune veche. Autentifica-te din nou.');
     const knex = this.tenantContext.knex;
-
-    const user = await knex('user')
-      .where('id', payload.sub)
-      .first();
-
-    if (!user) {
-      throw new UnauthorizedException();
-    }
-
-    const userRoles = await knex('user_role')
-      .join('role', 'user_role.id_role', 'role.id_role')
-      .where('user_role.id_user', user.id)
+    const user = await knex('user').where({ id: payload.sub, is_active: true }).first();
+    const profile = await knex('profile').where({ id_profile: payload.profileId, id_user: payload.sub, is_active: true }).first();
+    if (!user || !profile) throw new UnauthorizedException();
+    const roles = await knex('profile_role')
+      .join('role', 'profile_role.id_role', 'role.id_role')
+      .where('profile_role.id_profile', profile.id_profile)
       .select('role.slug');
-
-    const { hash: _, ...userWithoutHash } = user;
-
+    const { hash: _, ...safeUser } = user;
     return {
-      ...userWithoutHash,
-      roles: userRoles.map((ur: { slug: string }) => ur.slug),
+      ...safeUser,
+      profile,
+      profileId: profile.id_profile,
+      roles: roles.map((row: { slug: string }) => row.slug),
       tenant: payload.tenant,
       dbName: payload.dbName,
     };

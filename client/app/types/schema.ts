@@ -57,6 +57,17 @@ export interface EntitySchema {
   entity: EntityMeta
   fields: Field[]
   tabs: UiTab[]
+  capabilities: EntityCapabilities
+}
+
+export type PermissionScope = 'all' | 'owner' | null
+export interface EntityCapabilities {
+  read: PermissionScope
+  create: PermissionScope
+  update: PermissionScope
+  delete: PermissionScope
+  manage: PermissionScope
+  change_ownership: PermissionScope
 }
 
 // ─── Response-uri de la GET /api/v1/data/:entitySlug ───

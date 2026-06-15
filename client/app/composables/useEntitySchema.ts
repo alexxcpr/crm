@@ -2,19 +2,40 @@ import type { EntitySchema, Field } from '~/types/schema'
 
 const schemaCache = new Map<string, EntitySchema>()
 
+export function clearEntitySchemaCache(key?: string) {
+  if (key) {
+    for (const cacheKey of schemaCache.keys()) {
+      if (cacheKey.endsWith(`:${key}`)) {
+        schemaCache.delete(cacheKey)
+      }
+    }
+    return
+  }
+
+  schemaCache.clear()
+}
+
 export function useEntitySchema(entitySlug: MaybeRef<string>) {
   const slug = toValue(entitySlug)
   const { apiFetch } = useApi()
+  const { data: authData } = useAuth()
+  const { slug: tenantSlug } = useTenant()
+  const activeProfileId = computed(() => (authData.value as { profileId?: string } | null)?.profileId ?? 'anonymous')
 
   const schema = useState<EntitySchema | null>(`schema-${slug}`, () => null)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
+  function cacheKey(entityKey: string) {
+    return `${tenantSlug.value ?? 'default'}:${activeProfileId.value}:${entityKey}`
+  }
+
   async function fetchSchema(force = false) {
     const key = toValue(entitySlug)
+    const scopedKey = cacheKey(key)
 
-    if (!force && schemaCache.has(key)) {
-      schema.value = schemaCache.get(key)!
+    if (!force && schemaCache.has(scopedKey)) {
+      schema.value = schemaCache.get(scopedKey)!
       return
     }
 
@@ -23,7 +44,7 @@ export function useEntitySchema(entitySlug: MaybeRef<string>) {
 
     try {
       const data = await apiFetch<EntitySchema>(`/v1/schema/${key}`)
-      schemaCache.set(key, data)
+      schemaCache.set(scopedKey, data)
       schema.value = data
     }
     catch (err: any) {
@@ -36,12 +57,7 @@ export function useEntitySchema(entitySlug: MaybeRef<string>) {
   }
 
   function invalidateCache(key?: string) {
-    if (key) {
-      schemaCache.delete(key)
-    }
-    else {
-      schemaCache.clear()
-    }
+    clearEntitySchemaCache(key)
   }
 
   // ─── Computed helpers ───
@@ -71,6 +87,9 @@ export function useEntitySchema(entitySlug: MaybeRef<string>) {
   })
 
   const groups = computed(() => tabs.value.map(t => t.slug))
+  const capabilities = computed(() => schema.value?.capabilities ?? {
+    read: null, create: null, update: null, delete: null, manage: null, change_ownership: null
+  })
 
   function getFieldBySlug(fieldSlug: string): Field | undefined {
     return fields.value.find(f => f.slug === fieldSlug)
@@ -85,6 +104,13 @@ export function useEntitySchema(entitySlug: MaybeRef<string>) {
   // Fetch automat la initializare
   fetchSchema()
 
+  watch(activeProfileId, async (newProfileId, oldProfileId) => {
+    if (newProfileId === oldProfileId) return
+
+    schema.value = null
+    await fetchSchema(true)
+  })
+
   return {
     schema,
     entity,
@@ -94,6 +120,7 @@ export function useEntitySchema(entitySlug: MaybeRef<string>) {
     filterFields,
     tabs,
     groups,
+    capabilities,
     loading,
     error,
     fetchSchema,

@@ -90,6 +90,11 @@
 <script setup lang="ts">
 // Importam metoda signUp din pachetul de auth
 const { signUp } = useAuth()
+const signupEnabled = useRuntimeConfig().public.signupEnabled
+
+if (!signupEnabled) {
+  await navigateTo('/login', { replace: true })
+}
 
 // State-ul formularului
 const email = ref('')

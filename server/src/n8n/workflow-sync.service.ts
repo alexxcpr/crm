@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { N8nApiClient, N8nWorkflowJson } from './n8n-api.client';
 
@@ -53,6 +54,7 @@ export class WorkflowSyncService {
     private readonly n8nClient: N8nApiClient,
     private readonly tenantContext: TenantContext,
     private readonly config: ConfigService,
+    private readonly jwt: JwtService,
   ) {
     this.webhookBaseUrl = config.get<string>(
       'APP_WEBHOOK_BASE_URL',
@@ -197,7 +199,16 @@ export class WorkflowSyncService {
       ? this.tenantContext.slug
       : 'unknown';
     const webhookPath = `crm-${tenantSlug}-${workflow.slug}`;
-    const result = await this.n8nClient.executeWebhook(webhookPath, inputData, n8nId);
+    const workflowToken = inputData.userId && inputData.profileId
+      ? await this.jwt.signAsync({
+          sub: inputData.userId,
+          profileId: inputData.profileId,
+          tenant: this.tenantContext.slug,
+          dbName: this.tenantContext.dbName,
+          purpose: 'workflow',
+        }, { expiresIn: '15m' })
+      : null;
+    const result = await this.n8nClient.executeWebhook(webhookPath, { ...inputData, workflowToken }, n8nId);
 
     this.logger.log(
       `Executed workflow "${workflow.slug}" via webhook ${webhookPath}`,
@@ -241,6 +252,7 @@ export class WorkflowSyncService {
     recordId: string | null;
     record: Record<string, any>;
     userId: string | null;
+    profileId: string | null;
     tenantSlug: string;
     tenantDb: string;
     timestamp: Date;
@@ -256,6 +268,7 @@ export class WorkflowSyncService {
         recordId: payload.recordId,
         record: payload.record,
         userId: payload.userId,
+        profileId: payload.profileId,
         tenant: payload.tenantSlug,
         dbName: payload.tenantDb,
         timestamp: payload.timestamp.toISOString(),
@@ -560,16 +573,15 @@ export class WorkflowSyncService {
   ): Record<string, any> {
     const webhookDataBase = `${this.webhookBaseUrl}/v1/webhooks/n8n/${tenantSlug}/data`;
 
-    const webhookHeaders = this.webhookSecret
-      ? {
-          sendHeaders: true,
-          headerParameters: {
-            parameters: [
-              { name: 'x-webhook-secret', value: this.webhookSecret },
-            ],
-          },
-        }
-      : { sendHeaders: false };
+    const webhookHeaders = {
+      sendHeaders: true,
+      headerParameters: {
+        parameters: [
+          ...(this.webhookSecret ? [{ name: 'x-webhook-secret', value: this.webhookSecret }] : []),
+          { name: 'x-workflow-token', value: `={{ $('${startNodeId}').first().json.body.workflowToken }}` },
+        ],
+      },
+    };
 
     switch (nodeType) {
       case 'app_get_record': {
@@ -723,7 +735,7 @@ export class WorkflowSyncService {
                 ...Object.entries(resolvedFields).map(
                   ([key, value]) => ({ name: key, value }),
                 ),
-                { name: 'id_owner', value: `={{ $('${startNodeId}').first().json.body.userId }}` },
+                { name: 'id_profile', value: `={{ $('${startNodeId}').first().json.body.profileId }}` },
               ],
             },
             ...webhookHeaders,

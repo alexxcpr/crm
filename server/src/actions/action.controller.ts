@@ -10,10 +10,9 @@ import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
 import { returnValidResponse } from 'src/utils/crud.utils';
 import { ActionService } from './action.service';
+import { AuthenticatedUser } from 'src/security/security.types';
 
-interface RequestWithUser extends Request {
-  user: { id: string; email: string };
-}
+interface RequestWithUser extends Request { user: AuthenticatedUser }
 
 @Controller('v1/actions')
 @UseGuards(AuthGuard('jwt'))
@@ -21,8 +20,8 @@ export class ActionController {
   constructor(private readonly actionService: ActionService) {}
 
   @Get(':entitySlug')
-  async getActionsForEntity(@Param('entitySlug') entitySlug: string) {
-    return this.actionService.findByEntitySlug(entitySlug);
+  async getActionsForEntity(@Param('entitySlug') entitySlug: string, @Req() req: RequestWithUser) {
+    return this.actionService.findByEntitySlug(entitySlug, req.user);
   }
 
   @Post(':entitySlug/:actionSlug/execute')
@@ -36,7 +35,7 @@ export class ActionController {
       entitySlug,
       actionSlug,
       recordId,
-      req.user.id,
+      req.user,
     );
     return returnValidResponse('Actiunea a fost executata cu succes.', result);
   }

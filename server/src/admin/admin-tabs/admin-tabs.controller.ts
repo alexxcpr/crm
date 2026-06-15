@@ -8,6 +8,7 @@ import { CreateTabDto, UpdateTabDto } from '../dto/tab.dto';
 
 @Controller('v1/admin/entities/:entityId/tabs')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles('admin')
 export class AdminTabsController {
   constructor(private readonly tabsService: AdminTabsService) {}
 

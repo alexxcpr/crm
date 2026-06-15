@@ -26,6 +26,7 @@ import { TenantProvisioningService } from './tenant-provisioning.service';
     TenantProvisioningService,
   ],
   exports: [
+    JwtModule,
     TenantConnectionManager,
     TenantContext,
     MetaDbService,

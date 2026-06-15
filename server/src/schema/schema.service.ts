@@ -1,18 +1,22 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { TenantContext } from 'src/tenant/tenant-context.service';
+import { AuthorizationService } from 'src/security/authorization.service';
+import { AuthenticatedUser } from 'src/security/security.types';
 
 @Injectable()
 export class SchemaService {
-  constructor(private readonly tenantContext: TenantContext) {}
+  constructor(private readonly tenantContext: TenantContext, private readonly authorization: AuthorizationService) {}
 
   private get knex() { return this.tenantContext.knex; }
 
-  async getEntitySchema(entitySlug: string) {
+  async getEntitySchema(entitySlug: string, user: AuthenticatedUser) {
     const entity = await this.knex('entity').where('slug', entitySlug).first();
 
     if (!entity) {
       throw new NotFoundException(`Entitatea "${entitySlug}" nu exista.`);
     }
+    await this.authorization.require(user, entity.id_entity, 'read');
+    const capabilities = await this.authorization.capabilities(user, entity.id_entity);
 
     const fields = await this.knex('field')
       .leftJoin('ui_tab', 'field.id_ui_tab', 'ui_tab.id_ui_tab')
@@ -90,6 +94,7 @@ export class SchemaService {
       },
       fields: enrichedFields,
       tabs,
+      capabilities,
     };
   }
 }

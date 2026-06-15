@@ -6,7 +6,7 @@ definePageMeta({
 const route = useRoute()
 const entitySlug = computed(() => route.params.entity as string)
 
-const { entity: entityMeta } = useEntitySchema(entitySlug)
+const { entity: entityMeta, capabilities } = useEntitySchema(entitySlug)
 </script>
 
 <template>
@@ -38,6 +38,7 @@ const { entity: entityMeta } = useEntitySchema(entitySlug)
 
         <template #right>
           <UButton
+            v-if="capabilities.create"
             icon="i-lucide-plus"
             color="primary"
             variant="solid"

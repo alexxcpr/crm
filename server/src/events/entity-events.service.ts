@@ -28,6 +28,7 @@ export class EntityEventsService {
       data: Record<string, any>;
       previousData?: Record<string, any>;
       userId: string | null;
+      profileId: string | null;
     },
   ): Promise<void> {
     const payload: EntityEventPayload = {
@@ -41,6 +42,7 @@ export class EntityEventsService {
       data: context.data,
       previousData: context.previousData,
       userId: context.userId,
+      profileId: context.profileId,
       timestamp: new Date(),
     };
 

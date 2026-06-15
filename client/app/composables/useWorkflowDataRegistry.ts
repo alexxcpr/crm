@@ -151,7 +151,7 @@ export function useWorkflowDataRegistry(
         { column_name: 'id', name: 'ID (sistem)', slug: '_sys_id', data_type: 'uuid', ui_type: 'text' },
         { column_name: 'date_created', name: 'Data creare (sistem)', slug: '_sys_date_created', data_type: 'datetime', ui_type: 'datetimepicker' },
         { column_name: 'date_updated', name: 'Data actualizare (sistem)', slug: '_sys_date_updated', data_type: 'datetime', ui_type: 'datetimepicker' },
-        { column_name: 'id_owner', name: 'Owner (sistem)', slug: '_sys_id_owner', data_type: 'uuid', ui_type: 'text' },
+        { column_name: 'id_profile', name: 'Profil owner (sistem)', slug: '_sys_id_profile', data_type: 'uuid', ui_type: 'text' },
       ] as Field[]
       const fields = [...systemFields, ...customFields]
       schemaCache.set(entitySlug, { name: schema.entity.name, fields })
