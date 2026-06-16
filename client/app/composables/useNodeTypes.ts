@@ -260,6 +260,31 @@ export function useNodeTypes() {
       ]
     },
     {
+      type: 'validate',
+      label: 'Validare',
+      icon: 'i-lucide-shield-check',
+      category: 'logic',
+      color: '#f59e0b',
+      description: 'Opreste workflow-ul cu eroare cand conditia este indeplinita.',
+      defaults: { conditions: [], combinator: 'and', message: '' },
+      configFields: [
+        { key: 'conditions', label: 'Conditii de eroare', type: 'condition-editor', required: true },
+        { key: 'message', label: 'Mesaj eroare', type: 'textarea', required: true }
+      ]
+    },
+    {
+      type: 'stop_error',
+      label: 'Stop cu Eroare',
+      icon: 'i-lucide-octagon-x',
+      category: 'logic',
+      color: '#ef4444',
+      description: 'Opreste workflow-ul si returneaza un mesaj de eroare.',
+      defaults: { message: '' },
+      configFields: [
+        { key: 'message', label: 'Mesaj eroare', type: 'textarea', required: true }
+      ]
+    },
+    {
       type: 'delay',
       label: 'Asteapta',
       icon: 'i-lucide-clock',

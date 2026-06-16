@@ -11,6 +11,7 @@ import { TenantContext } from 'src/tenant/tenant-context.service';
 import { EntityEvent } from 'src/events/entity-event.enum';
 import type { EntityEventPayload } from 'src/events/entity-event.payload';
 import { WorkflowSyncService } from 'src/n8n/workflow-sync.service';
+import { extractValidationError } from 'src/n8n/workflow-error.utils';
 import { CreateActionDto, UpdateActionDto } from './dto';
 import { AuthorizationService } from 'src/security/authorization.service';
 import { AuthenticatedUser } from 'src/security/security.types';
@@ -283,10 +284,14 @@ export class ActionService {
       // If the error message looks like a CRM business error (not an n8n infra error),
       // pass it through cleanly so the user sees the validation message directly.
       const msg = err.message ?? '';
+      const validationMessage = extractValidationError(msg);
       const isN8nInfra = msg.startsWith('n8n') || msg.includes('workflow');
       this.logger.error(
         `Eroare la executia workflow-ului "${action.id_workflow}" / ${action.slug}: ${msg}`,
       );
+      if (validationMessage) {
+        throw new BadRequestException(validationMessage);
+      }
       throw new BadRequestException(
         isN8nInfra ? `Eroare la executia workflow-ului: ${msg}` : msg,
       );
@@ -383,7 +388,11 @@ export class ActionService {
       return events.includes(event) || events.includes(shortEvent);
     });
 
-    const isBeforeInsert = event === EntityEvent.BeforeInsert;
+    const isBeforeEvent = [
+      EntityEvent.BeforeInsert,
+      EntityEvent.BeforeUpdate,
+      EntityEvent.BeforeDelete,
+    ].includes(event);
 
     for (const action of matched) {
       if (!this.matchesConditions(action.trigger_conditions, payload)) {
@@ -396,22 +405,28 @@ export class ActionService {
 
       if (!action.id_workflow) continue;
 
-      if (isBeforeInsert) {
-        // BeforeInsert: execută workflow-ul direct și face merge în DTO
+      if (isBeforeEvent) {
+        // Before events run synchronously so validation workflows can block CRUD.
         try {
           const collected = await this.workflowSync.executeAndCollect(
             action.id_workflow,
             this.buildWorkflowInput(action, payload),
           );
-          Object.assign(payload.data, collected);
+          if (event !== EntityEvent.BeforeDelete) {
+            Object.assign(payload.data, collected);
+          }
           this.logger.log(
-            `BeforeInsert merge: ${action.slug} → ${Object.keys(collected).join(', ')}`,
+            `Before workflow: ${action.slug} -> ${Object.keys(collected).join(', ')}`,
           );
         } catch (err) {
           const msg = err.message ?? 'Eroare necunoscuta';
+          const validationMessage = extractValidationError(msg);
           this.logger.error(
-            `BeforeInsert workflow "${action.slug}" a esuat: ${msg}`,
+            `Before workflow "${action.slug}" a esuat: ${msg}`,
           );
+          if (validationMessage) {
+            throw new BadRequestException(validationMessage);
+          }
           throw new BadRequestException(
             `Actiunea automata "${action.name}" a esuat: ${msg}`,
           );

@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { N8nApiClient, N8nWorkflowJson } from './n8n-api.client';
+import { withValidationPrefix } from './workflow-error.utils';
 
 interface NodeDefinition {
   id: string;
@@ -483,6 +484,10 @@ export class WorkflowSyncService {
       this.translateNode(node, index, tenantSlug, startEntitySlug, startNodeId, nodes),
     );
 
+    for (const node of nodes.filter((n) => n.type === 'validate')) {
+      n8nNodes.push(this.buildValidationErrorNode(node));
+    }
+
     // Set predictable webhook path so we can call it from the CRM
     const webhookPath = `crm-${tenantSlug}-${workflow.slug}`;
     for (const n8nNode of n8nNodes) {
@@ -492,6 +497,7 @@ export class WorkflowSyncService {
     }
 
     const n8nConnections = this.translateConnections(connections, nodes);
+    this.attachValidationErrorBranches(n8nConnections, nodes);
 
     return {
       name: `[${tenantSlug}] ${workflow.name}`,
@@ -521,6 +527,8 @@ export class WorkflowSyncService {
       http_request: 'n8n-nodes-base.httpRequest',
       email: 'n8n-nodes-base.emailSend',
       condition: 'n8n-nodes-base.if',
+      validate: 'n8n-nodes-base.if',
+      stop_error: 'n8n-nodes-base.stopAndError',
       delay: 'n8n-nodes-base.wait',
       set_data: 'n8n-nodes-base.set',
       code: 'n8n-nodes-base.code',
@@ -768,7 +776,8 @@ export class WorkflowSyncService {
           options: {},
         };
 
-      case 'condition': {
+      case 'condition':
+      case 'validate': {
         const conditions: any[] = params.conditions ?? []
         const combinator = params.combinator ?? 'and'
         const result: Record<string, any> = {
@@ -808,6 +817,12 @@ export class WorkflowSyncService {
 
         return result
       }
+
+      case 'stop_error':
+        return {
+          errorType: 'errorMessage',
+          errorMessage: withValidationPrefix(params.message),
+        };
 
       case 'delay':
         return {
@@ -868,6 +883,9 @@ export class WorkflowSyncService {
     const n8nConnections: Record<string, any> = {};
 
     for (const conn of connections) {
+      const sourceNode = nodes.find((node) => node.id === conn.source);
+      if (sourceNode?.type === 'stop_error') continue;
+
       const sourceName = nodeNameMap.get(conn.source);
       if (!sourceName) continue;
 
@@ -878,7 +896,10 @@ export class WorkflowSyncService {
       const targetName = nodeNameMap.get(conn.target);
       if (!targetName) continue;
 
-      const outputIndex = conn.sourceHandle === 'false' ? 1 : 0;
+      const outputIndex =
+        sourceNode?.type === 'validate'
+          ? 1
+          : conn.sourceHandle === 'false' ? 1 : 0;
 
       while (n8nConnections[sourceName].main.length <= outputIndex) {
         n8nConnections[sourceName].main.push([]);
@@ -892,5 +913,44 @@ export class WorkflowSyncService {
     }
 
     return n8nConnections;
+  }
+
+  private buildValidationErrorNode(node: NodeDefinition): Record<string, any> {
+    const id = `${node.id}__validation_error`;
+    return {
+      id,
+      name: id,
+      type: 'n8n-nodes-base.stopAndError',
+      typeVersion: 1,
+      position: [
+        (node.position?.x ?? 0) + 250,
+        (node.position?.y ?? 0) + 130,
+      ],
+      parameters: {
+        errorType: 'errorMessage',
+        errorMessage: withValidationPrefix(node.parameters?.message),
+      },
+    };
+  }
+
+  private attachValidationErrorBranches(
+    n8nConnections: Record<string, any>,
+    nodes: NodeDefinition[],
+  ): void {
+    for (const node of nodes.filter((n) => n.type === 'validate')) {
+      if (!n8nConnections[node.id]) {
+        n8nConnections[node.id] = { main: [[]] };
+      }
+
+      while (n8nConnections[node.id].main.length <= 1) {
+        n8nConnections[node.id].main.push([]);
+      }
+
+      n8nConnections[node.id].main[0].push({
+        node: `${node.id}__validation_error`,
+        type: 'main',
+        index: 0,
+      });
+    }
   }
 }

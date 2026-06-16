@@ -14,7 +14,8 @@ const props = defineProps<{
 }>()
 
 const isCondition = computed(() => props.data.nodeType === 'condition')
-const isTrigger = computed(() => props.data.nodeType === 'start')
+const isTrigger = computed(() => ['start', 'trigger', 'webhook_trigger'].includes(props.data.nodeType))
+const isTerminal = computed(() => props.data.nodeType === 'stop_error')
 const isSetData = computed(() => props.data.nodeType === 'set_data')
 
 // Resolve entity display info from node parameters
@@ -82,6 +83,7 @@ const setDataInfo = computed(() => {
     />
 
     <Handle
+      v-if="!isTerminal"
       :id="isCondition ? 'true' : undefined"
       type="source"
       :position="Position.Right"

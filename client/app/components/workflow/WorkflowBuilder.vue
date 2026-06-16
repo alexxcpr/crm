@@ -160,6 +160,13 @@ const { getNodeType } = useNodeTypes()
 
 const TRIGGER_TYPES = new Set(['start', 'trigger', 'webhook_trigger'])
 
+function isMissingRequiredValue(value: unknown) {
+  if (value === undefined || value === null) return true
+  if (typeof value === 'string') return value.trim() === ''
+  if (Array.isArray(value)) return value.length === 0
+  return false
+}
+
 async function save() {
   const triggerNodes = nodes.value.filter(n => TRIGGER_TYPES.has(n.data?.nodeType))
   if (triggerNodes.length === 0) {
@@ -191,7 +198,7 @@ async function save() {
     for (const field of def.configFields) {
       if (!field.required) continue
       const value = params[field.key]
-      if (value === undefined || value === null || value === '') {
+      if (isMissingRequiredValue(value)) {
         toast.add({
           title: `Camp obligatoriu necompletat in nodul "${node.data.label}"`,
           description: `Campul "${field.label}" este obligatoriu. Completeaza-l inainte de a salva.`,

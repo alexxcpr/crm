@@ -20,7 +20,7 @@ const selectedTime = ref({ hour: 0, minute: 0, second: 0 })
 const popoverOpen = ref(false)
 const isTextFocused = ref(false)
 
-type CalendarDisplayValue = DateValue & {
+type CalendarDisplayValue = {
   day: number
   month: number
   year: number
