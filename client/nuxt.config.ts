@@ -24,6 +24,11 @@ export default defineNuxtConfig({
 
   compatibilityDate: '2024-07-11',
 
+  icon: {
+    // Avoid clash with Traefik routing /api/* to the NestJS backend
+    localApiEndpoint: '/_nuxt_icon'
+  },
+
   auth: {
     isEnabled: true,
     baseURL: process.env.NUXT_PUBLIC_API_BASE || '/api',
@@ -44,8 +49,8 @@ export default defineNuxtConfig({
         cookieName: 'auth.token',
         maxAgeInSeconds: 1800,
         sameSiteAttribute: 'lax',
-        secureCookieAttribute: process.env.NODE_ENV === 'production',
-        httpOnlyCookieAttribute: process.env.NODE_ENV === 'production'
+        secureCookieAttribute: process.env.NUXT_AUTH_SECURE_COOKIE === 'true',
+        httpOnlyCookieAttribute: process.env.NUXT_AUTH_HTTP_ONLY === 'true'
       },
       refresh: {
         isEnabled: true,
@@ -57,8 +62,8 @@ export default defineNuxtConfig({
           refreshResponseTokenPointer: '/accessToken',
           maxAgeInSeconds: 60 * 60 * 24,      // 1 zi
           sameSiteAttribute: 'lax',
-          secureCookieAttribute: process.env.NODE_ENV === 'production',
-          httpOnlyCookieAttribute: process.env.NODE_ENV === 'production'
+          secureCookieAttribute: process.env.NUXT_AUTH_SECURE_COOKIE === 'true',
+          httpOnlyCookieAttribute: process.env.NUXT_AUTH_HTTP_ONLY === 'true'
         }
       }
     },

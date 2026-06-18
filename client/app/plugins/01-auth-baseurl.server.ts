@@ -20,12 +20,10 @@ export default defineNuxtPlugin(async () => {
   const config = useRuntimeConfig()
 
   if (import.meta.server) {
-    // --- Patch 1: force baseURL to the internal backend URL ---
-    if (config.apiBaseInternal) {
-      config.public.auth.baseURL = config.apiBaseInternal as string
-    }
+    // Do NOT mutate config.public.auth.baseURL here — it is serialized into
+    // __NUXT__ and would make the browser call http://backend:4000/api.
 
-    // --- Patch 2: manually restore the full session from the cookie ---
+    // --- Patch 1: manually restore the full session from the cookie ---
     const event = useRequestEvent()
     if (!event) return
 

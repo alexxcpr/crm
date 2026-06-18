@@ -16,6 +16,7 @@ function validateProductionEnv(): void {
     'DB_PASSWORD',
     'META_DB',
     'DOMAIN_BASE',
+    'PROVISIONING_INTERNAL_SECRET',
   ];
 
   const missing = required.filter((key) => !process.env[key]);

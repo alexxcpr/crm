@@ -7,6 +7,7 @@ import { TenantMiddleware } from './tenant.middleware';
 import { BillingApiClient } from './billing-api.client';
 import { MetaDbService } from './meta-db.service';
 import { TenantProvisioningService } from './tenant-provisioning.service';
+import { InternalProvisioningController } from './internal-provisioning.controller';
 
 @Global()
 @Module({
@@ -25,6 +26,7 @@ import { TenantProvisioningService } from './tenant-provisioning.service';
     BillingApiClient,
     TenantProvisioningService,
   ],
+  controllers: [InternalProvisioningController],
   exports: [
     JwtModule,
     TenantConnectionManager,
@@ -38,7 +40,13 @@ export class TenantModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(TenantMiddleware)
-      .exclude({ path: 'health', method: RequestMethod.GET })
+      .exclude(
+        { path: 'health', method: RequestMethod.GET },
+        { path: 'internal/provisioning/tenants', method: RequestMethod.POST },
+        { path: 'internal/provisioning/tenants/availability', method: RequestMethod.GET },
+        { path: 'internal/provisioning/tenants/:slug/status', method: RequestMethod.GET },
+        { path: 'internal/provisioning/tenants/:slug/admin-credentials', method: RequestMethod.POST },
+      )
       .forRoutes('*');
   }
 }

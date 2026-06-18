@@ -128,6 +128,7 @@ export class N8nApiClient implements OnModuleInit {
   ): Promise<any> {
     const url = `${this.baseUrl}/webhook/${path}`;
     this.logger.log(`Calling n8n webhook: ${url}`);
+    const startedAt = Date.now();
 
     const response = await fetch(url, {
       method: 'POST',
@@ -175,14 +176,47 @@ export class N8nApiClient implements OnModuleInit {
       throw new Error(`n8n: ${detail}`);
     }
 
-    return response.json();
+    const result = await response.json();
+
+    // Some n8n webhook executions can return HTTP 200 even though a later node
+    // failed internally. Check the execution log for an error created by this
+    // call before reporting success to Moduvis.
+    if (n8nWorkflowId) {
+      const execError = await this.fetchRecentExecutionError(
+        n8nWorkflowId,
+        startedAt,
+      );
+      if (execError) {
+        throw new Error(`n8n: ${execError}`);
+      }
+    }
+
+    return result;
   }
 
   /**
    * Fetches the most recent failed execution for a workflow and extracts
    * the error from the failing node. Returns null if nothing useful is found.
    */
-  private async fetchLastExecutionError(n8nWorkflowId: string): Promise<string | null> {
+  private async fetchRecentExecutionError(
+    n8nWorkflowId: string,
+    startedAfterMs: number,
+  ): Promise<string | null> {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const error = await this.fetchLastExecutionError(
+        n8nWorkflowId,
+        startedAfterMs,
+      );
+      if (error) return error;
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    return null;
+  }
+
+  private async fetchLastExecutionError(
+    n8nWorkflowId: string,
+    startedAfterMs?: number,
+  ): Promise<string | null> {
     // 1. List recent error executions
     const listResult = await this.request<any>(
       'GET',
@@ -202,6 +236,16 @@ export class N8nApiClient implements OnModuleInit {
     const latest = list[0];
     const executionId = latest.id;
     if (!executionId) return null;
+
+    if (startedAfterMs && latest.startedAt) {
+      const executionStartedAt = new Date(latest.startedAt).getTime();
+      if (
+        Number.isFinite(executionStartedAt) &&
+        executionStartedAt < startedAfterMs - 1000
+      ) {
+        return null;
+      }
+    }
 
     let fullExec = await this.request<any>(
       'GET',

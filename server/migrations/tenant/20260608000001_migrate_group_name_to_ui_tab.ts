@@ -1,19 +1,27 @@
 import type { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
-  // 1. Create ui_tab table
-  await knex.schema.createTable('ui_tab', (t) => {
-    t.uuid('id_ui_tab').primary().defaultTo(knex.fn.uuid());
-    t.uuid('id_entity').notNullable().references('id_entity').inTable('entity').onDelete('CASCADE');
-    t.string('name', 100).notNullable();
-    t.string('slug', 100).notNullable();
-    t.integer('rank').notNullable().defaultTo(0);
-    t.boolean('is_system').notNullable().defaultTo(false);
-    t.timestamp('date_created', { useTz: true }).notNullable().defaultTo(knex.fn.now());
-    t.timestamp('date_updated', { useTz: true }).notNullable().defaultTo(knex.fn.now());
+  const hasGroupName = await knex.schema.hasColumn('field', 'group_name');
+  if (!hasGroupName) {
+    return;
+  }
 
-    t.unique(['id_entity', 'slug']);
-  });
+  // 1. Create ui_tab table
+  const hasUiTab = await knex.schema.hasTable('ui_tab');
+  if (!hasUiTab) {
+    await knex.schema.createTable('ui_tab', (t) => {
+      t.uuid('id_ui_tab').primary().defaultTo(knex.fn.uuid());
+      t.uuid('id_entity').notNullable().references('id_entity').inTable('entity').onDelete('CASCADE');
+      t.string('name', 100).notNullable();
+      t.string('slug', 100).notNullable();
+      t.integer('rank').notNullable().defaultTo(0);
+      t.boolean('is_system').notNullable().defaultTo(false);
+      t.timestamp('date_created', { useTz: true }).notNullable().defaultTo(knex.fn.now());
+      t.timestamp('date_updated', { useTz: true }).notNullable().defaultTo(knex.fn.now());
+
+      t.unique(['id_entity', 'slug']);
+    });
+  }
 
   // 2. Migrate existing group_name data into ui_tab rows
   // Get distinct (id_entity, group_name) pairs
@@ -76,13 +84,16 @@ export async function up(knex: Knex): Promise<void> {
       slug: normalized,
       rank,
       is_system: normalized === 'general',
-    });
+    }).onConflict(['id_entity', 'slug']).ignore();
   }
 
   // 3. Add id_ui_tab FK column to field
-  await knex.schema.alterTable('field', (t) => {
-    t.uuid('id_ui_tab').nullable().references('id_ui_tab').inTable('ui_tab').onDelete('RESTRICT');
-  });
+  const hasIdUiTab = await knex.schema.hasColumn('field', 'id_ui_tab');
+  if (!hasIdUiTab) {
+    await knex.schema.alterTable('field', (t) => {
+      t.uuid('id_ui_tab').nullable().references('id_ui_tab').inTable('ui_tab').onDelete('RESTRICT');
+    });
+  }
 
   // 4. Backfill field.id_ui_tab from ui_tab by matching slug = normalized group_name
   // Use raw SQL for the JOIN UPDATE (Knex doesn't have a clean cross-table UPDATE with JOIN)
@@ -101,23 +112,34 @@ export async function up(knex: Knex): Promise<void> {
 }
 
 export async function down(knex: Knex): Promise<void> {
+  const hasGroupName = await knex.schema.hasColumn('field', 'group_name');
+  if (hasGroupName) {
+    return;
+  }
+
   // 1. Add group_name back
   await knex.schema.alterTable('field', (t) => {
     t.string('group_name', 100).notNullable().defaultTo('general');
   });
 
   // 2. Backfill group_name from ui_tab.slug
-  await knex.raw(`
-    UPDATE field
-    SET group_name = ui_tab.slug
-    FROM ui_tab
-    WHERE field.id_ui_tab = ui_tab.id_ui_tab
-  `);
+  const hasUiTab = await knex.schema.hasTable('ui_tab');
+  const hasIdUiTab = await knex.schema.hasColumn('field', 'id_ui_tab');
+  if (hasUiTab && hasIdUiTab) {
+    await knex.raw(`
+      UPDATE field
+      SET group_name = ui_tab.slug
+      FROM ui_tab
+      WHERE field.id_ui_tab = ui_tab.id_ui_tab
+    `);
+  }
 
   // 3. Drop id_ui_tab column
-  await knex.schema.alterTable('field', (t) => {
-    t.dropColumn('id_ui_tab');
-  });
+  if (hasIdUiTab) {
+    await knex.schema.alterTable('field', (t) => {
+      t.dropColumn('id_ui_tab');
+    });
+  }
 
   // 4. Drop ui_tab table
   await knex.schema.dropTableIfExists('ui_tab');
