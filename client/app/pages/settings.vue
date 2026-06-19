@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'
 
+const runtimeConfig = useRuntimeConfig()
+const documentationUrl = `https://moduvis.${runtimeConfig.public.appDomainBase}`
+
 const links = [[{
   label: 'Profil',
   icon: 'i-lucide-user',
@@ -17,7 +20,7 @@ const links = [[{
 }], [{
   label: 'Documentation',
   icon: 'i-lucide-book-open',
-  to: 'https://ui.nuxt.com/docs/getting-started/installation/nuxt',
+  to: documentationUrl,
   target: '_blank'
 }]] satisfies NavigationMenuItem[][]
 </script>

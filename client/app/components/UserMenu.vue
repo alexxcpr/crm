@@ -7,6 +7,8 @@ defineProps<{
 
 const colorMode = useColorMode()
 const appConfig = useAppConfig()
+const runtimeConfig = useRuntimeConfig()
+const documentationUrl = computed(() => `https://moduvis.${runtimeConfig.public.appDomainBase}`)
 
 const colors = ['red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose']
 const neutrals = ['slate', 'gray', 'zinc', 'neutral', 'stone']
@@ -116,12 +118,7 @@ const items = computed<DropdownMenuItem[][]>(() => ([[{
 [{
   label: 'Documentation',
   icon: 'i-lucide-book-open',
-  to: 'https://ui.nuxt.com/docs/getting-started/installation/nuxt',
-  target: '_blank'
-}, {
-  label: 'GitHub repository',
-  icon: 'i-simple-icons-github',
-  to: 'https://github.com/nuxt-ui-templates/dashboard',
+  to: documentationUrl.value,
   target: '_blank'
 }, {
   label: 'Log out',

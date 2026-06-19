@@ -20,6 +20,7 @@ export default defineNuxtConfig({
     public: {
       apiBase: process.env.NUXT_PUBLIC_API_BASE || '/api',
       defaultTenantSlug: process.env.NUXT_PUBLIC_DEFAULT_TENANT_SLUG || 'dev',
+      appDomainBase: process.env.NUXT_PUBLIC_APP_DOMAIN_BASE || process.env.DOMAIN_BASE || 'stanciulescu.xyz',
       signupEnabled: process.env.NUXT_PUBLIC_SIGNUP_ENABLED === 'true'
     }
   },
