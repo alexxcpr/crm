@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: traefik:v3.2
+    image: traefik:v3.7.5
     container_name: moduvis-traefik
     restart: unless-stopped
     command:
@@ -46,7 +46,8 @@ services:
       - traefik.http.routers.moduvis-frontend.priority=10
       - traefik.http.routers.moduvis-frontend.tls=${TRAEFIK_TLS:-false}
       - traefik.http.routers.moduvis-frontend.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-}
-      - traefik.http.routers.moduvis-frontend.middlewares=${TRAEFIK_HTTPS_REDIRECT:-}
+      - traefik.http.routers.moduvis-frontend.tls.domains[0].main=${DOMAIN_BASE}
+      - traefik.http.routers.moduvis-frontend.tls.domains[0].sans=*.${DOMAIN_BASE}
       - traefik.http.services.moduvis-frontend.loadbalancer.server.port=3000
       - traefik.http.services.moduvis-frontend.loadbalancer.healthcheck.path=/
     networks:
@@ -95,7 +96,8 @@ services:
       - traefik.http.routers.moduvis-backend.priority=100
       - traefik.http.routers.moduvis-backend.tls=${TRAEFIK_TLS:-false}
       - traefik.http.routers.moduvis-backend.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-}
-      - traefik.http.routers.moduvis-backend.middlewares=${TRAEFIK_HTTPS_REDIRECT:-}
+      - traefik.http.routers.moduvis-backend.tls.domains[0].main=${DOMAIN_BASE}
+      - traefik.http.routers.moduvis-backend.tls.domains[0].sans=*.${DOMAIN_BASE}
       - traefik.http.services.moduvis-backend.loadbalancer.server.port=4000
       - traefik.http.services.moduvis-backend.loadbalancer.healthcheck.path=/api/health
     networks:
@@ -162,7 +164,7 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      NUXT_PUBLIC_SITE_URL: http://moduvis.${DOMAIN_BASE}
+      NUXT_PUBLIC_SITE_URL: https://moduvis.${DOMAIN_BASE}
       NUXT_PUBLIC_APP_DOMAIN_BASE: ${DOMAIN_BASE}
       NUXT_STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       NUXT_STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
@@ -180,7 +182,8 @@ services:
       - traefik.http.routers.moduvis-provisioning.priority=300
       - traefik.http.routers.moduvis-provisioning.tls=${TRAEFIK_TLS:-false}
       - traefik.http.routers.moduvis-provisioning.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-}
-      - traefik.http.routers.moduvis-provisioning.middlewares=${TRAEFIK_HTTPS_REDIRECT:-}
+      - traefik.http.routers.moduvis-provisioning.tls.domains[0].main=${DOMAIN_BASE}
+      - traefik.http.routers.moduvis-provisioning.tls.domains[0].sans=*.${DOMAIN_BASE}
       - traefik.http.services.moduvis-provisioning.loadbalancer.server.port=3000
       - traefik.http.services.moduvis-provisioning.loadbalancer.healthcheck.path=/
     networks:

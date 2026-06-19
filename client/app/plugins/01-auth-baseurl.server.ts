@@ -1,67 +1,144 @@
 /**
  * Fixes @sidebase/nuxt-auth v1.2.0 SSR session restoration on Nuxt 4.
  *
- * Three problems are patched:
- * 1. The auth module relies on the `AUTH_ORIGIN` env var to resolve its
- *    baseURL during SSR, but Nitro may not expose arbitrary env vars.
- * 2. Nuxt 4's `useCookie` may not reliably read cookies during SSR.
- * 3. The auth module's `_fetch()` uses `callWithNuxt` which is broken in
- *    Nuxt 4 — so we bypass `getSession()` entirely by calling the backend
- *    directly and seeding both `auth:raw-token` and `auth:data` states.
- *
- * When `auth:data` is already populated, the auth plugin skips its
- * `getSession()` call, avoiding the `callWithNuxt` error entirely.
- *
- * Runs after 00-tenant-fetch (which patches global $fetch).
+ * The auth module cannot reliably restore the local provider session during
+ * Nuxt 4 SSR, so we seed the token/session state manually. In production this
+ * also has to carry X-Tenant, because there is no dev tenant fallback.
  */
-import { getCookie } from 'h3'
+import { getCookie, setCookie } from 'h3'
+
+interface AuthTokens {
+  accessToken: string
+  refreshToken?: string
+}
+
+const ACCESS_TOKEN_MAX_AGE = 30 * 60
+const REFRESH_TOKEN_MAX_AGE = 24 * 60 * 60
+
+function isEnabled(value: unknown) {
+  return value === true || value === 'true'
+}
+
+function authCookieOptions(maxAge: number, config: ReturnType<typeof useRuntimeConfig>) {
+  return {
+    path: '/',
+    maxAge,
+    sameSite: 'lax' as const,
+    secure: isEnabled(config.authSecureCookie),
+    httpOnly: isEnabled(config.authHttpOnlyCookie)
+  }
+}
 
 export default defineNuxtPlugin(async () => {
+  if (!import.meta.server) return
+
   const config = useRuntimeConfig()
+  const event = useRequestEvent()
+  if (!event) return
+  const ssrEvent = event
 
-  if (import.meta.server) {
-    // Do NOT mutate config.public.auth.baseURL here — it is serialized into
-    // __NUXT__ and would make the browser call http://backend:4000/api.
+  const { slug } = useTenant()
+  const tenantSlug = slug.value
+  const apiBase = config.apiBaseInternal as string
 
-    // --- Patch 1: manually restore the full session from the cookie ---
-    const event = useRequestEvent()
-    if (!event) return
+  let rawToken = getCookie(ssrEvent, 'auth.token') ?? null
+  let rawRefreshToken = getCookie(ssrEvent, 'auth.refresh-token') ?? null
 
-    const rawToken = getCookie(event, 'auth.token')
-    if (!rawToken) {
-      console.log('[01-auth-baseurl] no auth.token cookie found in request')
-      return
+  function seedTokens(accessToken: string, refreshToken?: string | null) {
+    const tokenState = useState<string | null>('auth:raw-token', () => accessToken)
+    tokenState.value = accessToken
+    console.log('[01-auth-baseurl] token seeded, length:', accessToken.length)
+
+    if (refreshToken) {
+      const refreshTokenState = useState<string | null>('auth:raw-refresh-token', () => refreshToken)
+      refreshTokenState.value = refreshToken
+      console.log('[01-auth-baseurl] refresh token seeded, length:', refreshToken.length)
+    }
+  }
+
+  function tenantHeaders(token?: string) {
+    const headers = new Headers()
+    if (tenantSlug) {
+      headers.set('X-Tenant', tenantSlug)
+    }
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`)
+    }
+    return headers
+  }
+
+  async function rotateTokens() {
+    if (!rawRefreshToken) {
+      return null
     }
 
-    // Seed the raw token so useAuthState picks it up
-    const tokenState = useState<string | null>('auth:raw-token', () => rawToken)
-    tokenState.value = rawToken
-    console.log('[01-auth-baseurl] token seeded, length:', rawToken.length)
+    const response = await $fetch<AuthTokens>(`${apiBase}/auth/refresh`, {
+      method: 'POST',
+      headers: tenantHeaders(),
+      body: { refreshToken: rawRefreshToken }
+    })
 
-    // Seed the refresh token from cookie so the auth module can refresh on SSR
-    const rawRefreshToken = getCookie(event, 'auth.refresh-token')
-    if (rawRefreshToken) {
-      const refreshTokenState = useState<string | null>('auth:raw-refresh-token', () => rawRefreshToken)
-      refreshTokenState.value = rawRefreshToken
-      console.log('[01-auth-baseurl] refresh token seeded, length:', rawRefreshToken.length)
+    if (!response?.accessToken) {
+      return null
     }
 
-    // Fetch session directly, bypassing @sidebase/nuxt-auth's _fetch()
-    // which uses callWithNuxt — broken in Nuxt 4.
-    const apiBase = config.apiBaseInternal as string
+    rawToken = response.accessToken
+    rawRefreshToken = response.refreshToken ?? rawRefreshToken
+
+    setCookie(ssrEvent, 'auth.token', response.accessToken, authCookieOptions(ACCESS_TOKEN_MAX_AGE, config))
+    if (response.refreshToken) {
+      setCookie(ssrEvent, 'auth.refresh-token', response.refreshToken, authCookieOptions(REFRESH_TOKEN_MAX_AGE, config))
+    }
+
+    seedTokens(rawToken, rawRefreshToken)
+    console.log('[01-auth-baseurl] session tokens refreshed on SSR')
+    return rawToken
+  }
+
+  if (!rawToken) {
+    console.log('[01-auth-baseurl] no auth.token cookie found in request')
     try {
+      rawToken = await rotateTokens()
+    } catch (err: any) {
+      console.error('[01-auth-baseurl] refresh without access token failed:', err.message)
+    }
+
+    if (!rawToken) return
+  } else {
+    seedTokens(rawToken, rawRefreshToken)
+  }
+
+  try {
+    const userData = await $fetch(`${apiBase}/user/me`, {
+      headers: tenantHeaders(rawToken)
+    })
+
+    if (userData) {
+      const dataState = useState<any>('auth:data', () => userData)
+      dataState.value = userData
+      console.log('[01-auth-baseurl] session seeded for user:', (userData as any).login_username)
+    }
+  } catch (err: any) {
+    console.error('[01-auth-baseurl] backend /user/me failed:', err.message)
+
+    try {
+      const refreshedToken = await rotateTokens()
+      if (!refreshedToken) {
+        throw err
+      }
+
       const userData = await $fetch(`${apiBase}/user/me`, {
-        headers: { authorization: `Bearer ${rawToken}` }
+        headers: tenantHeaders(refreshedToken)
       })
+
       if (userData) {
         const dataState = useState<any>('auth:data', () => userData)
         dataState.value = userData
-        console.log('[01-auth-baseurl] session seeded for user:', (userData as any).login_username)
+        console.log('[01-auth-baseurl] session seeded after refresh for user:', (userData as any).login_username)
       }
-    } catch (err: any) {
-      // If the backend call fails, still seed data with a stub to prevent
-      // the auth plugin from calling getSession() (which would wipe rawToken).
-      console.error('[01-auth-baseurl] backend /user/me failed:', err.message)
+    } catch (refreshErr: any) {
+      // Keep the auth plugin from clearing a valid raw token during SSR.
+      console.error('[01-auth-baseurl] SSR refresh fallback failed:', refreshErr.message)
       const dataState = useState<any>('auth:data', () => ({}))
       dataState.value = dataState.value ?? {}
     }

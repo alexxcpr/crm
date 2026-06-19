@@ -15,6 +15,8 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     apiBaseInternal: process.env.NUXT_API_BASE_INTERNAL || 'http://localhost:4000/api',
+    authSecureCookie: process.env.NUXT_AUTH_SECURE_COOKIE === 'true',
+    authHttpOnlyCookie: process.env.NUXT_AUTH_HTTP_ONLY === 'true',
     public: {
       apiBase: process.env.NUXT_PUBLIC_API_BASE || '/api',
       defaultTenantSlug: process.env.NUXT_PUBLIC_DEFAULT_TENANT_SLUG || 'dev',

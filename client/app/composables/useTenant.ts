@@ -17,8 +17,11 @@ export function useTenant() {
   }
 
   if (import.meta.server) {
-    const headers = useRequestHeaders(['host'])
-    const slug = computed(() => slugFromHost(headers.host))
+    const headers = useRequestHeaders(['x-forwarded-host', 'host'])
+    const slug = computed(() => {
+      const forwardedHost = headers['x-forwarded-host']?.split(',')[0]?.trim()
+      return slugFromHost(forwardedHost || headers.host)
+    })
     return { slug }
   }
 

@@ -17,12 +17,11 @@ export default defineNuxtPlugin(() => {
       const isApiCall = url.startsWith(apiBase) || url.startsWith(publicApiBase) || url.startsWith('/')
 
       if (isApiCall && tenantSlug) {
-        const headers = options.headers ??= new Headers()
-        if (headers instanceof Headers) {
-          if (!headers.has('X-Tenant')) {
-            headers.set('X-Tenant', tenantSlug)
-          }
+        const headers = new Headers(options.headers)
+        if (!headers.has('X-Tenant')) {
+          headers.set('X-Tenant', tenantSlug)
         }
+        options.headers = headers
       }
     }
   })
