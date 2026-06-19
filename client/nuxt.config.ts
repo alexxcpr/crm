@@ -62,6 +62,7 @@ export default defineNuxtConfig({
           signInResponseRefreshTokenPointer: '/refreshToken',
           refreshRequestTokenPointer: '/refreshToken',
           refreshResponseTokenPointer: '/accessToken',
+          cookieName: 'auth.refresh-token',
           maxAgeInSeconds: 60 * 60 * 24,      // 1 zi
           sameSiteAttribute: 'lax',
           secureCookieAttribute: process.env.NUXT_AUTH_SECURE_COOKIE === 'true',

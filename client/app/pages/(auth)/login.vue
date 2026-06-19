@@ -79,6 +79,7 @@
 <script setup lang="ts">
 // Importam metoda signIn din pachetul de auth
 const { signIn } = useAuth()
+const { apiFetch } = useApi()
 
 // State-ul formularului
 const loginUsername = ref('')
@@ -96,8 +97,15 @@ async function handleLogin() {
     // Apelam metoda signIn (astfel, Nuxt face automat un POST spre http://localhost:4000/api/auth/signin)
     await signIn(
       { loginUsername: loginUsername.value, password: password.value },
-      { callbackUrl: '/' } // Unde sa ne redirectioneze daca login-ul are succes
+      {
+        callGetSession: false,
+        redirect: false
+      }
     )
+
+    await nextTick()
+    useState<any>('auth:data').value = await apiFetch('/user/me')
+    await navigateTo('/')
   } catch (error: any) {
     console.error('Eroare la login:', error)
     // Afisam un mesaj daca ceva merge prost (parola gresita etc.)
