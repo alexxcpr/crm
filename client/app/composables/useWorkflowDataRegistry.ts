@@ -6,6 +6,7 @@ export interface DataSource {
   label: string
   entitySlug: string
   fields: Field[]
+  cardinality: 'single' | 'list' | 'item'
 }
 
 /**
@@ -57,6 +58,7 @@ export function useWorkflowDataRegistry(
         label: `${label}: ${schemaCache.get(startEntitySlug.value)?.name ?? startEntitySlug.value}`,
         entitySlug: startEntitySlug.value,
         fields: schemaCache.get(startEntitySlug.value)?.fields ?? [],
+        cardinality: 'single',
       })
       processed.add(startNode.id)
     }
@@ -88,18 +90,38 @@ export function useWorkflowDataRegistry(
             label: `${data.label || 'Relatie'}: ${schemaCache.get(targetSlug)?.name ?? targetSlug}`,
             entitySlug: targetSlug,
             fields: schemaCache.get(targetSlug)?.fields ?? [],
+            cardinality: 'single',
           })
           processed.add(node.id)
           changed = true
         } else if (nodeType === 'app_get_record') {
           const entitySlug: string = data.parameters?.entity ?? ''
           if (!entitySlug) continue
+          const limit = Number(data.parameters?.limit)
+          const cardinality = limit === 1 ? 'single' : 'list'
 
           sources.push({
             nodeId: node.id,
             label: `${data.label || 'Citeste'}: ${schemaCache.get(entitySlug)?.name ?? entitySlug}`,
             entitySlug,
             fields: schemaCache.get(entitySlug)?.fields ?? [],
+            cardinality,
+          })
+          processed.add(node.id)
+          changed = true
+        } else if (nodeType === 'for_each') {
+          const srcNodeId: string = data.parameters?.sourceNodeId ?? ''
+          if (!srcNodeId) continue
+
+          const listSource = sources.find((s) => s.nodeId === srcNodeId && s.cardinality === 'list')
+          if (!listSource) continue
+
+          sources.push({
+            nodeId: node.id,
+            label: `${data.label || 'Pentru fiecare'}: ${listSource.label}`,
+            entitySlug: listSource.entitySlug,
+            fields: listSource.fields,
+            cardinality: 'item',
           })
           processed.add(node.id)
           changed = true
@@ -126,6 +148,7 @@ export function useWorkflowDataRegistry(
             label: `${data.label || 'Set Data'}: ${predecessor.label}`,
             entitySlug: predecessor.entitySlug,
             fields: [...predecessor.fields, ...computedFields],
+            cardinality: predecessor.cardinality,
           })
           processed.add(node.id)
           changed = true

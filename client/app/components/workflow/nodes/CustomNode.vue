@@ -17,6 +17,7 @@ const isCondition = computed(() => props.data.nodeType === 'condition')
 const isTrigger = computed(() => ['start', 'trigger', 'webhook_trigger'].includes(props.data.nodeType))
 const isTerminal = computed(() => props.data.nodeType === 'stop_error')
 const isSetData = computed(() => props.data.nodeType === 'set_data')
+const isForEach = computed(() => props.data.nodeType === 'for_each')
 
 // Resolve entity display info from node parameters
 const entityDisplay = computed(() => {
@@ -34,6 +35,11 @@ const setDataInfo = computed(() => {
   if (!isSetData.value) return null
   const count = (props.data.parameters?.assignments as any[])?.length ?? 0
   return count > 0 ? `${count} campuri configurate` : 'Nicio formula configurata'
+})
+
+const forEachInfo = computed(() => {
+  if (!isForEach.value) return null
+  return props.data.parameters?.sourceNodeId ? 'Iterare lista configurata' : 'Alege lista de parcurs'
 })
 </script>
 
@@ -65,6 +71,12 @@ const setDataInfo = computed(() => {
         class="text-[10px] text-gray-600 dark:text-gray-300 truncate font-medium"
       >
         {{ setDataInfo }}
+      </p>
+      <p
+        v-else-if="forEachInfo"
+        class="text-[10px] text-gray-600 dark:text-gray-300 truncate font-medium"
+      >
+        {{ forEachInfo }}
       </p>
       <p
         v-else-if="entityDisplay"

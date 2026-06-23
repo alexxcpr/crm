@@ -57,7 +57,8 @@ export class DynamicDataService {
     const scope = await this.authorization.require(actor, entity.id_entity, 'read');
     const tableName = entity.table_name;
     const page = Math.max(1, parseInt(query.page) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(query.limit) || 25));
+    const parsedLimit = Number.parseInt(String(query.limit ?? ''), 10);
+    const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 25;
     const offset = (page - 1) * limit;
     const selectColumns = this.buildSelect(tableName, fields, true);
     let dataQuery = this.addRelationJoins(this.knex(tableName), tableName, fields.filter((field) => field.visible_in_table), selectColumns)

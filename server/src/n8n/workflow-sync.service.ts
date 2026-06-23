@@ -286,6 +286,7 @@ export class WorkflowSyncService {
     mappings: FieldMapping[],
     allNodes: NodeDefinition[],
     startNodeId: string,
+    itemNodeIds: Set<string>,
   ): Record<string, string> {
     const result: Record<string, string> = {};
     for (const m of mappings) {
@@ -305,7 +306,7 @@ export class WorkflowSyncService {
           break;
         case 'node_output':
           if (m.sourceNodeId && m.sourceFieldSlug) {
-            result[m.key] = `={{${this.nodeOutputJsonPath(m.sourceNodeId, allNodes)}.${m.sourceFieldSlug}}}`;
+            result[m.key] = `={{${this.nodeOutputJsonPath(m.sourceNodeId, allNodes, itemNodeIds)}.${m.sourceFieldSlug}}}`;
           }
           break;
         default:
@@ -315,9 +316,14 @@ export class WorkflowSyncService {
     return result;
   }
 
-  private resolveRecordId(source: RecordIdSource, allNodes: NodeDefinition[], _startNodeId: string): string {
+  private resolveRecordId(
+    source: RecordIdSource,
+    allNodes: NodeDefinition[],
+    _startNodeId: string,
+    itemNodeIds: Set<string>,
+  ): string {
     if (source.sourceType === 'node_output') {
-      return `={{${this.nodeOutputJsonPath(source.sourceNodeId!, allNodes)}.${source.sourceFieldSlug}}}`;
+      return `={{${this.nodeOutputJsonPath(source.sourceNodeId!, allNodes, itemNodeIds)}.${source.sourceFieldSlug}}}`;
     }
     return source.value;
   }
@@ -347,9 +353,19 @@ export class WorkflowSyncService {
     return httpTypes.has(node.type)
   }
 
-  private nodeOutputJsonPath(nodeId: string, nodes: NodeDefinition[]): string {
+  private nodeOutputJsonPath(
+    nodeId: string,
+    nodes: NodeDefinition[],
+    itemNodeIds: Set<string>,
+  ): string {
     if (this.isStartNode(nodeId, nodes)) {
       return `$('${nodeId}').first().json.body.record`
+    }
+    if (itemNodeIds.has(nodeId)) {
+      if (this.isHttpWrapperNode(nodeId, nodes)) {
+        return `$('${nodeId}').item.json.data`
+      }
+      return `$('${nodeId}').item.json`
     }
     if (this.isHttpWrapperNode(nodeId, nodes)) {
       return `$('${nodeId}').first().json.data`
@@ -367,12 +383,16 @@ export class WorkflowSyncService {
     return typeof value === 'string' && (value.startsWith('={{') || value.startsWith('{{'));
   }
 
-  private translateFormulaTokens(tokens: FormulaToken[], allNodes: NodeDefinition[]): string {
+  private translateFormulaTokens(
+    tokens: FormulaToken[],
+    allNodes: NodeDefinition[],
+    itemNodeIds: Set<string>,
+  ): string {
     let expr = '={{'
     for (const token of tokens) {
       switch (token.type) {
         case 'field': {
-          expr += `${this.nodeOutputJsonPath(token.sourceNodeId!, allNodes)}.${token.fieldSlug}`
+          expr += `${this.nodeOutputJsonPath(token.sourceNodeId!, allNodes, itemNodeIds)}.${token.fieldSlug}`
           break
         }
         case 'literal':
@@ -399,6 +419,7 @@ export class WorkflowSyncService {
     operand: any,
     allNodes: NodeDefinition[],
     startNodeId: string,
+    itemNodeIds: Set<string>,
   ): string {
     if (!operand) return ''
 
@@ -409,7 +430,7 @@ export class WorkflowSyncService {
     if (operand.sourceType === 'node_output') {
       if (operand.sourceNodeId && (operand.fieldSlug || operand.columnName)) {
         const field = operand.fieldSlug || operand.columnName
-        return `={{${this.nodeOutputJsonPath(operand.sourceNodeId, allNodes)}.${field}}}`
+        return `={{${this.nodeOutputJsonPath(operand.sourceNodeId, allNodes, itemNodeIds)}.${field}}}`
       }
       // Fallback: only fieldSlug (no sourceNodeId) → assume $json (immediate predecessor)
       const field = operand.fieldSlug || operand.columnName
@@ -454,6 +475,41 @@ export class WorkflowSyncService {
     }
   }
 
+  private computeItemNodeIds(
+    nodes: NodeDefinition[],
+    connections: ConnectionDefinition[],
+  ): Set<string> {
+    const itemNodeIds = new Set<string>();
+    const queue = nodes.filter((node) => node.type === 'for_each').map((node) => node.id);
+
+    while (queue.length > 0) {
+      const nodeId = queue.shift()!;
+      if (itemNodeIds.has(nodeId)) continue;
+      itemNodeIds.add(nodeId);
+
+      for (const conn of connections.filter((item) => item.source === nodeId)) {
+        if (!itemNodeIds.has(conn.target)) {
+          queue.push(conn.target);
+        }
+      }
+    }
+
+    return itemNodeIds;
+  }
+
+  private buildForEachCode(): string {
+    return [
+      'const source = items[0]?.json ?? {};',
+      'const records = Array.isArray(source.data) ? source.data : null;',
+      "if (!records) {",
+      "  throw new Error('Nodul Pentru fiecare asteapta o lista de inregistrari in data[].');",
+      '}',
+      'return records.map((record, index) => ({',
+      '  json: { ...record, _foreach_index: index },',
+      '}));',
+    ].join('\n');
+  }
+
   private translateToN8n(workflow: {
     name: string;
     slug: string;
@@ -479,9 +535,10 @@ export class WorkflowSyncService {
     );
     const startEntitySlug = startNode?.parameters?.entity ?? '';
     const startNodeId = startNode?.id ?? '';
+    const itemNodeIds = this.computeItemNodeIds(nodes, connections);
 
     const n8nNodes = nodes.map((node, index) =>
-      this.translateNode(node, index, tenantSlug, startEntitySlug, startNodeId, nodes),
+      this.translateNode(node, index, tenantSlug, startEntitySlug, startNodeId, nodes, itemNodeIds),
     );
 
     for (const node of nodes.filter((n) => n.type === 'validate')) {
@@ -518,6 +575,7 @@ export class WorkflowSyncService {
     startEntitySlug: string,
     startNodeId: string,
     allNodes: NodeDefinition[],
+    itemNodeIds: Set<string>,
   ): Record<string, any> {
     const typeMap: Record<string, string> = {
       start: 'n8n-nodes-base.webhook',
@@ -536,6 +594,7 @@ export class WorkflowSyncService {
       app_get_related: 'n8n-nodes-base.httpRequest',
       app_update_record: 'n8n-nodes-base.httpRequest',
       app_create_record: 'n8n-nodes-base.httpRequest',
+      for_each: 'n8n-nodes-base.code',
     };
 
     // Detect self-update (same entity as start, no external recordId) → translate as set node
@@ -565,7 +624,7 @@ export class WorkflowSyncService {
       type: n8nType,
       typeVersion: n8nType === 'n8n-nodes-base.httpRequest' ? 4 : 1,
       position: [node.position?.x ?? index * 250, node.position?.y ?? 0],
-      parameters: this.translateParameters(node.type, node.parameters ?? {}, tenantSlug, startEntitySlug, startNodeId, allNodes),
+      parameters: this.translateParameters(node.type, node.parameters ?? {}, tenantSlug, startEntitySlug, startNodeId, allNodes, itemNodeIds),
     };
 
     return n8nNode;
@@ -578,6 +637,7 @@ export class WorkflowSyncService {
     startEntitySlug: string,
     startNodeId: string,
     allNodes: NodeDefinition[],
+    itemNodeIds: Set<string>,
   ): Record<string, any> {
     const webhookDataBase = `${this.webhookBaseUrl}/v1/webhooks/n8n/${tenantSlug}/data`;
 
@@ -606,6 +666,7 @@ export class WorkflowSyncService {
               f.valueSource as RecordIdSource,
               allNodes,
               startNodeId,
+              itemNodeIds,
             )
             queryParams.push({
               name: `filter[${f.field}][${f.operator}]`,
@@ -672,7 +733,7 @@ export class WorkflowSyncService {
 
           const resolvedFields =
             params.fieldMappings?.length
-              ? this.resolveFieldMappings(params.fieldMappings, allNodes, startNodeId)
+              ? this.resolveFieldMappings(params.fieldMappings, allNodes, startNodeId, itemNodeIds)
               : (params.fields ?? {});
 
           // Self-entity update without recordId → DTO merge mode (BeforeInsert)
@@ -688,7 +749,7 @@ export class WorkflowSyncService {
           }
 
           const resolvedRecordId = params.recordIdSource
-            ? this.resolveRecordId(params.recordIdSource, allNodes, startNodeId)
+            ? this.resolveRecordId(params.recordIdSource, allNodes, startNodeId, itemNodeIds)
             : params.recordId;
 
           const updRecId = !!resolvedRecordId;
@@ -731,7 +792,7 @@ export class WorkflowSyncService {
 
           const resolvedFields =
             params.fieldMappings?.length
-              ? this.resolveFieldMappings(params.fieldMappings, allNodes, startNodeId)
+              ? this.resolveFieldMappings(params.fieldMappings, allNodes, startNodeId, itemNodeIds)
               : (params.fields ?? {});
 
           const shared = {
@@ -796,7 +857,7 @@ export class WorkflowSyncService {
           }
 
           const entry: any = {
-            value1: this.translateConditionOperand(cond.leftOperand, allNodes, startNodeId),
+            value1: this.translateConditionOperand(cond.leftOperand, allNodes, startNodeId, itemNodeIds),
             operation: this.translateConditionOperator(cond.operator, n8nGroup),
           }
 
@@ -805,6 +866,7 @@ export class WorkflowSyncService {
               cond.rightOperand ?? { sourceType: 'static', value: '' },
               allNodes,
               startNodeId,
+              itemNodeIds,
             )
           }
 
@@ -838,6 +900,11 @@ export class WorkflowSyncService {
           options: {},
         };
 
+      case 'for_each':
+        return {
+          jsCode: this.buildForEachCode(),
+        };
+
       case 'code':
         return {
           jsCode: params.code ?? 'return items;',
@@ -847,7 +914,7 @@ export class WorkflowSyncService {
         const assignments: any[] = params.assignments ?? []
         const values = assignments.map(a => ({
           name: a.key,
-          value: this.translateFormulaTokens(a.tokens ?? [], allNodes),
+          value: this.translateFormulaTokens(a.tokens ?? [], allNodes, itemNodeIds),
         }))
         return {
           values: { string: values },

@@ -118,4 +118,141 @@ describe('WorkflowSyncService validation nodes', () => {
       { node: 'next', type: 'main', index: 0 },
     ]);
   });
+
+  it('traduce for_each in Code node care expandeaza lista in item-uri', () => {
+    const service = makeService();
+    const workflow = {
+      name: 'Iterare',
+      slug: 'iterare',
+      nodes: [
+        {
+          id: 'start',
+          type: 'start',
+          position: { x: 0, y: 0 },
+          parameters: { entity: 'contacts' },
+        },
+        {
+          id: 'fetch_contacts',
+          type: 'app_get_record',
+          position: { x: 250, y: 0 },
+          parameters: { entity: 'contacts', limit: 5000, filters: [] },
+        },
+        {
+          id: 'each_contact',
+          type: 'for_each',
+          position: { x: 500, y: 0 },
+          parameters: { sourceNodeId: 'fetch_contacts' },
+        },
+      ],
+      connections: [
+        { source: 'start', target: 'fetch_contacts' },
+        { source: 'fetch_contacts', target: 'each_contact' },
+      ],
+    };
+
+    const translated = (service as any).translateToN8n(workflow);
+    const forEachNode = translated.nodes.find((node: any) => node.id === 'each_contact');
+
+    expect(forEachNode).toMatchObject({
+      type: 'n8n-nodes-base.code',
+      parameters: {
+        jsCode: expect.stringContaining('records.map((record, index)'),
+      },
+    });
+    expect(forEachNode.parameters.jsCode).toContain('throw new Error');
+    expect(forEachNode.parameters.jsCode).toContain('_foreach_index');
+  });
+
+  it('foloseste item-ul curent pentru nodurile din interiorul for_each', () => {
+    const service = makeService();
+    const workflow = {
+      name: 'Iterare',
+      slug: 'iterare',
+      nodes: [
+        {
+          id: 'start',
+          type: 'start',
+          position: { x: 0, y: 0 },
+          parameters: { entity: 'contacts' },
+        },
+        {
+          id: 'fetch_contacts',
+          type: 'app_get_record',
+          position: { x: 250, y: 0 },
+          parameters: { entity: 'contacts', limit: 5000, filters: [] },
+        },
+        {
+          id: 'each_contact',
+          type: 'for_each',
+          position: { x: 500, y: 0 },
+          parameters: { sourceNodeId: 'fetch_contacts' },
+        },
+        {
+          id: 'validate_contact',
+          type: 'validate',
+          position: { x: 750, y: 0 },
+          parameters: {
+            combinator: 'and',
+            message: 'Email lipsa',
+            conditions: [
+              {
+                leftOperand: {
+                  sourceType: 'node_output',
+                  sourceNodeId: 'each_contact',
+                  fieldSlug: 'cf_email',
+                  dataType: 'varchar',
+                },
+                operator: 'isNull',
+              },
+            ],
+          },
+        },
+        {
+          id: 'update_contact',
+          type: 'app_update_record',
+          position: { x: 1000, y: 0 },
+          parameters: {
+            entity: 'contacts',
+            recordIdSource: {
+              sourceType: 'node_output',
+              sourceNodeId: 'each_contact',
+              sourceFieldSlug: 'id',
+              value: 'id',
+            },
+            fieldMappings: [
+              {
+                key: 'cf_status',
+                sourceType: 'node_output',
+                sourceNodeId: 'each_contact',
+                sourceFieldSlug: 'cf_status',
+                value: '',
+              },
+            ],
+          },
+        },
+      ],
+      connections: [
+        { source: 'start', target: 'fetch_contacts' },
+        { source: 'fetch_contacts', target: 'each_contact' },
+        { source: 'each_contact', target: 'validate_contact' },
+        { source: 'validate_contact', target: 'update_contact' },
+      ],
+    };
+
+    const translated = (service as any).translateToN8n(workflow);
+    const validateNode = translated.nodes.find((node: any) => node.id === 'validate_contact');
+    const updateNode = translated.nodes.find((node: any) => node.id === 'update_contact');
+
+    expect(validateNode.parameters.conditions.string[0].value1).toBe(
+      "={{$('each_contact').item.json.cf_email}}",
+    );
+    expect(updateNode.parameters.queryParameters.parameters).toContainEqual({
+      name: 'id',
+      value: "={{$('each_contact').item.json.id}}",
+    });
+    expect(updateNode.parameters.bodyParameters.parameters).toContainEqual({
+      name: 'cf_status',
+      value: "={{$('each_contact').item.json.cf_status}}",
+    });
+  });
 });

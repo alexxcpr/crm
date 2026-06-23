@@ -133,7 +133,7 @@ export interface NodeTypeDefinition {
 export interface NodeConfigField {
   key: string
   label: string
-  type: 'text' | 'textarea' | 'select' | 'number' | 'boolean' | 'entity-select' | 'field-select' | 'field-mappings' | 'record-id-source' | 'data-source-select' | 'relation-field-select' | 'formula-assignments' | 'target-field-select' | 'condition-editor' | 'filter-list'
+  type: 'text' | 'textarea' | 'select' | 'number' | 'boolean' | 'entity-select' | 'field-select' | 'field-mappings' | 'record-id-source' | 'data-source-select' | 'list-source-select' | 'relation-field-select' | 'formula-assignments' | 'target-field-select' | 'condition-editor' | 'filter-list'
   placeholder?: string
   options?: { label: string, value: string }[]
   required?: boolean
@@ -257,6 +257,18 @@ export function useNodeTypes() {
       defaults: { conditions: [], combinator: 'and' },
       configFields: [
         { key: 'conditions', label: 'Conditii', type: 'condition-editor' }
+      ]
+    },
+    {
+      type: 'for_each',
+      label: 'Pentru Fiecare',
+      icon: 'i-lucide-repeat-2',
+      category: 'logic',
+      color: '#14b8a6',
+      description: 'Ruleaza nodurile urmatoare o data pentru fiecare inregistrare dintr-o lista.',
+      defaults: { sourceNodeId: '' },
+      configFields: [
+        { key: 'sourceNodeId', label: 'Lista de inregistrari', type: 'list-source-select', required: true }
       ]
     },
     {

@@ -39,8 +39,21 @@ const entityOptions = computed(() =>
 )
 
 // ─── Data source select options (for app_get_related, etc.) ───
+const fieldSelectableDataSources = computed(() =>
+  (props.dataSources || []).filter(ds => ds.cardinality !== 'list'),
+)
+
+const listSourceOptions = computed(() =>
+  (props.dataSources || [])
+    .filter(ds => ds.cardinality === 'list')
+    .map(ds => ({
+      label: `${ds.label} (${ds.entitySlug})`,
+      value: ds.nodeId,
+    })),
+)
+
 const dataSourceOptions = computed(() =>
-  (props.dataSources || []).map(ds => ({
+  fieldSelectableDataSources.value.map(ds => ({
     label: `${ds.label} (${ds.entitySlug})`,
     value: ds.nodeId,
   })),
@@ -50,7 +63,7 @@ const dataSourceOptions = computed(() =>
 const relationFieldOptions = computed(() => {
   const srcNodeId: string = localParams.value.sourceNodeId ?? ''
   if (!srcNodeId) return []
-  const ds = (props.dataSources || []).find(s => s.nodeId === srcNodeId)
+  const ds = fieldSelectableDataSources.value.find(s => s.nodeId === srcNodeId)
   if (!ds) return []
   return ds.fields
     .filter(f => f.ui_type === 'relation' && f.relation_entity_slug)
@@ -245,6 +258,18 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
         />
 
         <USelect
+          v-else-if="field.type === 'list-source-select'"
+          :model-value="localParams[field.key] ?? ''"
+          size="sm"
+          class="w-full"
+          :items="listSourceOptions"
+          value-key="value"
+          label-key="label"
+          placeholder="Selecteaza lista..."
+          @update:model-value="onParamChange(field.key, $event)"
+        />
+
+        <USelect
           v-else-if="field.type === 'relation-field-select'"
           :model-value="localParams[field.key] ?? ''"
           size="sm"
@@ -280,7 +305,7 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
         <WorkflowPanelsRecordIdSourceEditor
           v-else-if="field.type === 'record-id-source'"
           :model-value="(localParams[field.key] as RecordIdSource | null) ?? null"
-          :data-sources="dataSources ?? []"
+          :data-sources="fieldSelectableDataSources"
           :fetch-source-fields="fetchSourceFields"
           @update:model-value="onParamChange(field.key, $event)"
         />
@@ -288,7 +313,7 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
         <WorkflowPanelsFieldMappingEditor
           v-else-if="field.type === 'field-mappings'"
           :model-value="(localParams[field.key] as FieldMapping[]) ?? []"
-          :data-sources="dataSources ?? []"
+          :data-sources="fieldSelectableDataSources"
           :target-entity-fields="targetEntityFields"
           :fetch-source-fields="fetchSourceFields"
           @update:model-value="onParamChange(field.key, $event)"
@@ -297,7 +322,7 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
         <WorkflowPanelsSetDataEditor
           v-else-if="field.type === 'formula-assignments'"
           :model-value="(localParams[field.key] as FormulaAssignment[]) ?? []"
-          :data-sources="dataSources ?? []"
+          :data-sources="fieldSelectableDataSources"
           :fetch-source-fields="fetchSourceFields"
           @update:model-value="onParamChange(field.key, $event)"
         />
@@ -306,7 +331,7 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
           v-else-if="field.type === 'condition-editor'"
           :model-value="(localParams[field.key] as Condition[]) ?? []"
           :combinator="(localParams.combinator as 'and' | 'or') ?? 'and'"
-          :data-sources="dataSources ?? []"
+          :data-sources="fieldSelectableDataSources"
           :fetch-source-fields="fetchSourceFields"
           @update:model-value="onParamChange(field.key, $event)"
           @update:combinator="onParamChange('combinator', $event)"
@@ -316,7 +341,7 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
           v-else-if="field.type === 'filter-list'"
           :model-value="(localParams[field.key] as FilterEntry[]) ?? []"
           :target-entity-fields="targetEntityFields"
-          :data-sources="dataSources ?? []"
+          :data-sources="fieldSelectableDataSources"
           :fetch-source-fields="fetchSourceFields"
           @update:model-value="onParamChange(field.key, $event)"
         />

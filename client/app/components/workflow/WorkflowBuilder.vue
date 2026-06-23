@@ -103,7 +103,9 @@ async function enrichBeforeSave(exported: { nodes: any[], connections: any[] }):
 
     const recordIdExpr = isStart
       ? `={{$('${srcNodeId}').first().json.body.record.${relField.column_name}}}`
-      : `={{$('${srcNodeId}').first().json.data.${relField.column_name}}}`
+      : srcSource.cardinality === 'item'
+        ? `={{$('${srcNodeId}').item.json.${relField.column_name}}}`
+        : `={{$('${srcNodeId}').first().json.data.${relField.column_name}}}`
 
     return {
       ...node,
@@ -148,11 +150,27 @@ function onDrop(event: DragEvent) {
   })
 
   addNode(nodeType, position)
+  nextTick(() => refreshRegistry())
 }
 
 function onDragOver(event: DragEvent) {
   event.preventDefault()
   event.dataTransfer!.dropEffect = 'move'
+}
+
+function onUpdateNodeParameters(nodeId: string, params: Record<string, any>) {
+  updateNodeParameters(nodeId, params)
+  nextTick(() => refreshRegistry())
+}
+
+function onUpdateNodeLabel(nodeId: string, label: string) {
+  updateNodeLabel(nodeId, label)
+  nextTick(() => refreshRegistry())
+}
+
+function onDeleteSelectedNode() {
+  deleteSelectedNode()
+  nextTick(() => refreshRegistry())
 }
 
 const toast = useToast()
@@ -165,6 +183,25 @@ function isMissingRequiredValue(value: unknown) {
   if (typeof value === 'string') return value.trim() === ''
   if (Array.isArray(value)) return value.length === 0
   return false
+}
+
+function findListSourceReferences(value: unknown, listSourceIds: Set<string>, found = new Set<string>()) {
+  if (!value || typeof value !== 'object') return found
+
+  if (Array.isArray(value)) {
+    for (const item of value) findListSourceReferences(item, listSourceIds, found)
+    return found
+  }
+
+  for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+    if (key === 'sourceNodeId' && typeof nested === 'string' && listSourceIds.has(nested)) {
+      found.add(nested)
+    } else {
+      findListSourceReferences(nested, listSourceIds, found)
+    }
+  }
+
+  return found
 }
 
 async function save() {
@@ -229,6 +266,50 @@ async function save() {
     return
   }
 
+  const dataSourceByNodeId = new Map(dataSources.value.map(ds => [ds.nodeId, ds]))
+  const listSourceIds = new Set(
+    dataSources.value.filter(ds => ds.cardinality === 'list').map(ds => ds.nodeId),
+  )
+
+  for (const node of nodes.value) {
+    if (node.data?.nodeType !== 'for_each') continue
+
+    const sourceNodeId = String(node.data?.parameters?.sourceNodeId ?? '')
+    const source = dataSourceByNodeId.get(sourceNodeId)
+    if (!source || source.cardinality !== 'list') {
+      toast.add({
+        title: `Lista lipsa in nodul "${node.data.label}"`,
+        description: 'Alege un nod "Citeste Inregistrari" care intoarce mai multe inregistrari.',
+        color: 'error',
+      })
+      return
+    }
+
+    const hasSourceEdge = edges.value.some(edge => edge.source === sourceNodeId && edge.target === node.id)
+    if (!hasSourceEdge) {
+      toast.add({
+        title: `Conexiune lipsa in nodul "${node.data.label}"`,
+        description: 'Conecteaza nodul care citeste lista direct la nodul "Pentru fiecare".',
+        color: 'error',
+      })
+      return
+    }
+  }
+
+  for (const node of nodes.value) {
+    if (node.data?.nodeType === 'for_each') continue
+
+    const refs = findListSourceReferences(node.data?.parameters ?? {}, listSourceIds)
+    if (refs.size === 0) continue
+
+    toast.add({
+      title: `Sursa lista folosita direct in nodul "${node.data.label}"`,
+      description: 'Listele trebuie parcurse prin nodul "Pentru fiecare" inainte sa alegi campuri din ele.',
+      color: 'error',
+    })
+    return
+  }
+
   const data = exportWorkflow()
   const enriched = await enrichBeforeSave(data)
   emit('save', enriched)
@@ -283,9 +364,9 @@ defineExpose({ save, exportWorkflow, fitView })
       :data-sources="dataSources"
       :fetch-entity-schema="fetchEntitySchema"
       :fetch-source-fields="fetchSourceFields"
-      @update-parameters="updateNodeParameters"
-      @update-label="updateNodeLabel"
-      @delete-node="deleteSelectedNode"
+      @update-parameters="onUpdateNodeParameters"
+      @update-label="onUpdateNodeLabel"
+      @delete-node="onDeleteSelectedNode"
       @close="selectNode(null)"
     />
   </div>
