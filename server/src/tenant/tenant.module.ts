@@ -46,6 +46,7 @@ export class TenantModule implements NestModule {
         { path: 'internal/provisioning/tenants/availability', method: RequestMethod.GET },
         { path: 'internal/provisioning/tenants/:slug/status', method: RequestMethod.GET },
         { path: 'internal/provisioning/tenants/:slug/admin-credentials', method: RequestMethod.POST },
+        { path: 'internal/provisioning/tenants/:slug/billing-status', method: RequestMethod.POST },
       )
       .forRoutes('*');
   }

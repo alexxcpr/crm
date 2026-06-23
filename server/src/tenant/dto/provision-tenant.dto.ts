@@ -1,4 +1,4 @@
-import { IsEmail, IsInt, IsNotEmpty, IsOptional, IsString, Length, Matches, Min, MinLength } from 'class-validator';
+import { IsEmail, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, Length, Matches, Min, MinLength } from 'class-validator';
 
 export class TenantAvailabilityQueryDto {
   @IsOptional()
@@ -35,6 +35,25 @@ export class ProvisionTenantDto {
   @Min(1)
   maxUsers?: number;
 
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  profileSeats?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  includedStorageGb?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  extraStorageUnits?: number;
+
+  @IsOptional()
+  @IsObject()
+  features?: Record<string, boolean>;
+
   @IsString()
   @IsNotEmpty()
   stripeCustomerId: string;
@@ -70,4 +89,17 @@ export class SetAdminCredentialsDto {
   @IsString()
   @MinLength(8)
   password: string;
+}
+
+export class SyncBillingStatusDto {
+  @IsString()
+  @IsNotEmpty()
+  subscriptionStatus: string;
+
+  @IsOptional()
+  @IsString()
+  billingStatus?: string;
+
+  @IsOptional()
+  currentPeriodEnd?: string;
 }

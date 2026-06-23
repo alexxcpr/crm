@@ -5,11 +5,16 @@ import * as argon from 'argon2';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { AuthenticatedUser } from 'src/security/security.types';
 import { AuthorizationService } from 'src/security/authorization.service';
+import { BillingService } from 'src/billing/billing.service';
 
 @Controller('user')
 @UseGuards(AuthGuard('jwt'))
 export class UserController {
-  constructor(private readonly tenantContext: TenantContext, private readonly authorization: AuthorizationService) {}
+  constructor(
+    private readonly tenantContext: TenantContext,
+    private readonly authorization: AuthorizationService,
+    private readonly billing: BillingService,
+  ) {}
 
   @Get('me')
   async getSession(@Req() req: Request & { user: AuthenticatedUser }) {
@@ -21,7 +26,8 @@ export class UserController {
     const entities = await this.tenantContext.knex('entity').select('id_entity', 'slug');
     const capabilities: Record<string, unknown> = {};
     for (const entity of entities) capabilities[entity.slug] = await this.authorization.capabilities(user, entity.id_entity);
-    return { ...user, profiles, capabilities };
+    const billing = await this.billing.getTenantFeatures(this.tenantContext.slug);
+    return { ...user, profiles, capabilities, billing, features: billing?.features ?? {} };
   }
 
   @Get('profiles/active')

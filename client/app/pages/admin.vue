@@ -15,6 +15,10 @@ const links = [[{
   icon: 'i-lucide-shield-check',
   to: '/admin/security'
 }, {
+  label: 'Abonament',
+  icon: 'i-lucide-credit-card',
+  to: '/admin/billing'
+}, {
   label: 'Workflow-uri',
   icon: 'i-lucide-workflow',
   to: '/admin/workflows'

@@ -4,6 +4,7 @@ import * as argon from 'argon2';
 import knex, { Knex } from 'knex';
 import { MetaDbService } from './meta-db.service';
 import { migrationDirectory } from './migration-directory';
+import { BASE_INCLUDED_PROFILE_SEATS, BASE_INCLUDED_STORAGE_GB } from 'src/billing/billing.constants';
 
 export interface ProvisionTenantInput {
   slug?: string;
@@ -12,6 +13,10 @@ export interface ProvisionTenantInput {
   adminName?: string;
   plan?: string;
   maxUsers?: number;
+  profileSeats?: number;
+  includedStorageGb?: number;
+  extraStorageUnits?: number;
+  features?: Record<string, boolean>;
   adminEmail?: string;
   adminPassword?: string;
   stripeCustomerId?: string;
@@ -28,6 +33,10 @@ interface TenantRegistryInput {
   adminEmail: string | null;
   plan: string;
   maxUsers: number;
+  profileSeats: number;
+  includedStorageGb: number;
+  extraStorageUnits: number;
+  features: Record<string, boolean>;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
   stripeCheckoutSessionId: string | null;
@@ -226,6 +235,79 @@ export class TenantProvisioningService {
     return { slug };
   }
 
+  async syncBillingStatus(input: {
+    slug: string;
+    subscriptionStatus: string;
+    billingStatus?: string;
+    currentPeriodEnd?: string | null;
+  }): Promise<{ slug: string }> {
+    const slug = this.parseSlug(input.slug);
+    if (!slug) throw new BadRequestException('Tenant slug invalid');
+
+    const billingStatus = input.billingStatus || this.billingStatusFromSubscription(input.subscriptionStatus);
+    await this.metaDb.knex.transaction(async (trx) => {
+      const [tenant] = await trx('tenants')
+        .where({ slug })
+        .update({
+          subscription_status: input.subscriptionStatus,
+          billing_status: billingStatus,
+          current_period_end: input.currentPeriodEnd ? new Date(input.currentPeriodEnd) : null,
+          updated_at: trx.fn.now(),
+        })
+        .returning(['id']);
+
+      if (!tenant) throw new BadRequestException('Tenantul nu exista.');
+      await this.applyDueScheduledBillingChanges(trx, tenant.id);
+    });
+
+    return { slug };
+  }
+
+  private async applyDueScheduledBillingChanges(trx: Knex.Transaction, tenantId: string): Promise<void> {
+    const changes = await trx('tenant_scheduled_billing_changes')
+      .where({ tenant_id: tenantId, status: 'scheduled' })
+      .where('effective_at', '<=', trx.fn.now());
+
+    for (const change of changes) {
+      const payload = typeof change.payload === 'string' ? JSON.parse(change.payload) : change.payload;
+      const patch: Record<string, unknown> = { updated_at: trx.fn.now() };
+
+      if (change.change_type === 'profile_seats' && Number.isInteger(payload.profileSeats)) {
+        patch.profile_seats = payload.profileSeats;
+        patch.max_users = payload.profileSeats;
+      }
+
+      if (change.change_type === 'extra_storage_units' && Number.isInteger(payload.extraStorageUnits)) {
+        patch.extra_storage_units = payload.extraStorageUnits;
+      }
+
+      if (Object.keys(patch).length > 1) {
+        await trx('tenants').where({ id: tenantId }).update(patch);
+      }
+      await trx('tenant_scheduled_billing_changes')
+        .where({ id: change.id })
+        .update({ status: 'applied', updated_at: trx.fn.now() });
+    }
+
+    await trx('tenant_feature_entitlements')
+      .where({ tenant_id: tenantId, cancel_at_period_end: true, status: 'active' })
+      .whereNotNull('active_until')
+      .where('active_until', '<=', trx.fn.now())
+      .update({
+        status: 'inactive',
+        cancel_at_period_end: false,
+        updated_at: trx.fn.now(),
+      });
+  }
+
+  private billingStatusFromSubscription(status: string): string {
+    const normalized = status.toLowerCase();
+    if (normalized === 'active' || normalized === 'trialing') return 'active';
+    if (normalized === 'past_due' || normalized === 'unpaid' || normalized === 'incomplete_expired') return 'blocked';
+    if (normalized === 'canceled') return 'canceled';
+    return normalized;
+  }
+
   private normalizeSlug(slug?: string): string {
     const normalized = this.parseSlug(slug);
     if (!normalized) {
@@ -254,7 +336,11 @@ export class TenantProvisioningService {
       adminName: this.optionalString(input.adminName),
       adminEmail: this.optionalString(input.adminEmail)?.toLowerCase() || null,
       plan: this.optionalString(input.plan) || 'starter',
-      maxUsers: this.normalizeMaxUsers(input.maxUsers),
+      profileSeats: this.normalizeProfileSeats(input.profileSeats ?? input.maxUsers),
+      maxUsers: this.normalizeProfileSeats(input.profileSeats ?? input.maxUsers),
+      includedStorageGb: this.normalizeStorageGb(input.includedStorageGb),
+      extraStorageUnits: this.normalizeExtraStorageUnits(input.extraStorageUnits),
+      features: input.features || {},
       stripeCustomerId: this.optionalString(input.stripeCustomerId),
       stripeSubscriptionId: this.optionalString(input.stripeSubscriptionId),
       stripeCheckoutSessionId: this.optionalString(input.stripeCheckoutSessionId),
@@ -262,12 +348,28 @@ export class TenantProvisioningService {
     };
   }
 
-  private normalizeMaxUsers(maxUsers?: number): number {
-    if (maxUsers === undefined || maxUsers === null) return 100;
-    if (!Number.isInteger(maxUsers) || maxUsers < 1) {
-      throw new BadRequestException('maxUsers must be a positive integer');
+  private normalizeProfileSeats(profileSeats?: number): number {
+    if (profileSeats === undefined || profileSeats === null) return BASE_INCLUDED_PROFILE_SEATS;
+    if (!Number.isInteger(profileSeats) || profileSeats < BASE_INCLUDED_PROFILE_SEATS) {
+      throw new BadRequestException(`profileSeats must be at least ${BASE_INCLUDED_PROFILE_SEATS}`);
     }
-    return maxUsers;
+    return profileSeats;
+  }
+
+  private normalizeStorageGb(value?: number): number {
+    if (value === undefined || value === null) return BASE_INCLUDED_STORAGE_GB;
+    if (!Number.isInteger(value) || value < 0) {
+      throw new BadRequestException('includedStorageGb must be a positive integer');
+    }
+    return value;
+  }
+
+  private normalizeExtraStorageUnits(value?: number): number {
+    if (value === undefined || value === null) return 0;
+    if (!Number.isInteger(value) || value < 0) {
+      throw new BadRequestException('extraStorageUnits must be a positive integer');
+    }
+    return value;
   }
 
   private optionalString(value?: string): string | null {
@@ -408,6 +510,10 @@ export class TenantProvisioningService {
       plan: input.plan,
       is_active: false,
       max_users: input.maxUsers,
+      profile_seats: input.profileSeats,
+      included_storage_gb: input.includedStorageGb,
+      extra_storage_units: input.extraStorageUnits,
+      billing_status: 'active',
       company_name: input.companyName,
       admin_name: input.adminName,
       admin_email: input.adminEmail,
@@ -440,6 +546,10 @@ export class TenantProvisioningService {
         plan: input.plan,
         is_active: true,
         max_users: input.maxUsers,
+        profile_seats: input.profileSeats,
+        included_storage_gb: input.includedStorageGb,
+        extra_storage_units: input.extraStorageUnits,
+        billing_status: input.subscriptionStatus === 'past_due' ? 'blocked' : 'active',
         company_name: input.companyName,
         admin_name: input.adminName,
         admin_email: input.adminEmail,
@@ -451,6 +561,32 @@ export class TenantProvisioningService {
         provisioning_error: null,
         updated_at: this.metaDb.knex.fn.now(),
       });
+
+    await this.syncProvisionedEntitlements(input);
+  }
+
+  private async syncProvisionedEntitlements(input: TenantRegistryInput): Promise<void> {
+    const tenant = await this.metaDb.knex('tenants').select('id').where({ slug: input.slug }).first();
+    if (!tenant) return;
+
+    if (input.features.reportsDashboards) {
+      await this.metaDb.knex('tenant_feature_entitlements')
+        .insert({
+          tenant_id: tenant.id,
+          feature_key: 'reports_dashboards',
+          status: 'active',
+          active_from: this.metaDb.knex.fn.now(),
+          updated_at: this.metaDb.knex.fn.now(),
+        })
+        .onConflict(['tenant_id', 'feature_key'])
+        .merge({
+          status: 'active',
+          active_from: this.metaDb.knex.fn.now(),
+          active_until: null,
+          cancel_at_period_end: false,
+          updated_at: this.metaDb.knex.fn.now(),
+        });
+    }
   }
 
   private async markTenantProvisioningFailed(input: TenantRegistryInput, error: unknown): Promise<void> {

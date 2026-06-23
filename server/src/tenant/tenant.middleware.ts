@@ -39,6 +39,9 @@ export class TenantMiddleware implements NestMiddleware {
     if (requestedTenant) {
       const tenantInfo = await this.billingClient.getCompanyBySlug(requestedTenant);
       if (tenantInfo && tenantInfo.isActive) {
+        if (tenantInfo.billingStatus === 'blocked' && !this.isBillingRecoveryPath(req.path)) {
+          return _res.status(402).json({ message: 'Abonamentul necesita actualizarea platii.' });
+        }
         dbName = tenantInfo.dbName;
         dbUser = tenantInfo.dbUser;
         dbPassword = tenantInfo.dbPassword;
@@ -98,5 +101,12 @@ export class TenantMiddleware implements NestMiddleware {
 
     const slug = cleanHost.slice(0, -1 * (`.${this.domainBase}`).length);
     return slug || undefined;
+  }
+
+  private isBillingRecoveryPath(path: string): boolean {
+    return path.startsWith('/auth/')
+      || path === '/user/me'
+      || path.startsWith('/v1/admin/billing')
+      || path === '/health';
   }
 }

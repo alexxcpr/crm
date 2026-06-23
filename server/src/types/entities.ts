@@ -113,6 +113,11 @@ export interface TenantInfo {
   plan: string;
   isActive: boolean;
   maxUsers: number;
+  billingStatus?: string;
+  profileSeats?: number;
+  includedStorageGb?: number;
+  extraStorageUnits?: number;
+  storageQuotaGb?: number;
 }
 
 export interface JwtPayload {

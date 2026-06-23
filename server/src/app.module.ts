@@ -13,6 +13,7 @@ import { ActionsModule } from './actions/actions.module';
 import { N8nModule } from './n8n/n8n.module';
 import { HealthModule } from './health/health.module';
 import { SecurityModule } from './security/security.module';
+import { BillingModule } from './billing/billing.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { SecurityModule } from './security/security.module';
     DynamicDataModule,
     SchemaModule,
     AdminModule,
+    BillingModule,
     ActionsModule,
     N8nModule,
     HealthModule,

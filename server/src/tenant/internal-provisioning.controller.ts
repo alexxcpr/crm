@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { timingSafeEqual } from 'crypto';
-import { ProvisionTenantDto, SetAdminCredentialsDto, TenantAvailabilityQueryDto } from './dto/provision-tenant.dto';
+import { ProvisionTenantDto, SetAdminCredentialsDto, SyncBillingStatusDto, TenantAvailabilityQueryDto } from './dto/provision-tenant.dto';
 import { TenantProvisioningService } from './tenant-provisioning.service';
 
 @Controller('internal/provisioning/tenants')
@@ -87,6 +87,29 @@ export class InternalProvisioningController {
       data: {
         tenantSlug: result.slug,
         appUrl: this.appUrl(result.slug),
+      },
+    };
+  }
+
+  @Post(':slug/billing-status')
+  async syncBillingStatus(
+    @Headers('x-provisioning-secret') secret: string | undefined,
+    @Param('slug') slug: string,
+    @Body() dto: SyncBillingStatusDto,
+  ) {
+    this.assertSecret(secret);
+
+    const result = await this.provisioning.syncBillingStatus({
+      slug,
+      subscriptionStatus: dto.subscriptionStatus,
+      billingStatus: dto.billingStatus,
+      currentPeriodEnd: dto.currentPeriodEnd,
+    });
+
+    return {
+      success: true,
+      data: {
+        tenantSlug: result.slug,
       },
     };
   }

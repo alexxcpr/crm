@@ -3,6 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { TenantInfo } from 'src/types/entities';
 import { MetaDbService } from './meta-db.service';
 
+const BASE_INCLUDED_PROFILE_SEATS = 5;
+const BASE_INCLUDED_STORAGE_GB = 10;
+const STORAGE_UNIT_GB = 10;
+
 interface CachedTenant {
   value: TenantInfo | null;
   expiresAt: number;
@@ -35,10 +39,24 @@ export class BillingApiClient {
 
     try {
       const row = await this.metaDb.knex('tenants')
-        .select('db_name', 'db_user', 'db_password_encrypted', 'plan', 'is_active', 'max_users')
+        .select(
+          'db_name',
+          'db_user',
+          'db_password_encrypted',
+          'plan',
+          'is_active',
+          'max_users',
+          'billing_status',
+          'profile_seats',
+          'included_storage_gb',
+          'extra_storage_units',
+        )
         .where({ slug: normalizedSlug })
         .first();
 
+      const profileSeats = Number(row?.profile_seats || row?.max_users || BASE_INCLUDED_PROFILE_SEATS);
+      const includedStorageGb = Number(row?.included_storage_gb || BASE_INCLUDED_STORAGE_GB);
+      const extraStorageUnits = Number(row?.extra_storage_units || 0);
       let tenant: TenantInfo | null = row
         ? {
             dbName: row.db_name,
@@ -46,7 +64,12 @@ export class BillingApiClient {
             dbPassword: row.db_password_encrypted,
             plan: row.plan,
             isActive: row.is_active,
-            maxUsers: row.max_users,
+            maxUsers: profileSeats,
+            billingStatus: row.billing_status || 'active',
+            profileSeats,
+            includedStorageGb,
+            extraStorageUnits,
+            storageQuotaGb: includedStorageGb + extraStorageUnits * STORAGE_UNIT_GB,
           }
         : null;
 
@@ -90,6 +113,11 @@ export class BillingApiClient {
       plan: 'starter',
       isActive: true,
       maxUsers: 100,
+      billingStatus: 'active',
+      profileSeats: 100,
+      includedStorageGb: BASE_INCLUDED_STORAGE_GB,
+      extraStorageUnits: 0,
+      storageQuotaGb: BASE_INCLUDED_STORAGE_GB,
     };
   }
 }

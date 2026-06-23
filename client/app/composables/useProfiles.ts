@@ -15,6 +15,13 @@ export interface ModuvisSession {
   profiles: SessionProfile[]
   roles: string[]
   capabilities: Record<string, Record<string, 'all' | 'owner' | null>>
+  billing?: {
+    billingStatus: string
+    profileSeats: number
+    storageQuotaGb: number
+    features: Record<string, boolean>
+  } | null
+  features?: Record<string, boolean>
 }
 
 export function useProfiles() {
