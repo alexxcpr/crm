@@ -77,6 +77,7 @@ export class AdminSecurityService {
     if (!current) throw new NotFoundException('Profilul nu exista.');
     if (body.isActive === true && !current.is_active) await this.assertProfileCapacity();
     if (body.isActive === false && current.is_active) await this.assertNotLastAdmin(profileId);
+    if (Array.isArray(body.roleIds) && current.is_active) await this.assertAdminCoverageAfterRoleReplacement([profileId], body.roleIds);
     return this.knex.transaction(async (trx) => {
       const [profile] = await trx('profile').where('id_profile', profileId).update({
         username: body.username ? this.normalize(body.username) : current.username,
@@ -91,6 +92,100 @@ export class AdminSecurityService {
       }
       return profile;
     });
+  }
+
+  async listRoleGroups() {
+    const groups = await this.knex('role_group').orderBy('name');
+    for (const group of groups) {
+      group.roles = await this.knex('role_group_role')
+        .join('role', 'role_group_role.id_role', 'role.id_role')
+        .where('role_group_role.id_role_group', group.id_role_group)
+        .select('role.id_role', 'role.name', 'role.slug', 'role.is_system')
+        .orderBy('role.name');
+      group.profiles = await this.knex('role_group_profile')
+        .join('profile', 'role_group_profile.id_profile', 'profile.id_profile')
+        .leftJoin('user', 'profile.id_user', 'user.id')
+        .where('role_group_profile.id_role_group', group.id_role_group)
+        .select('profile.id_profile', 'profile.username', 'profile.email', 'profile.display_name', 'profile.is_active', 'user.login_username')
+        .orderBy('profile.date_created');
+    }
+    return groups;
+  }
+
+  async createRoleGroup(body: any) {
+    const name = body.name?.trim();
+    if (!name) throw new BadRequestException('Numele grupului este obligatoriu.');
+    try {
+      const [group] = await this.knex.transaction(async (trx) => {
+        const [created] = await trx('role_group').insert({
+          name,
+          description: body.description?.trim() || null,
+        }).returning('*');
+        await this.replaceRoleGroupLinks(created.id_role_group, body.roleIds ?? [], body.profileIds ?? [], trx);
+        return [created];
+      });
+      return (await this.listRoleGroups()).find((item) => item.id_role_group === group.id_role_group);
+    } catch (error: any) {
+      if (error.code === '23505') throw new ConflictException('Exista deja un role group cu acest nume.');
+      throw error;
+    }
+  }
+
+  async updateRoleGroup(roleGroupId: string, body: any) {
+    const group = await this.knex('role_group').where('id_role_group', roleGroupId).first();
+    if (!group) throw new NotFoundException('Role group-ul nu exista.');
+    try {
+      await this.knex.transaction(async (trx) => {
+        await trx('role_group').where('id_role_group', roleGroupId).update({
+          name: body.name?.trim() || group.name,
+          description: body.description !== undefined ? body.description?.trim() || null : group.description,
+          date_updated: new Date(),
+        });
+        if (Array.isArray(body.roleIds) || Array.isArray(body.profileIds)) {
+          const roleIds = Array.isArray(body.roleIds)
+            ? body.roleIds
+            : (await trx('role_group_role').where('id_role_group', roleGroupId).pluck('id_role'));
+          const profileIds = Array.isArray(body.profileIds)
+            ? body.profileIds
+            : (await trx('role_group_profile').where('id_role_group', roleGroupId).pluck('id_profile'));
+          await this.replaceRoleGroupLinks(roleGroupId, roleIds, profileIds, trx);
+        }
+      });
+      return (await this.listRoleGroups()).find((item) => item.id_role_group === roleGroupId);
+    } catch (error: any) {
+      if (error.code === '23505') throw new ConflictException('Exista deja un role group cu acest nume.');
+      throw error;
+    }
+  }
+
+  async deleteRoleGroup(roleGroupId: string) {
+    const group = await this.knex('role_group').where('id_role_group', roleGroupId).first();
+    if (!group) throw new NotFoundException('Role group-ul nu exista.');
+    await this.knex('role_group').where('id_role_group', roleGroupId).del();
+  }
+
+  async applyRoleGroup(roleGroupId: string, body: any) {
+    const mode = body.mode === 'replace' ? 'replace' : body.mode === 'add' ? 'add' : null;
+    if (!mode) throw new BadRequestException('Modul de aplicare trebuie sa fie add sau replace.');
+
+    const group = await this.knex('role_group').where('id_role_group', roleGroupId).first();
+    if (!group) throw new NotFoundException('Role group-ul nu exista.');
+
+    const roleIds = await this.knex('role_group_role').where('id_role_group', roleGroupId).pluck('id_role');
+    const profileIds = await this.knex('role_group_profile').where('id_role_group', roleGroupId).pluck('id_profile');
+    if (!profileIds.length) throw new BadRequestException('Role group-ul nu are profiluri selectate.');
+
+    if (mode === 'replace') await this.assertAdminCoverageAfterRoleReplacement(profileIds, roleIds);
+
+    await this.knex.transaction(async (trx) => {
+      if (mode === 'replace') {
+        await trx('profile_role').whereIn('id_profile', profileIds).del();
+      }
+      const rows = profileIds.flatMap((id_profile: string) => roleIds.map((id_role: string) => ({ id_profile, id_role })));
+      if (rows.length) await trx('profile_role').insert(rows).onConflict(['id_profile', 'id_role']).ignore();
+    });
+
+    return { updatedProfiles: profileIds.length, mode };
   }
 
   async listRoles() {
@@ -143,6 +238,19 @@ export class AdminSecurityService {
     });
   }
 
+  private async replaceRoleGroupLinks(roleGroupId: string, roleIds: string[], profileIds: string[], trx: any) {
+    const cleanRoleIds = this.uniqueStrings(roleIds);
+    const cleanProfileIds = this.uniqueStrings(profileIds);
+    await trx('role_group_role').where('id_role_group', roleGroupId).del();
+    await trx('role_group_profile').where('id_role_group', roleGroupId).del();
+    if (cleanRoleIds.length) {
+      await trx('role_group_role').insert(cleanRoleIds.map((id_role) => ({ id_role_group: roleGroupId, id_role })));
+    }
+    if (cleanProfileIds.length) {
+      await trx('role_group_profile').insert(cleanProfileIds.map((id_profile) => ({ id_role_group: roleGroupId, id_profile })));
+    }
+  }
+
   private async assertProfileCapacity() {
     const tenant = await this.billing.getCompanyBySlug(this.tenantContext.slug);
     const [{ count }] = await this.knex('profile').where('is_active', true).count('* as count');
@@ -161,5 +269,35 @@ export class AdminSecurityService {
     if (Number(count) === 0) throw new BadRequestException('Ultimul profil administrator activ nu poate fi dezactivat.');
   }
 
+  private async assertAdminCoverageAfterRoleReplacement(profileIds: string[], nextRoleIds: string[]) {
+    const cleanProfileIds = this.uniqueStrings(profileIds);
+    if (!cleanProfileIds.length) return;
+
+    const nextHasAdmin = nextRoleIds.length
+      ? !!(await this.knex('role').whereIn('id_role', this.uniqueStrings(nextRoleIds)).where('slug', 'admin').first())
+      : false;
+    if (nextHasAdmin) return;
+
+    const activeTargetAdmin = await this.knex('profile')
+      .join('profile_role', 'profile.id_profile', 'profile_role.id_profile')
+      .join('role', 'profile_role.id_role', 'role.id_role')
+      .whereIn('profile.id_profile', cleanProfileIds)
+      .where({ 'profile.is_active': true, 'role.slug': 'admin' })
+      .first('profile.id_profile');
+    if (!activeTargetAdmin) return;
+
+    const [{ count }] = await this.knex('profile')
+      .join('profile_role', 'profile.id_profile', 'profile_role.id_profile')
+      .join('role', 'profile_role.id_role', 'role.id_role')
+      .where({ 'profile.is_active': true, 'role.slug': 'admin' })
+      .whereNotIn('profile.id_profile', cleanProfileIds)
+      .countDistinct('profile.id_profile as count');
+    if (Number(count) === 0) throw new BadRequestException('Ultimul profil administrator activ nu poate pierde rolul admin.');
+  }
+
   private normalize(value?: string) { return value?.trim().toLowerCase(); }
+
+  private uniqueStrings(values: string[]) {
+    return [...new Set((values ?? []).filter((value): value is string => typeof value === 'string' && value.length > 0))];
+  }
 }
