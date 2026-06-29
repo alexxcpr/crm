@@ -163,6 +163,37 @@ describe('WorkflowSyncService validation nodes', () => {
     expect(forEachNode.parameters.jsCode).toContain('_foreach_index');
   });
 
+  it('trimite tenantul curent in headerele requesturilor CRM generate pentru n8n', () => {
+    const service = makeService();
+    const workflow = {
+      name: 'Transfer',
+      slug: 'transfer',
+      nodes: [
+        {
+          id: 'start',
+          type: 'start',
+          position: { x: 0, y: 0 },
+          parameters: { entity: 'geo_unit' },
+        },
+        {
+          id: 'fetch_judete',
+          type: 'app_get_record',
+          position: { x: 250, y: 0 },
+          parameters: { entity: 'judete', limit: 100, filters: [] },
+        },
+      ],
+      connections: [{ source: 'start', target: 'fetch_judete' }],
+    };
+
+    const translated = (service as any).translateToN8n(workflow);
+    const fetchNode = translated.nodes.find((node: any) => node.id === 'fetch_judete');
+
+    expect(fetchNode.parameters.headerParameters.parameters).toContainEqual({
+      name: 'x-tenant',
+      value: 'tenant',
+    });
+  });
+
   it('foloseste item-ul curent pentru nodurile din interiorul for_each', () => {
     const service = makeService();
     const workflow = {

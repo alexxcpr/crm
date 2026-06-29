@@ -646,6 +646,7 @@ export class WorkflowSyncService {
       headerParameters: {
         parameters: [
           ...(this.webhookSecret ? [{ name: 'x-webhook-secret', value: this.webhookSecret }] : []),
+          { name: 'x-tenant', value: tenantSlug },
           { name: 'x-workflow-token', value: `={{ $('${startNodeId}').first().json.body.workflowToken }}` },
         ],
       },
