@@ -151,7 +151,7 @@ export class AdminFieldsService {
   }
 
   async update(entityId: string, fieldId: string, dto: UpdateFieldDto) {
-    await this.ensureEntityExists(entityId);
+    const entity = await this.ensureEntityExists(entityId);
 
     const field = await this.knex('field')
       .where({ id_field: fieldId, id_entity: entityId })
@@ -208,6 +208,10 @@ export class AdminFieldsService {
       updateData.validation_rules = dto.validation_rules ? JSON.stringify(dto.validation_rules) : null;
     } else {
       updateData.validation_rules = field.validation_rules;
+    }
+
+    if (dto.is_required !== undefined) {
+      await this.dynamicSchema.updateColumnRequired(entity, field, dto.is_required);
     }
 
     const [updated] = await this.knex('field')

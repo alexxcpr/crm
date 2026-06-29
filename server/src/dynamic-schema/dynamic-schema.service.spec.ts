@@ -60,6 +60,7 @@ describe('DynamicSchemaService', () => {
   let mockColumnBuilder: Record<string, jest.Mock>;
   let mockTableBuilder: Record<string, jest.Mock | any>;
   let mockSchema: Record<string, jest.Mock>;
+  let mockQueryBuilder: Record<string, jest.Mock>;
   let mockKnexInstance: any;
   let mockTenantContext: { knex: any; isAvailable: boolean };
 
@@ -107,7 +108,7 @@ describe('DynamicSchemaService', () => {
       }),
     };
 
-    const mockQueryBuilder = {
+    mockQueryBuilder = {
       where: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
       count: jest.fn().mockReturnThis(),
@@ -477,6 +478,65 @@ describe('DynamicSchemaService', () => {
   // ═══════════════════════════════════════════
   //  createIndex
   // ═══════════════════════════════════════════
+  describe('updateColumnRequired', () => {
+    it('face coloana nullable cand campul nu mai este required', async () => {
+      mockSchema.hasColumn.mockResolvedValue(true);
+
+      await service.updateColumnRequired(
+        mockEntity(),
+        mockField({ is_required: true, is_filterable: false }),
+        false,
+      );
+
+      expect(mockSchema.hasColumn).toHaveBeenCalledWith('ent_contacts', 'cf_industry');
+      expect(mockColumnBuilder.nullable).toHaveBeenCalled();
+      expect(mockColumnBuilder.alter).toHaveBeenCalled();
+    });
+
+    it('face coloana not nullable cand nu exista valori null', async () => {
+      mockSchema.hasColumn.mockResolvedValue(true);
+      mockQueryBuilder.first.mockResolvedValueOnce({ cnt: 0 });
+
+      await service.updateColumnRequired(
+        mockEntity(),
+        mockField({ is_required: false, is_filterable: false }),
+        true,
+      );
+
+      expect(mockColumnBuilder.notNullable).toHaveBeenCalled();
+      expect(mockColumnBuilder.alter).toHaveBeenCalled();
+    });
+
+    it('respinge required=true daca exista deja valori null', async () => {
+      mockSchema.hasColumn.mockResolvedValue(true);
+      mockQueryBuilder.first.mockResolvedValueOnce({ cnt: 2 });
+
+      await expect(
+        service.updateColumnRequired(
+          mockEntity(),
+          mockField({ is_required: false, is_filterable: false }),
+          true,
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockSchema.alterTable).not.toHaveBeenCalled();
+    });
+
+    it('resincronizeaza coloana chiar daca metadata este deja optionala', async () => {
+      mockSchema.hasColumn.mockResolvedValue(true);
+
+      await service.updateColumnRequired(
+        mockEntity(),
+        mockField({ is_required: false, is_filterable: false }),
+        false,
+      );
+
+      expect(mockSchema.hasColumn).toHaveBeenCalledWith('ent_contacts', 'cf_industry');
+      expect(mockColumnBuilder.nullable).toHaveBeenCalled();
+      expect(mockColumnBuilder.alter).toHaveBeenCalled();
+    });
+  });
+
   describe('createIndex', () => {
     it('creeaza index cu naming convention corecta', async () => {
       await service.createIndex('ent_contacts', 'cf_industry');

@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Knex } from 'knex';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { Entity, Field } from 'src/types/entities';
-import { applyColumn, ColumnDefinition } from './data-type.mapper';
+import { applyColumn } from './data-type.mapper';
 
 const SLUG_REGEX = /^[a-z][a-z0-9_]{1,50}$/;
 
@@ -117,7 +117,47 @@ export class DynamicSchemaService {
     this.logger.log(`Coloana "${field.column_name}" a fost stearsa din "${tableName}".`);
   }
 
-  // ─── Creează index B-Tree ───
+  // Sincronizeaza constrangerea NOT NULL cand se schimba bifa de required.
+  async updateColumnRequired(entity: Entity, field: Field, isRequired: boolean): Promise<void> {
+    const tableName = entity.table_name;
+    const columnName = this.ensureColumnPrefix(field);
+    const hasColumn = await this.knex.schema.hasColumn(tableName, columnName);
+
+    if (!hasColumn) {
+      throw new BadRequestException(
+        `Coloana "${columnName}" nu exista in tabela "${tableName}".`,
+      );
+    }
+
+    if (isRequired) {
+      const nullCountResult = await this.knex(tableName)
+        .whereNull(columnName)
+        .count('* as cnt')
+        .first();
+      const nullCount = Number(nullCountResult?.cnt ?? 0);
+
+      if (nullCount > 0) {
+        throw new BadRequestException(
+          `Campul "${field.name}" nu poate deveni obligatoriu deoarece exista ${nullCount} inregistrari fara valoare.`,
+        );
+      }
+    }
+
+    await this.knex.schema.alterTable(tableName, (table) => {
+      const col = this.rebuildColumnBuilder(table, field.data_type, columnName);
+      if (isRequired) {
+        col.notNullable().alter();
+      } else {
+        col.nullable().alter();
+      }
+    });
+
+    this.logger.log(
+      `Coloana "${columnName}" din "${tableName}" a fost setata ca ${isRequired ? 'obligatorie' : 'optionala'}.`,
+    );
+  }
+
+  // Creeaza index B-Tree
   async createIndex(tableName: string, columnName: string): Promise<void> {
     const indexName = `idx_${tableName}_${columnName}`;
 
