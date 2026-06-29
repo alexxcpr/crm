@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { Entity, FieldWithRelation } from 'src/types/entities';
 import { AuthorizationService } from 'src/security/authorization.service';
@@ -8,6 +8,8 @@ import { DynamicValidationService } from './dynamic-validation.service';
 import { PaginatedResponse } from './dto/query.dto';
 import { EntityEventsService } from 'src/events/entity-events.service';
 import { EntityEvent } from 'src/events/entity-event.enum';
+
+const DELETE_CONFLICT_REFERENCE_ID_LIMIT = 3;
 
 @Injectable()
 export class DynamicDataService {
@@ -20,6 +22,12 @@ export class DynamicDataService {
   ) {}
 
   private get knex() { return this.tenantContext.knex; }
+
+  private isForeignKeyViolation(error: unknown): error is { code: string; table?: string; constraint?: string } {
+    return typeof error === 'object'
+      && error !== null
+      && (error as { code?: string }).code === '23503';
+  }
 
   private async resolveEntity(entitySlug: string): Promise<{ entity: Entity; fields: FieldWithRelation[] }> {
     const entity = await this.authorization.getEntity(entitySlug);
@@ -154,8 +162,113 @@ export class DynamicDataService {
     if (!existing) throw new NotFoundException(`Inregistrarea cu id "${id}" nu a fost gasita.`);
     const eventCtx = this.eventContext(entity, entitySlug, id, existing, actor, existing);
     await this.entityEvents.emit(EntityEvent.BeforeDelete, eventCtx);
-    await this.knex(entity.table_name).where('id', id).del();
+    try {
+      await this.knex(entity.table_name).where('id', id).del();
+    } catch (error) {
+      if (this.isForeignKeyViolation(error)) {
+        throw new ConflictException(await this.buildDeleteConflictMessage(entity, id, error));
+      }
+      throw error;
+    }
     await this.entityEvents.emit(EntityEvent.AfterDelete, eventCtx);
+  }
+
+  private async buildDeleteConflictMessage(
+    entity: Entity,
+    recordId: string,
+    error: { table?: string; constraint?: string },
+  ): Promise<string> {
+    const relation = await this.findReferencingRelation(entity.id_entity, error);
+    const targetLabel = entity.label_singular || entity.name || 'aceasta inregistrare';
+
+    if (!relation) {
+      return `Nu poti sterge aceasta inregistrare (${targetLabel}) deoarece este folosita de alte inregistrari. Sterge sau schimba mai intai acele referinte.`;
+    }
+
+    const usage = await this.getReferenceUsage(relation.table_name, relation.column_name, recordId);
+    const sourceLabel = relation.label_plural || relation.entity_name || relation.slug || relation.table_name;
+    const sourceSingular = relation.label_singular || relation.entity_name || relation.slug || relation.table_name;
+    const usageText = usage === null
+      ? `in ${sourceLabel}`
+      : usage.total === 1
+        ? `in ${sourceSingular}${usage.ids[0] ? ` cu id-ul: ${usage.ids[0]}` : ''}`
+        : `in ${usage.total} inregistrari din ${sourceLabel}${this.formatReferenceIds(usage)}`;
+
+    return `Nu poti sterge aceasta inregistrare (${targetLabel}) deoarece este folosita ${usageText}, prin campul "${relation.field_name}". Sterge sau schimba mai intai acele referinte.`;
+  }
+
+  private async findReferencingRelation(
+    targetEntityId: string,
+    error: { table?: string; constraint?: string },
+  ): Promise<{
+    field_name: string;
+    column_name: string;
+    table_name: string;
+    entity_name: string;
+    label_singular: string | null;
+    label_plural: string | null;
+    slug: string;
+  } | null> {
+    const query = this.knex('field as field')
+      .join('entity as entity', 'entity.id_entity', 'field.id_entity')
+      .where('field.id_relation_entity', targetEntityId)
+      .select(
+        'field.name as field_name',
+        'field.column_name',
+        'entity.table_name',
+        'entity.name as entity_name',
+        'entity.label_singular',
+        'entity.label_plural',
+        'entity.slug',
+      );
+
+    if (error.table) {
+      query.andWhere('entity.table_name', error.table);
+    }
+
+    const relations = await query;
+    if (!relations.length) return null;
+
+    const constraintMatch = relations.find((relation) =>
+      typeof error.constraint === 'string'
+      && error.constraint.startsWith(`${relation.table_name}_`)
+      && error.constraint.endsWith(`${relation.column_name}_foreign`),
+    );
+
+    return constraintMatch ?? relations[0];
+  }
+
+  private async getReferenceUsage(
+    tableName: string,
+    columnName: string,
+    recordId: string,
+  ): Promise<{ total: number; ids: string[] } | null> {
+    try {
+      const [countRow, rows] = await Promise.all([
+        this.knex(tableName)
+          .where(columnName, recordId)
+          .count('* as total')
+          .first(),
+        this.knex(tableName)
+          .where(columnName, recordId)
+          .select('id')
+          .limit(DELETE_CONFLICT_REFERENCE_ID_LIMIT),
+      ]);
+      return {
+        total: Number(countRow?.total ?? 0),
+        ids: rows.map((row: { id: string }) => row.id).filter(Boolean),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private formatReferenceIds(usage: { total: number; ids: string[] }): string {
+    if (!usage.ids.length) return '';
+
+    const remaining = usage.total - usage.ids.length;
+    const suffix = remaining > 0 ? ` si inca ${remaining}` : '';
+    return ` (id-uri: ${usage.ids.join(', ')}${suffix})`;
   }
 
   private eventContext(entity: Entity, entitySlug: string, recordId: string | null, data: Record<string, any>, actor: AuthenticatedUser, previousData?: Record<string, any>) {

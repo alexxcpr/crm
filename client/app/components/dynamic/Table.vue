@@ -270,7 +270,11 @@ const columns = computed<TableColumn<TableRow>[]>(() => {
                   toast.add({ title: 'Inregistrare stearsa', color: 'success' })
                   await loadData()
                 } else {
-                  toast.add({ title: 'Eroare la stergere', color: 'error' })
+                  toast.add({
+                    title: 'Eroare la stergere',
+                    description: dataError.value ?? 'Inregistrarea nu a putut fi stearsa.',
+                    color: 'error'
+                  })
                 }
               }
             }] : [])
@@ -335,7 +339,16 @@ async function confirmBulkDelete() {
   bulkDeleting.value = false
   showBulkDeleteConfirm.value = false
   rowSelection.value = {}
-  toast.add({ title: `${deleted} inregistrari sterse`, color: 'success' })
+  if (deleted === ids.length) {
+    toast.add({ title: `${deleted} inregistrari sterse`, color: 'success' })
+  } else {
+    const failed = ids.length - deleted
+    toast.add({
+      title: deleted > 0 ? `${deleted} sterse, ${failed} nesterse` : 'Eroare la stergere',
+      description: dataError.value ?? 'Unele inregistrari nu au putut fi sterse.',
+      color: deleted > 0 ? 'warning' : 'error'
+    })
+  }
   await loadData()
 }
 </script>
