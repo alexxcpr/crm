@@ -24,6 +24,8 @@ import * as crypto from 'crypto';
 import { JwtService } from '@nestjs/jwt';
 import { AuthenticatedUser } from 'src/security/security.types';
 
+const EMPTY_WORKFLOW_FILTER_VALUE = '__MODUVIS_EMPTY_FILTER__';
+
 interface WebhookPayload {
   executionId: string;
   workflowId: string;
@@ -265,7 +267,7 @@ export class N8nWebhookController {
   }
 
   private containsEmptyFilterValue(value: unknown): boolean {
-    if (value === null || value === undefined || value === '') return true;
+    if (value === null || value === undefined || value === '' || value === EMPTY_WORKFLOW_FILTER_VALUE) return true;
     if (Array.isArray(value)) {
       return value.some((item) => this.containsEmptyFilterValue(item));
     }

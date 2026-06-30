@@ -299,6 +299,74 @@ describe('WorkflowSyncService validation nodes', () => {
     });
   });
 
+  it('genereaza filtre null-safe cand valoarea vine dintr-un nod care poate intoarce data null', () => {
+    const service = makeService();
+    const workflow = {
+      name: 'Activitate companie',
+      slug: 'activitate_companie',
+      nodes: [
+        {
+          id: 'start',
+          type: 'start',
+          position: { x: 0, y: 0 },
+          parameters: { entity: 'crm_activitate' },
+        },
+        {
+          id: 'contact',
+          type: 'app_get_record',
+          position: { x: 250, y: 0 },
+          parameters: {
+            entity: 'crm_contact',
+            limit: 1,
+            filters: [
+              {
+                field: 'id',
+                operator: 'eq',
+                valueSource: {
+                  sourceType: 'node_output',
+                  sourceNodeId: 'start',
+                  sourceFieldSlug: 'cf_contact',
+                },
+              },
+            ],
+          },
+        },
+        {
+          id: 'company',
+          type: 'app_get_record',
+          position: { x: 500, y: 0 },
+          parameters: {
+            entity: 'crm_companie',
+            limit: 1,
+            filters: [
+              {
+                field: 'id',
+                operator: 'eq',
+                valueSource: {
+                  sourceType: 'node_output',
+                  sourceNodeId: 'contact',
+                  sourceFieldSlug: 'cf_companie',
+                },
+              },
+            ],
+          },
+        },
+      ],
+      connections: [
+        { source: 'start', target: 'contact' },
+        { source: 'contact', target: 'company' },
+      ],
+    };
+
+    const translated = (service as any).translateToN8n(workflow);
+    const companyNode = translated.nodes.find((node: any) => node.id === 'company');
+
+    expect(companyNode.parameters.queryParameters.parameters).toContainEqual({
+      name: 'filter[id][eq]',
+      value: `={{$('contact').first().json.data?.cf_companie ?? "__MODUVIS_EMPTY_FILTER__"}}`,
+    });
+  });
+
   it('trimite tenantul curent in headerele requesturilor CRM generate pentru n8n', () => {
     const service = makeService();
     const workflow = {

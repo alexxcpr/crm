@@ -6,6 +6,8 @@ import { TenantContext } from 'src/tenant/tenant-context.service';
 import { N8nApiClient, N8nWorkflowJson } from './n8n-api.client';
 import { withValidationPrefix } from './workflow-error.utils';
 
+const EMPTY_WORKFLOW_FILTER_VALUE = '__MODUVIS_EMPTY_FILTER__';
+
 interface NodeDefinition {
   id: string;
   type: string;
@@ -327,6 +329,24 @@ export class WorkflowSyncService {
       return `={{${this.nodeOutputJsonPath(source.sourceNodeId!, allNodes, itemNodeIds)}.${source.sourceFieldSlug}}}`;
     }
     return source.value;
+  }
+
+  private resolveFilterValue(
+    source: RecordIdSource,
+    allNodes: NodeDefinition[],
+    itemNodeIds: Set<string>,
+  ): string {
+    if (!source) return EMPTY_WORKFLOW_FILTER_VALUE;
+
+    if (source.sourceType === 'node_output') {
+      if (!source.sourceNodeId || !source.sourceFieldSlug) {
+        return EMPTY_WORKFLOW_FILTER_VALUE;
+      }
+
+      return `={{${this.nodeOutputJsonPath(source.sourceNodeId, allNodes, itemNodeIds)}?.${source.sourceFieldSlug} ?? "${EMPTY_WORKFLOW_FILTER_VALUE}"}}`;
+    }
+
+    return source.value || EMPTY_WORKFLOW_FILTER_VALUE;
   }
 
   private workflowHasActivatableTrigger(workflow: { nodes: any }): boolean {
@@ -673,15 +693,14 @@ export class WorkflowSyncService {
 
           for (const f of filters) {
             if (!f.field || !f.operator) continue
-            const filterValue = this.resolveRecordId(
+            const filterValue = this.resolveFilterValue(
               f.valueSource as RecordIdSource,
               allNodes,
-              startNodeId,
               itemNodeIds,
             )
             queryParams.push({
               name: `filter[${f.field}][${f.operator}]`,
-              value: filterValue || '',
+              value: filterValue,
             })
           }
 

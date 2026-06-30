@@ -47,6 +47,28 @@ describe('N8nWebhookController data-list', () => {
     expect(dataService.findAll).not.toHaveBeenCalled();
   });
 
+  it('returneaza null pentru lookup limit=1 cand filtrul are sentinel de valoare lipsa', async () => {
+    const { controller, dataService } = makeController();
+
+    const result = await controller.getDataList(
+      'tenant',
+      {
+        entity: 'crm_companie',
+        limit: '1',
+        filter: {
+          id: {
+            eq: '__MODUVIS_EMPTY_FILTER__',
+          },
+        },
+      },
+      undefined,
+      'workflow-token',
+    );
+
+    expect(result).toEqual({ data: null });
+    expect(dataService.findAll).not.toHaveBeenCalled();
+  });
+
   it('pastreaza lookup-ul valid si intoarce primul rezultat pentru limit=1', async () => {
     const { controller, dataService } = makeController();
     dataService.findAll.mockResolvedValue({
