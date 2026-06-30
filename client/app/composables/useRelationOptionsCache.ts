@@ -28,6 +28,10 @@ type RefreshOptions = {
   background?: boolean
 }
 
+type SeedSelectedRelationOptions = {
+  fallbackToValue?: boolean
+}
+
 const CACHE_TTL_MS = 60_000
 const DEFAULT_LIMIT = 50
 const pendingFetches = new Map<string, Promise<RelationOption[]>>()
@@ -278,8 +282,14 @@ export function useRelationOptionsCache() {
     cache.value = nextCache
   }
 
-  function seedSelectedRelationOptions(fields: Field[], record: RelationRecord | null | undefined) {
+  function seedSelectedRelationOptions(
+    fields: Field[],
+    record: RelationRecord | null | undefined,
+    options: SeedSelectedRelationOptions = {}
+  ) {
     if (!record) return
+
+    const fallbackToValue = options.fallbackToValue ?? true
 
     for (const field of fields) {
       if (!isRelationField(field)) continue
@@ -287,8 +297,13 @@ export function useRelationOptionsCache() {
       const value = record[field.column_name]
       if (!value) continue
 
+      const displayValue = record[`${field.column_name}_display`]
+      if ((displayValue === null || displayValue === undefined || displayValue === '') && !fallbackToValue) {
+        continue
+      }
+
       upsertRelationOption(field, {
-        label: String(record[`${field.column_name}_display`] ?? value),
+        label: String(displayValue || value),
         value: String(value)
       })
     }

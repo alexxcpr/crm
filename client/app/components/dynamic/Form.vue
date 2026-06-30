@@ -11,6 +11,10 @@ type ActiveProfile = {
   email: string
 }
 
+type ApplyRecordStateOptions = {
+  fallbackRelationLabels?: boolean
+}
+
 const props = defineProps<{
   entity: string
   recordId?: string
@@ -204,8 +208,10 @@ function castDefault(field: Field): any {
   return val
 }
 
-function applyRecordState(record: Record<string, any> | null) {
-  seedSelectedRelationOptions(formFields.value, record)
+function applyRecordState(record: Record<string, any> | null, options: ApplyRecordStateOptions = {}) {
+  seedSelectedRelationOptions(formFields.value, record, {
+    fallbackToValue: options.fallbackRelationLabels ?? true
+  })
   initFormState(record)
   if (!record) return
 
@@ -227,6 +233,14 @@ function fetchActiveProfilesInBackground() {
   })
 }
 
+function refreshRelationLabelsInBackground(recordId: string) {
+  fetchOne(recordId)
+    .then((record) => seedSelectedRelationOptions(formFields.value, record))
+    .catch((err) => {
+      console.error('[DynamicForm] Eroare la reincarcarea etichetelor relatiilor:', err)
+    })
+}
+
 // ─── Incarcarea record-ului (edit mode) ───
 watch(() => schema.value, async (sch) => {
   if (!sch) return
@@ -238,9 +252,10 @@ watch(() => schema.value, async (sch) => {
   if (isEditMode.value && props.recordId) {
     const handedOffRecord = consumeEntityRecordHandoff(props.entity, props.recordId)
     if (handedOffRecord) {
-      applyRecordState(handedOffRecord)
+      applyRecordState(handedOffRecord, { fallbackRelationLabels: false })
       captureInitialState()
       fetchActiveProfilesInBackground()
+      refreshRelationLabelsInBackground(props.recordId)
       return
     }
 
