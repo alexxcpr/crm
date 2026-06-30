@@ -521,6 +521,7 @@ onUnmounted(() => {
     ref="formRef"
     :state="formState"
     :schema="zodSchema"
+    :loading-auto="false"
     class="flex flex-col flex-1"
     @submit="onSubmit"
     @error="onFormError"
