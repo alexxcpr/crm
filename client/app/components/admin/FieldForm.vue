@@ -69,7 +69,7 @@ const state = reactive({
   relation_display_field: props.field?.relation_display_field ?? '',
   is_required: props.field?.is_required ?? false,
   is_unique: props.field?.is_unique ?? false,
-  is_filterable: props.field?.is_filterable ?? true,
+  is_filterable: props.field?.is_filterable ?? false,
   is_sortable: props.field?.is_sortable ?? true,
   visible_in_table: props.field?.visible_in_table ?? true,
   visible_in_form: props.field?.visible_in_form ?? true,
