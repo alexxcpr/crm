@@ -484,7 +484,7 @@ export class ActionService {
       entity: payload.entitySlug,
       entityId: payload.entityId,
       recordId: payload.recordId,
-      record: payload.data,
+      record: this.buildWorkflowRecord(payload),
       previousData: payload.previousData,
       userId: payload.userId,
       profileId: payload.profileId,
@@ -492,6 +492,15 @@ export class ActionService {
       dbName: this.tenantContext.dbName,
       timestamp: new Date().toISOString(),
     };
+  }
+
+  private buildWorkflowRecord(
+    payload: EntityEventPayload,
+  ): Record<string, any> {
+    if (payload.previousData) {
+      return { ...payload.previousData, ...payload.data };
+    }
+    return payload.data;
   }
 
   private async emitActionExecuted(

@@ -34,4 +34,32 @@ describe('ActionService workflow output normalization', () => {
       nume: 'Ana',
     });
   });
+
+  it('builds before-update workflow input from previous data plus update patch', () => {
+    const { service } = makeService([]);
+
+    const result = (service as any).buildWorkflowInput(
+      { slug: 'actualizeaza_search_name' },
+      {
+        entitySlug: 'crm_contact',
+        entityId: 'entity-id',
+        recordId: 'record-id',
+        data: { cf_search_name: 'nou' },
+        previousData: {
+          id: 'record-id',
+          cf_nume: 'Ana',
+          cf_search_name: 'vechi',
+        },
+        userId: 'user-id',
+        profileId: 'profile-id',
+      },
+    );
+
+    expect(result.record).toEqual({
+      id: 'record-id',
+      cf_nume: 'Ana',
+      cf_search_name: 'nou',
+    });
+    expect(result.previousData.cf_search_name).toBe('vechi');
+  });
 });
