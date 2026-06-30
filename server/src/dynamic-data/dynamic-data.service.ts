@@ -60,7 +60,12 @@ export class DynamicDataService {
     return query;
   }
 
-  async findAll(entitySlug: string, query: Record<string, any>, actor: AuthenticatedUser): Promise<PaginatedResponse<Record<string, any>>> {
+  async findAll(
+    entitySlug: string,
+    query: Record<string, any>,
+    actor: AuthenticatedUser,
+    options: { tableOnly?: boolean } = {},
+  ): Promise<PaginatedResponse<Record<string, any>>> {
     const { entity, fields } = await this.resolveEntity(entitySlug);
     const scope = await this.authorization.require(actor, entity.id_entity, 'read');
     const tableName = entity.table_name;
@@ -69,8 +74,10 @@ export class DynamicDataService {
     const parsedLimit = Number.parseInt(String(query.limit ?? ''), 10);
     const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 25;
     const offset = (page - 1) * limit;
-    const selectColumns = this.buildSelect(tableName, fields, true);
-    let dataQuery = this.addRelationJoins(this.knex(tableName), tableName, fields.filter((field) => field.visible_in_table), selectColumns)
+    const tableOnly = options.tableOnly ?? true;
+    const relationFields = tableOnly ? fields.filter((field) => field.visible_in_table) : fields;
+    const selectColumns = this.buildSelect(tableName, fields, tableOnly);
+    let dataQuery = this.addRelationJoins(this.knex(tableName), tableName, relationFields, selectColumns)
       .select(selectColumns);
     let countQuery = this.knex(tableName).count(`${tableName}.id as total`);
     this.authorization.applyScope(dataQuery, tableName, scope, actor.profileId);

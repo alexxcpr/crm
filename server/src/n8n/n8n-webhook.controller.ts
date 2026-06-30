@@ -221,7 +221,9 @@ export class N8nWebhookController {
 
     const result = await this.handleDataOperation(tenantSlug, workflowToken, async (actor) => {
       if (!query.entity) throw new BadRequestException('Query param "entity" is required');
-      const list = await this.dataService.findAll(query.entity, query, actor);
+      const list = await this.dataService.findAll(query.entity, query, actor, {
+        tableOnly: false,
+      });
       // When limit=1, unwrap the array so downstream $json.data.field works the same
       // as the old data-resolve endpoint did for single-record fetches.
       if (query.limit === '1' || query.limit === 1) {
@@ -262,7 +264,9 @@ export class N8nWebhookController {
             [filterField]: { eq: filterValue },
           },
         };
-        const list = await this.dataService.findAll(entitySlug, query, actor);
+        const list = await this.dataService.findAll(entitySlug, query, actor, {
+          tableOnly: false,
+        });
         const first = list.data?.[0] ?? null;
         if (!first) {
           throw new NotFoundException(`Nicio inregistrare gasita in "${entitySlug}" cu ${filterField} = "${filterValue}".`);
