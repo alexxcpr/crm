@@ -26,7 +26,7 @@ export interface DataSource {
 export function useWorkflowDataRegistry(
   nodes: Ref<Node[]>,
   startEntitySlug: Ref<string>,
-  edges: Ref<Edge[]>,
+  edges: Ref<Edge[]>
 ) {
   const { apiFetch } = useApi()
 
@@ -58,7 +58,7 @@ export function useWorkflowDataRegistry(
         label: `${label}: ${schemaCache.get(startEntitySlug.value)?.name ?? startEntitySlug.value}`,
         entitySlug: startEntitySlug.value,
         fields: schemaCache.get(startEntitySlug.value)?.fields ?? [],
-        cardinality: 'single',
+        cardinality: 'single'
       })
       processed.add(startNode.id)
     }
@@ -78,10 +78,10 @@ export function useWorkflowDataRegistry(
           const relFieldSlug: string = data.parameters?.relationField ?? ''
           if (!srcNodeId || !relFieldSlug) continue
 
-          const srcSource = sources.find((s) => s.nodeId === srcNodeId)
+          const srcSource = sources.find(s => s.nodeId === srcNodeId)
           if (!srcSource) continue
 
-          const relField = srcSource.fields.find((f) => f.slug === relFieldSlug)
+          const relField = srcSource.fields.find(f => f.slug === relFieldSlug)
           if (!relField?.relation_entity_slug) continue
 
           const targetSlug = relField.relation_entity_slug
@@ -90,7 +90,7 @@ export function useWorkflowDataRegistry(
             label: `${data.label || 'Relatie'}: ${schemaCache.get(targetSlug)?.name ?? targetSlug}`,
             entitySlug: targetSlug,
             fields: schemaCache.get(targetSlug)?.fields ?? [],
-            cardinality: 'single',
+            cardinality: 'single'
           })
           processed.add(node.id)
           changed = true
@@ -105,7 +105,7 @@ export function useWorkflowDataRegistry(
             label: `${data.label || 'Citeste'}: ${schemaCache.get(entitySlug)?.name ?? entitySlug}`,
             entitySlug,
             fields: schemaCache.get(entitySlug)?.fields ?? [],
-            cardinality,
+            cardinality
           })
           processed.add(node.id)
           changed = true
@@ -113,7 +113,7 @@ export function useWorkflowDataRegistry(
           const srcNodeId: string = data.parameters?.sourceNodeId ?? ''
           if (!srcNodeId) continue
 
-          const listSource = sources.find((s) => s.nodeId === srcNodeId && s.cardinality === 'list')
+          const listSource = sources.find(s => s.nodeId === srcNodeId && s.cardinality === 'list')
           if (!listSource) continue
 
           sources.push({
@@ -121,7 +121,7 @@ export function useWorkflowDataRegistry(
             label: `${data.label || 'Pentru fiecare'}: ${listSource.label}`,
             entitySlug: listSource.entitySlug,
             fields: listSource.fields,
-            cardinality: 'item',
+            cardinality: 'item'
           })
           processed.add(node.id)
           changed = true
@@ -140,7 +140,7 @@ export function useWorkflowDataRegistry(
               name: a.key,
               slug: `_computed_${a.key}`,
               data_type: 'numeric' as const,
-              ui_type: 'number' as const,
+              ui_type: 'number' as const
             } as Field))
 
           sources.push({
@@ -148,7 +148,7 @@ export function useWorkflowDataRegistry(
             label: `${data.label || 'Set Data'}: ${predecessor.label}`,
             entitySlug: predecessor.entitySlug,
             fields: [...predecessor.fields, ...computedFields],
-            cardinality: predecessor.cardinality,
+            cardinality: predecessor.cardinality
           })
           processed.add(node.id)
           changed = true
@@ -174,7 +174,7 @@ export function useWorkflowDataRegistry(
         { column_name: 'id', name: 'ID (sistem)', slug: '_sys_id', data_type: 'uuid', ui_type: 'text' },
         { column_name: 'date_created', name: 'Data creare (sistem)', slug: '_sys_date_created', data_type: 'datetime', ui_type: 'datetimepicker' },
         { column_name: 'date_updated', name: 'Data actualizare (sistem)', slug: '_sys_date_updated', data_type: 'datetime', ui_type: 'datetimepicker' },
-        { column_name: 'id_profile', name: 'Profil owner (sistem)', slug: '_sys_id_profile', data_type: 'uuid', ui_type: 'text' },
+        { column_name: 'id_profile', name: 'Profil owner (sistem)', slug: '_sys_id_profile', data_type: 'uuid', ui_type: 'text' }
       ] as Field[]
       const fields = [...systemFields, ...customFields]
       schemaCache.set(entitySlug, { name: schema.entity.name, fields })
@@ -206,12 +206,12 @@ export function useWorkflowDataRegistry(
       id: n.id,
       type: n.data?.nodeType,
       params: n.data?.parameters,
-      label: n.data?.label,
-    })),
+      label: n.data?.label
+    }))
   ))
 
   const edgeFingerprint = computed(() => JSON.stringify(
-    edges.value.map(e => ({ source: e.source, target: e.target })),
+    edges.value.map(e => ({ source: e.source, target: e.target }))
   ))
 
   watch([graphFingerprint, edgeFingerprint, startEntitySlug], () => {
@@ -231,6 +231,6 @@ export function useWorkflowDataRegistry(
     /** Get cached entity name for a slug (does not trigger fetch). */
     getEntityName,
     /** Force recompute of the registry (e.g. after schema cache populated). */
-    refresh: computeRegistrySync,
+    refresh: computeRegistrySync
   }
 }

@@ -34,7 +34,7 @@ function emitUpdate() {
     sourceType: sourceType.value,
     value: sourceType.value === 'static' ? staticValue.value : undefined,
     sourceNodeId: sourceType.value === 'node_output' ? sourceNodeId.value || undefined : undefined,
-    fieldSlug: sourceType.value === 'node_output' ? fieldSlug.value || undefined : undefined,
+    fieldSlug: sourceType.value === 'node_output' ? fieldSlug.value || undefined : undefined
   }
 
   // Attach field metadata for display and type-aware operator filtering
@@ -92,7 +92,7 @@ const typeLabel = computed(() => {
     varchar: 'text', text: 'text', uuid: 'text',
     integer: 'număr', numeric: 'număr',
     boolean: 'boolean',
-    datetime: 'dată',
+    datetime: 'dată'
   }
   return map[field.data_type] ?? field.data_type
 })
@@ -111,21 +111,21 @@ const typeBadgeColor = computed(() => {
 
 const sourceTypeOptions = [
   { label: 'Valoare fixă', value: 'static' },
-  { label: 'Din nod', value: 'node_output' },
+  { label: 'Din nod', value: 'node_output' }
 ]
 
 const dataSourceOptions = computed(() =>
   props.dataSources.map(ds => ({
     label: `${ds.label} (${ds.entitySlug})`,
-    value: ds.nodeId,
-  })),
+    value: ds.nodeId
+  }))
 )
 
 const fieldSelectOptions = computed(() =>
   fieldOptions.value.map(f => ({
     label: `${f.name} (${f.column_name})`,
-    value: f.column_name,
-  })),
+    value: f.column_name
+  }))
 )
 </script>
 

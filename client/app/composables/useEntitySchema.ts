@@ -46,12 +46,10 @@ export function useEntitySchema(entitySlug: MaybeRef<string>) {
       const data = await apiFetch<EntitySchema>(`/v1/schema/${key}`)
       schemaCache.set(scopedKey, data)
       schema.value = data
-    }
-    catch (err: any) {
+    } catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la incarcarea schemei'
       console.error(`[useEntitySchema] Eroare pentru "${key}":`, err)
-    }
-    finally {
+    } finally {
       loading.value = false
     }
   }

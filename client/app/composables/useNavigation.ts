@@ -46,12 +46,10 @@ export function useNavigation() {
       }
 
       entityLinks.value = links
-    }
-    catch (err) {
+    } catch (err) {
       console.error('[useNavigation] Eroare la incarcarea modulelor:', err)
       entityLinks.value = []
-    }
-    finally {
+    } finally {
       loading.value = false
     }
   }

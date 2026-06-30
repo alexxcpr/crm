@@ -44,8 +44,7 @@ async function onConfirmDelete() {
   const success = await deleteModule(deletingModule.value.id_module)
   if (success) {
     toast.add({ title: 'Modul sters', color: 'success' })
-  }
-  else {
+  } else {
     toast.add({ title: 'Eroare la stergere', description: error.value ?? '', color: 'error' })
   }
 

@@ -48,11 +48,9 @@ export function useAdminBilling() {
     try {
       const response = await apiFetch<{ data: BillingState }>('/v1/admin/billing')
       billing.value = response.data
-    }
-    catch (err: any) {
+    } catch (err: any) {
       error.value = err?.data?.message || err.message || 'Nu am putut incarca abonamentul.'
-    }
-    finally {
+    } finally {
       loading.value = false
     }
   }
@@ -71,12 +69,10 @@ export function useAdminBilling() {
       })
       billing.value = response.data
       return true
-    }
-    catch (err: any) {
+    } catch (err: any) {
       error.value = err?.data?.message || err.message || 'Nu am putut actualiza abonamentul.'
       return false
-    }
-    finally {
+    } finally {
       saving.value = false
     }
   }

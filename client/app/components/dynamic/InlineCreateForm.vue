@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Field, UiTab } from '~/types/schema'
+import type { Field } from '~/types/schema'
 import type { Form, FormSubmitEvent } from '@nuxt/ui'
 import { buildZodSchema } from '~/utils/buildZodSchema'
 import { INLINE_CREATE_DEPTH_KEY } from '~/utils/inlineCreate'
@@ -30,7 +30,6 @@ const {
 } = useEntitySchema(props.entitySlug)
 
 const {
-  loading: dataLoading,
   error: dataError,
   create
 } = useEntityData(props.entitySlug)
@@ -119,14 +118,11 @@ function initFormState(record?: Record<string, any> | null) {
   for (const field of formFields.value) {
     if (record && record[field.column_name] !== undefined) {
       formState[field.slug] = record[field.column_name]
-    }
-    else if (field.default_value != null) {
+    } else if (field.default_value != null) {
       formState[field.slug] = castDefault(field)
-    }
-    else if (field.data_type === 'boolean') {
+    } else if (field.data_type === 'boolean') {
       formState[field.slug] = false
-    }
-    else {
+    } else {
       formState[field.slug] = null
     }
   }
@@ -162,16 +158,14 @@ async function onSubmit(event: FormSubmitEvent<Record<string, unknown>>) {
         color: 'success'
       })
       emit('created', result)
-    }
-    else {
+    } else {
       toast.add({
         title: 'Eroare la salvare',
         description: dataError.value ?? 'A apărut o eroare neașteptată.',
         color: 'error'
       })
     }
-  }
-  finally {
+  } finally {
     submitting.value = false
   }
 }
@@ -185,6 +179,10 @@ function buildPayload(validated: Record<string, unknown>): Record<string, any> {
     }
   }
   return payload
+}
+
+function updateFormField(payload: { slug: string, value: any }) {
+  formState[payload.slug] = payload.value
 }
 
 const loading = computed(() => schemaLoading.value)
@@ -215,7 +213,13 @@ defineExpose({
       :description="schemaError"
     >
       <template #actions>
-        <UButton label="Anulează" icon="i-lucide-x" color="neutral" variant="outline" @click="emit('cancel')" />
+        <UButton
+          label="Anulează"
+          icon="i-lucide-x"
+          color="neutral"
+          variant="outline"
+          @click="emit('cancel')"
+        />
       </template>
     </UEmpty>
   </div>
@@ -236,6 +240,7 @@ defineExpose({
         :fields="getFieldsByGroup(groups[0] ?? 'general')"
         :form-state="formState"
         :autofocus-first="true"
+        @update-field="updateFormField"
       />
     </template>
 
@@ -258,6 +263,7 @@ defineExpose({
           :fields="getFieldsByGroup(group)"
           :form-state="formState"
           :autofocus-first="true"
+          @update-field="updateFormField"
         />
       </template>
     </UTabs>

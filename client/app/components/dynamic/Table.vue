@@ -260,24 +260,26 @@ const columns = computed<TableColumn<TableRow>[]>(() => {
                   }))
                 ]
               : []),
-            ...(capabilities.value.delete ? [{ type: 'separator' as const }, {
-              label: 'Sterge',
-              icon: 'i-lucide-trash',
-              color: 'error',
-              onSelect: async () => {
-                const success = await remove(String(record.id))
-                if (success) {
-                  toast.add({ title: 'Inregistrare stearsa', color: 'success' })
-                  await loadData()
-                } else {
-                  toast.add({
-                    title: 'Eroare la stergere',
-                    description: dataError.value ?? 'Inregistrarea nu a putut fi stearsa.',
-                    color: 'error'
-                  })
-                }
-              }
-            }] : [])
+            ...(capabilities.value.delete
+              ? [{ type: 'separator' as const }, {
+                  label: 'Sterge',
+                  icon: 'i-lucide-trash',
+                  color: 'error',
+                  onSelect: async () => {
+                    const success = await remove(String(record.id))
+                    if (success) {
+                      toast.add({ title: 'Inregistrare stearsa', color: 'success' })
+                      await loadData()
+                    } else {
+                      toast.add({
+                        title: 'Eroare la stergere',
+                        description: dataError.value ?? 'Inregistrarea nu a putut fi stearsa.',
+                        color: 'error'
+                      })
+                    }
+                  }
+                }]
+              : [])
           ]
         }, () => h(UButton, {
           icon: 'i-lucide-ellipsis-vertical',

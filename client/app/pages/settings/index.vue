@@ -38,9 +38,15 @@ async function saveDefault() {
     <UForm :schema="schema" :state="state" @submit="save">
       <UPageCard title="Profil activ" description="Identitatea folosita in aplicatie si pentru ownership." variant="subtle">
         <div class="space-y-4 max-w-md">
-          <UFormField label="Nume afisat" name="displayName"><UInput v-model="state.displayName" class="w-full" /></UFormField>
-          <UFormField label="Username profil" name="username" required><UInput v-model="state.username" class="w-full" /></UFormField>
-          <UFormField label="Email profil" name="email" required><UInput v-model="state.email" type="email" class="w-full" /></UFormField>
+          <UFormField label="Nume afisat" name="displayName">
+            <UInput v-model="state.displayName" class="w-full" />
+          </UFormField>
+          <UFormField label="Username profil" name="username" required>
+            <UInput v-model="state.username" class="w-full" />
+          </UFormField>
+          <UFormField label="Email profil" name="email" required>
+            <UInput v-model="state.email" type="email" class="w-full" />
+          </UFormField>
           <UButton type="submit" label="Salveaza profilul" />
         </div>
       </UPageCard>
@@ -48,7 +54,12 @@ async function saveDefault() {
 
     <UPageCard title="Profil implicit" description="Acest profil este selectat automat dupa autentificare." variant="subtle">
       <div class="flex gap-3 max-w-md">
-        <USelectMenu v-model="defaultProfileId" :items="session?.profiles.map(profile => ({ label: label(profile), value: profile.id_profile })) ?? []" value-key="value" class="flex-1" />
+        <USelectMenu
+          v-model="defaultProfileId"
+          :items="session?.profiles.map(profile => ({ label: label(profile), value: profile.id_profile })) ?? []"
+          value-key="value"
+          class="flex-1"
+        />
         <UButton label="Seteaza" color="neutral" @click="saveDefault" />
       </div>
     </UPageCard>

@@ -31,28 +31,28 @@ function emitUpdate() {
     sourceType: sourceType.value,
     value: value.value,
     sourceNodeId: sourceNodeId.value || undefined,
-    sourceFieldSlug: sourceFieldSlug.value || undefined,
+    sourceFieldSlug: sourceFieldSlug.value || undefined
   })
 }
 
 const sourceOptions = [
   { label: 'Valoare fixa', value: 'static' },
-  { label: 'Din registry (nod)', value: 'node_output' },
+  { label: 'Din registry (nod)', value: 'node_output' }
 ]
 
 const dataSourceOptions = computed(() =>
   (props.dataSources ?? []).map(ds => ({
     label: `${ds.label} (${ds.entitySlug})`,
-    value: ds.nodeId,
-  })),
+    value: ds.nodeId
+  }))
 )
 
 const fieldSelectOptions = computed(() =>
   fieldOptions.value.map(f => ({
     label: `${f.name} (${f.column_name})`,
     value: f.column_name,
-    name: f.name,
-  })),
+    name: f.name
+  }))
 )
 
 async function onSourceNodeChange(nodeId: string) {

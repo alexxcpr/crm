@@ -20,12 +20,10 @@ export function useAdminModules() {
     try {
       const response = await apiFetch<ApiResponse<AdminModule[]>>('/v1/admin/modules')
       modules.value = response.data
-    }
-    catch (err: any) {
+    } catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la incarcarea modulelor'
       console.error('[useAdminModules] fetchModules:', err)
-    }
-    finally {
+    } finally {
       loading.value = false
     }
   }
@@ -34,8 +32,7 @@ export function useAdminModules() {
     try {
       const response = await apiFetch<ApiResponse<AdminModule>>(`/v1/admin/modules/${id}`)
       return response.data
-    }
-    catch (err: any) {
+    } catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la incarcarea modulului'
       console.error('[useAdminModules] fetchModule:', err)
       return null
@@ -53,13 +50,11 @@ export function useAdminModules() {
       })
       await fetchModules()
       return response.data
-    }
-    catch (err: any) {
+    } catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la crearea modulului'
       console.error('[useAdminModules] createModule:', err)
       return null
-    }
-    finally {
+    } finally {
       loading.value = false
     }
   }
@@ -75,13 +70,11 @@ export function useAdminModules() {
       })
       await fetchModules()
       return response.data
-    }
-    catch (err: any) {
+    } catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la actualizarea modulului'
       console.error('[useAdminModules] updateModule:', err)
       return null
-    }
-    finally {
+    } finally {
       loading.value = false
     }
   }
@@ -94,13 +87,11 @@ export function useAdminModules() {
       await apiFetch(`/v1/admin/modules/${id}`, { method: 'DELETE' })
       await fetchModules()
       return true
-    }
-    catch (err: any) {
+    } catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la stergerea modulului'
       console.error('[useAdminModules] deleteModule:', err)
       return false
-    }
-    finally {
+    } finally {
       loading.value = false
     }
   }
@@ -116,13 +107,11 @@ export function useAdminModules() {
       })
       await fetchModules()
       return (res as any).mesaj ?? null
-    }
-    catch (err: any) {
+    } catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la stergerea modulelor'
       console.error('[useAdminModules] deleteModules:', err)
       return null
-    }
-    finally {
+    } finally {
       loading.value = false
     }
   }

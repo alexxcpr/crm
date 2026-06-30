@@ -35,12 +35,12 @@ async function fetchTargetEntityFields(entitySlug: string) {
 }
 
 const entityOptions = computed(() =>
-  (entities.value || []).map(e => ({ label: e.name, value: e.slug })),
+  (entities.value || []).map(e => ({ label: e.name, value: e.slug }))
 )
 
 // ─── Data source select options (for app_get_related, etc.) ───
 const fieldSelectableDataSources = computed(() =>
-  (props.dataSources || []).filter(ds => ds.cardinality !== 'list'),
+  (props.dataSources || []).filter(ds => ds.cardinality !== 'list')
 )
 
 const listSourceOptions = computed(() =>
@@ -48,15 +48,15 @@ const listSourceOptions = computed(() =>
     .filter(ds => ds.cardinality === 'list')
     .map(ds => ({
       label: `${ds.label} (${ds.entitySlug})`,
-      value: ds.nodeId,
-    })),
+      value: ds.nodeId
+    }))
 )
 
 const dataSourceOptions = computed(() =>
   fieldSelectableDataSources.value.map(ds => ({
     label: `${ds.label} (${ds.entitySlug})`,
-    value: ds.nodeId,
-  })),
+    value: ds.nodeId
+  }))
 )
 
 // ─── Relation field options (cascading — depends on sourceNodeId) ───
@@ -69,7 +69,7 @@ const relationFieldOptions = computed(() => {
     .filter(f => f.ui_type === 'relation' && f.relation_entity_slug)
     .map(f => ({
       label: `${f.name} (${f.slug} → ${f.relation_entity_slug})`,
-      value: f.slug,
+      value: f.slug
     }))
 })
 
@@ -91,7 +91,9 @@ watch(() => props.node, (newNode) => {
     isSwitchingNode.value = true
     localLabel.value = newNode.data.label ?? ''
     localParams.value = { ...(newNode.data.parameters ?? {}) }
-    nextTick(() => { isSwitchingNode.value = false })
+    nextTick(() => {
+      isSwitchingNode.value = false
+    })
   }
 }, { immediate: true })
 

@@ -9,6 +9,10 @@ const props = defineProps<{
   autofocusFirst?: boolean
 }>()
 
+const emit = defineEmits<{
+  updateField: [payload: { slug: string, value: any }]
+}>()
+
 const MIN_COLUMN_WIDTH = 280
 const gridContainer = ref<HTMLElement>()
 const containerWidth = ref(0)
@@ -43,6 +47,10 @@ function getDesktopStyle(placedField: PlacedField) {
     gridRow: `${placedField.rowStart}`
   }
 }
+
+function updateField(slug: string, value: any) {
+  emit('updateField', { slug, value })
+}
 </script>
 
 <template>
@@ -55,7 +63,7 @@ function getDesktopStyle(placedField: PlacedField) {
         :field="placedField.field"
         :model-value="formState[placedField.field.slug]"
         :autofocus="autofocusFirst && idx === 0"
-        @update:model-value="formState[placedField.field.slug] = $event"
+        @update:model-value="updateField(placedField.field.slug, $event)"
       />
     </div>
 
@@ -74,7 +82,7 @@ function getDesktopStyle(placedField: PlacedField) {
           :field="placedField.field"
           :model-value="formState[placedField.field.slug]"
           :autofocus="autofocusFirst && idx === 0"
-          @update:model-value="formState[placedField.field.slug] = $event"
+          @update:model-value="updateField(placedField.field.slug, $event)"
         />
       </div>
     </div>

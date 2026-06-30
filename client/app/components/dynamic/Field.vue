@@ -316,7 +316,6 @@ const applyDateTime = () => {
   }
   popoverOpen.value = false
 }
-
 </script>
 
 <template>
@@ -336,237 +335,237 @@ const applyDateTime = () => {
       :description="undefined"
       size="sm"
     >
-    <!-- text -->
-    <UInput
-      v-if="field.ui_type === 'text'"
-      v-model="value"
-      type="text"
-      :placeholder="field.placeholder ?? undefined"
-      :disabled="field.is_readonly"
-      size="sm"
-      class="w-full"
-    />
-
-    <!-- textarea -->
-    <UTextarea
-      v-else-if="field.ui_type === 'textarea'"
-      v-model="value"
-      :placeholder="field.placeholder ?? undefined"
-      :rows="4"
-      :disabled="field.is_readonly"
-      size="sm"
-      class="w-full"
-    />
-
-    <!-- number -->
-    <UInput
-      v-else-if="field.ui_type === 'number'"
-      v-model="value"
-      type="number"
-      :placeholder="field.placeholder ?? undefined"
-      :disabled="field.is_readonly"
-      size="sm"
-      class="w-full"
-    />
-
-    <!-- currency -->
-    <UInput
-      v-else-if="field.ui_type === 'currency'"
-      v-model="value"
-      type="number"
-      :placeholder="field.placeholder ?? '0.00'"
-      :disabled="field.is_readonly"
-      size="sm"
-      class="w-full currency-input"
-    >
-      <template #trailing>
-        <span class="text-dimmed text-sm ml-2">RON</span>
-      </template>
-    </UInput>
-
-    <!-- email -->
-    <UInput
-      v-else-if="field.ui_type === 'email'"
-      v-model="value"
-      type="email"
-      :placeholder="field.placeholder ?? 'email@exemplu.ro'"
-      :disabled="field.is_readonly"
-      size="sm"
-      class="w-full"
-    />
-
-    <!-- phone -->
-    <UInput
-      v-else-if="field.ui_type === 'phone'"
-      v-model="value"
-      type="tel"
-      :placeholder="field.placeholder ?? '+40 XXX XXX XXX'"
-      :disabled="field.is_readonly"
-      size="sm"
-      class="w-full"
-    />
-
-    <!-- checkbox (boolean) -->
-    <UCheckbox
-      v-else-if="field.ui_type === 'checkbox'"
-      v-model="value"
-      :label="field.placeholder ?? 'Da'"
-      :disabled="field.is_readonly"
-      size="md"
-    />
-
-    <!-- datepicker (date-only) — Input text + buton calendar -->
-    <div
-      v-else-if="field.ui_type === 'datepicker'"
-      class="flex items-center gap-1.5 w-full"
-    >
+      <!-- text -->
       <UInput
-        v-model="dateText"
+        v-if="field.ui_type === 'text'"
+        v-model="value"
         type="text"
-        :placeholder="datePlaceholder"
+        :placeholder="field.placeholder ?? undefined"
         :disabled="field.is_readonly"
         size="sm"
-        class="flex-1"
-        @blur="onDateTextBlur"
-        @keydown.enter="($event.target as HTMLInputElement).blur()"
+        class="w-full"
       />
-      <UPopover
-        v-model:open="popoverOpen"
-        :content="{ align: 'start' }"
-        :modal="true"
-        :ui="{ content: 'max-h-(--reka-popover-content-available-height,100vh) max-w-[calc(100vw-16px)] overflow-y-auto overscroll-contain' }"
+
+      <!-- textarea -->
+      <UTextarea
+        v-else-if="field.ui_type === 'textarea'"
+        v-model="value"
+        :placeholder="field.placeholder ?? undefined"
+        :rows="4"
+        :disabled="field.is_readonly"
+        size="sm"
+        class="w-full"
+      />
+
+      <!-- number -->
+      <UInput
+        v-else-if="field.ui_type === 'number'"
+        v-model="value"
+        type="number"
+        :placeholder="field.placeholder ?? undefined"
+        :disabled="field.is_readonly"
+        size="sm"
+        class="w-full"
+      />
+
+      <!-- currency -->
+      <UInput
+        v-else-if="field.ui_type === 'currency'"
+        v-model="value"
+        type="number"
+        :placeholder="field.placeholder ?? '0.00'"
+        :disabled="field.is_readonly"
+        size="sm"
+        class="w-full currency-input"
       >
-        <UButton
-          color="neutral"
-          variant="outline"
-          icon="i-lucide-calendar"
-          :disabled="field.is_readonly"
-          size="sm"
-        />
-        <template #content>
-          <div class="p-2">
-            <UCalendar :model-value="(calendarDate as any)" class="p-2" @update:model-value="calendarDate = $event as DateValue" />
-          </div>
+        <template #trailing>
+          <span class="text-dimmed text-sm ml-2">RON</span>
         </template>
-      </UPopover>
-      <UButton
-        v-if="calendarDate && !field.is_readonly"
-        color="neutral"
-        variant="ghost"
-        icon="i-lucide-x"
-        size="sm"
-        class="shrink-0"
-        @click="calendarDate = undefined"
-      />
-    </div>
+      </UInput>
 
-    <!-- datetimepicker (timestamp) — Input text + buton calendar -->
-    <div
-      v-else-if="field.ui_type === 'datetimepicker'"
-      class="flex items-center gap-1.5 w-full"
-    >
+      <!-- email -->
       <UInput
-        v-model="dateTimeText"
-        type="text"
-        :placeholder="dateTimePlaceholder"
+        v-else-if="field.ui_type === 'email'"
+        v-model="value"
+        type="email"
+        :placeholder="field.placeholder ?? 'email@exemplu.ro'"
         :disabled="field.is_readonly"
         size="sm"
-        class="flex-1"
-        @blur="onDateTimeTextBlur"
-        @keydown.enter="($event.target as HTMLInputElement).blur()"
+        class="w-full"
       />
-      <UPopover
-        v-model:open="popoverOpen"
-        :content="{ align: 'start' }"
-        :modal="true"
-        :ui="{ content: 'max-h-(--reka-popover-content-available-height,100vh) max-w-[calc(100vw-16px)] overflow-y-auto overscroll-contain' }"
+
+      <!-- phone -->
+      <UInput
+        v-else-if="field.ui_type === 'phone'"
+        v-model="value"
+        type="tel"
+        :placeholder="field.placeholder ?? '+40 XXX XXX XXX'"
+        :disabled="field.is_readonly"
+        size="sm"
+        class="w-full"
+      />
+
+      <!-- checkbox (boolean) -->
+      <UCheckbox
+        v-else-if="field.ui_type === 'checkbox'"
+        v-model="value"
+        :label="field.placeholder ?? 'Da'"
+        :disabled="field.is_readonly"
+        size="md"
+      />
+
+      <!-- datepicker (date-only) — Input text + buton calendar -->
+      <div
+        v-else-if="field.ui_type === 'datepicker'"
+        class="flex items-center gap-1.5 w-full"
       >
-        <UButton
-          color="neutral"
-          variant="outline"
-          icon="i-lucide-calendar-clock"
+        <UInput
+          v-model="dateText"
+          type="text"
+          :placeholder="datePlaceholder"
           :disabled="field.is_readonly"
           size="sm"
+          class="flex-1"
+          @blur="onDateTextBlur"
+          @keydown.enter="($event.target as HTMLInputElement).blur()"
         />
-        <template #content>
-          <div class="p-3 space-y-3">
-            <!-- Calendar -->
-            <UCalendar :model-value="(calendarDateTime as any)" class="p-2" @update:model-value="calendarDateTime = $event as DateValue" />
-
-            <!-- Time Selection -->
-            <div class="flex items-center gap-3 pt-2 border-t border-default">
-              <span class="text-sm text-muted">Ora:</span>
-              <div class="flex items-center gap-1.5">
-                <!-- Hour -->
-                <USelect
-                  v-model="selectedTime.hour"
-                  :items="Array.from({ length: 24 }, (_, i) => ({ label: String(i).padStart(2, '0'), value: i }))"
-                  class="w-16"
-                  size="sm"
-                />
-                <span class="text-lg">:</span>
-                <!-- Minute -->
-                <USelect
-                  v-model="selectedTime.minute"
-                  :items="Array.from({ length: 60 }, (_, i) => ({ label: String(i).padStart(2, '0'), value: i }))"
-                  class="w-16"
-                  size="sm"
-                />
-                <span class="text-lg">:</span>
-                <!-- Second -->
-                <USelect
-                  v-model="selectedTime.second"
-                  :items="Array.from({ length: 60 }, (_, i) => ({ label: String(i).padStart(2, '0'), value: i }))"
-                  class="w-16"
-                  size="sm"
-                />
-              </div>
+        <UPopover
+          v-model:open="popoverOpen"
+          :content="{ align: 'start' }"
+          :modal="true"
+          :ui="{ content: 'max-h-(--reka-popover-content-available-height,100vh) max-w-[calc(100vw-16px)] overflow-y-auto overscroll-contain' }"
+        >
+          <UButton
+            color="neutral"
+            variant="outline"
+            icon="i-lucide-calendar"
+            :disabled="field.is_readonly"
+            size="sm"
+          />
+          <template #content>
+            <div class="p-2">
+              <UCalendar :model-value="(calendarDate as any)" class="p-2" @update:model-value="calendarDate = $event as DateValue" />
             </div>
+          </template>
+        </UPopover>
+        <UButton
+          v-if="calendarDate && !field.is_readonly"
+          color="neutral"
+          variant="ghost"
+          icon="i-lucide-x"
+          size="sm"
+          class="shrink-0"
+          @click="calendarDate = undefined"
+        />
+      </div>
 
-            <!-- Apply Button -->
-            <UButton
-              color="primary"
-              variant="solid"
-              size="sm"
-              class="w-full"
-              @click="applyDateTime"
-            >
-              Aplică
-            </UButton>
-          </div>
-        </template>
-      </UPopover>
-      <UButton
-        v-if="calendarDateTime && !field.is_readonly"
-        color="neutral"
-        variant="ghost"
-        icon="i-lucide-x"
-        size="sm"
-        class="shrink-0"
-        @click="clearDateTime"
+      <!-- datetimepicker (timestamp) — Input text + buton calendar -->
+      <div
+        v-else-if="field.ui_type === 'datetimepicker'"
+        class="flex items-center gap-1.5 w-full"
+      >
+        <UInput
+          v-model="dateTimeText"
+          type="text"
+          :placeholder="dateTimePlaceholder"
+          :disabled="field.is_readonly"
+          size="sm"
+          class="flex-1"
+          @blur="onDateTimeTextBlur"
+          @keydown.enter="($event.target as HTMLInputElement).blur()"
+        />
+        <UPopover
+          v-model:open="popoverOpen"
+          :content="{ align: 'start' }"
+          :modal="true"
+          :ui="{ content: 'max-h-(--reka-popover-content-available-height,100vh) max-w-[calc(100vw-16px)] overflow-y-auto overscroll-contain' }"
+        >
+          <UButton
+            color="neutral"
+            variant="outline"
+            icon="i-lucide-calendar-clock"
+            :disabled="field.is_readonly"
+            size="sm"
+          />
+          <template #content>
+            <div class="p-3 space-y-3">
+              <!-- Calendar -->
+              <UCalendar :model-value="(calendarDateTime as any)" class="p-2" @update:model-value="calendarDateTime = $event as DateValue" />
+
+              <!-- Time Selection -->
+              <div class="flex items-center gap-3 pt-2 border-t border-default">
+                <span class="text-sm text-muted">Ora:</span>
+                <div class="flex items-center gap-1.5">
+                  <!-- Hour -->
+                  <USelect
+                    v-model="selectedTime.hour"
+                    :items="Array.from({ length: 24 }, (_, i) => ({ label: String(i).padStart(2, '0'), value: i }))"
+                    class="w-16"
+                    size="sm"
+                  />
+                  <span class="text-lg">:</span>
+                  <!-- Minute -->
+                  <USelect
+                    v-model="selectedTime.minute"
+                    :items="Array.from({ length: 60 }, (_, i) => ({ label: String(i).padStart(2, '0'), value: i }))"
+                    class="w-16"
+                    size="sm"
+                  />
+                  <span class="text-lg">:</span>
+                  <!-- Second -->
+                  <USelect
+                    v-model="selectedTime.second"
+                    :items="Array.from({ length: 60 }, (_, i) => ({ label: String(i).padStart(2, '0'), value: i }))"
+                    class="w-16"
+                    size="sm"
+                  />
+                </div>
+              </div>
+
+              <!-- Apply Button -->
+              <UButton
+                color="primary"
+                variant="solid"
+                size="sm"
+                class="w-full"
+                @click="applyDateTime"
+              >
+                Aplică
+              </UButton>
+            </div>
+          </template>
+        </UPopover>
+        <UButton
+          v-if="calendarDateTime && !field.is_readonly"
+          color="neutral"
+          variant="ghost"
+          icon="i-lucide-x"
+          size="sm"
+          class="shrink-0"
+          @click="clearDateTime"
+        />
+      </div>
+
+      <!-- relation -->
+      <DynamicRelationSelect
+        v-else-if="field.ui_type === 'relation'"
+        :field="field"
+        :model-value="value"
+        :disabled="field.is_readonly"
+        @update:model-value="value = $event"
       />
-    </div>
 
-    <!-- relation -->
-    <DynamicRelationSelect
-      v-else-if="field.ui_type === 'relation'"
-      :field="field"
-      :model-value="value"
-      :disabled="field.is_readonly"
-      @update:model-value="value = $event"
-    />
-
-    <!-- fallback -->
-    <UInput
-      v-else
-      v-model="value"
-      type="text"
-      :placeholder="field.placeholder ?? undefined"
-      :disabled="field.is_readonly"
-      size="sm"
-      class="w-full"
-    />
-  </UFormField>
+      <!-- fallback -->
+      <UInput
+        v-else
+        v-model="value"
+        type="text"
+        :placeholder="field.placeholder ?? undefined"
+        :disabled="field.is_readonly"
+        size="sm"
+        class="w-full"
+      />
+    </UFormField>
   </div>
 </template>
 

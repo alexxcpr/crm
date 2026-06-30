@@ -16,7 +16,7 @@ export interface WorkflowConnection {
 }
 
 export function useWorkflowBuilder(flowId?: string) {
-  const { nodeTypes, getNodeType } = useNodeTypes()
+  const { getNodeType } = useNodeTypes()
 
   const {
     nodes,

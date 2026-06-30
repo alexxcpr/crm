@@ -24,12 +24,10 @@ export function useAdminTabs(entityId: MaybeRef<string>) {
     try {
       const response = await apiFetch<ApiResponse<AdminTab[]>>(basePath())
       tabs.value = response.data
-    }
-    catch (err: any) {
+    } catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la incarcarea tab-urilor'
       console.error('[useAdminTabs] fetchTabs:', err)
-    }
-    finally {
+    } finally {
       loading.value = false
     }
   }
@@ -38,8 +36,7 @@ export function useAdminTabs(entityId: MaybeRef<string>) {
     try {
       const response = await apiFetch<ApiResponse<AdminTab>>(`${basePath()}/${tabId}`)
       return response.data
-    }
-    catch (err: any) {
+    } catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la incarcarea tab-ului'
       console.error('[useAdminTabs] fetchTab:', err)
       return null
@@ -57,13 +54,11 @@ export function useAdminTabs(entityId: MaybeRef<string>) {
       })
       await fetchTabs()
       return response.data
-    }
-    catch (err: any) {
+    } catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la crearea tab-ului'
       console.error('[useAdminTabs] createTab:', err)
       return null
-    }
-    finally {
+    } finally {
       loading.value = false
     }
   }
@@ -79,13 +74,11 @@ export function useAdminTabs(entityId: MaybeRef<string>) {
       })
       await fetchTabs()
       return response.data
-    }
-    catch (err: any) {
+    } catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la actualizarea tab-ului'
       console.error('[useAdminTabs] updateTab:', err)
       return null
-    }
-    finally {
+    } finally {
       loading.value = false
     }
   }
@@ -98,13 +91,11 @@ export function useAdminTabs(entityId: MaybeRef<string>) {
       await apiFetch(`${basePath()}/${tabId}`, { method: 'DELETE' })
       await fetchTabs()
       return true
-    }
-    catch (err: any) {
+    } catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la stergerea tab-ului'
       console.error('[useAdminTabs] deleteTab:', err)
       return false
-    }
-    finally {
+    } finally {
       loading.value = false
     }
   }
@@ -120,13 +111,11 @@ export function useAdminTabs(entityId: MaybeRef<string>) {
       })
       await fetchTabs()
       return (res as any).mesaj ?? null
-    }
-    catch (err: any) {
+    } catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la stergerea tab-urilor'
       console.error('[useAdminTabs] deleteTabs:', err)
       return null
-    }
-    finally {
+    } finally {
       loading.value = false
     }
   }

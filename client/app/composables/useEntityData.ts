@@ -34,13 +34,11 @@ export function useEntityData(entitySlug: MaybeRef<string>) {
             query[`filter[${key}][${index}][op]`] = String(op)
             query[`filter[${key}][${index}][value]`] = String(val)
           })
-        }
-        else if (typeof value === 'object') {
+        } else if (typeof value === 'object') {
           for (const [op, val] of Object.entries(value)) {
             query[`filter[${key}][${op}]`] = String(val)
           }
-        }
-        else {
+        } else {
           query[`filter[${key}]`] = String(value)
         }
       }
@@ -61,12 +59,10 @@ export function useEntityData(entitySlug: MaybeRef<string>) {
       })
       items.value = response.data
       meta.value = response.meta
-    }
-    catch (err: any) {
+    } catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la incarcarea datelor'
       console.error(`[useEntityData] Eroare fetchItems "${slug}":`, err)
-    }
-    finally {
+    } finally {
       loading.value = false
     }
   }
@@ -77,8 +73,7 @@ export function useEntityData(entitySlug: MaybeRef<string>) {
     try {
       const response = await apiFetch<SingleResponse>(`/v1/data/${slug}/${id}`)
       return response.data
-    }
-    catch (err: any) {
+    } catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la incarcarea inregistrarii'
       console.error(`[useEntityData] Eroare fetchOne "${slug}/${id}":`, err)
       return null
@@ -97,13 +92,11 @@ export function useEntityData(entitySlug: MaybeRef<string>) {
       })
       invalidateRelationEntity(slug)
       return response.data
-    }
-    catch (err: any) {
+    } catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la creare'
       console.error(`[useEntityData] Eroare create "${slug}":`, err)
       return null
-    }
-    finally {
+    } finally {
       loading.value = false
     }
   }
@@ -120,13 +113,11 @@ export function useEntityData(entitySlug: MaybeRef<string>) {
       })
       invalidateRelationEntity(slug)
       return response.data
-    }
-    catch (err: any) {
+    } catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la actualizare'
       console.error(`[useEntityData] Eroare update "${slug}/${id}":`, err)
       return null
-    }
-    finally {
+    } finally {
       loading.value = false
     }
   }
@@ -144,13 +135,11 @@ export function useEntityData(entitySlug: MaybeRef<string>) {
       items.value = items.value.filter(item => item.id !== id)
       meta.value.total--
       return true
-    }
-    catch (err: any) {
+    } catch (err: any) {
       error.value = err?.data?.message || err.message || 'Eroare la stergere'
       console.error(`[useEntityData] Eroare remove "${slug}/${id}":`, err)
       return false
-    }
-    finally {
+    } finally {
       loading.value = false
     }
   }

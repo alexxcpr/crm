@@ -1,27 +1,27 @@
 import type { Field } from './schema'
 
-export type FilterOperator =
-  | 'eq'
-  | 'contains'
-  | 'starts_with'
-  | 'gt'
-  | 'gte'
-  | 'lt'
-  | 'lte'
-  | 'between'
-  | 'in'
-  | 'is_null'
+export type FilterOperator
+  = | 'eq'
+    | 'contains'
+    | 'starts_with'
+    | 'gt'
+    | 'gte'
+    | 'lt'
+    | 'lte'
+    | 'between'
+    | 'in'
+    | 'is_null'
 
-export type FilterValueKind =
-  | 'text'
-  | 'number'
-  | 'date'
-  | 'datetime'
-  | 'boolean'
-  | 'relation'
-  | 'relation-multiple'
-  | 'range'
-  | 'none'
+export type FilterValueKind
+  = | 'text'
+    | 'number'
+    | 'date'
+    | 'datetime'
+    | 'boolean'
+    | 'relation'
+    | 'relation-multiple'
+    | 'range'
+    | 'none'
 
 export interface FilterOperatorOption {
   label: string

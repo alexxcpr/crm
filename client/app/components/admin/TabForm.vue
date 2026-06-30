@@ -66,8 +66,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         rank: event.data.rank
       }
       result = await updateTab(props.tab.id_ui_tab, payload)
-    }
-    else {
+    } else {
       const payload: CreateTabPayload = {
         name: event.data.name,
         slug: event.data.slug,
@@ -82,16 +81,14 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         color: 'success'
       })
       emit('saved', result)
-    }
-    else {
+    } else {
       toast.add({
         title: 'Eroare',
         description: error.value ?? 'A aparut o eroare.',
         color: 'error'
       })
     }
-  }
-  finally {
+  } finally {
     submitting.value = false
   }
 }

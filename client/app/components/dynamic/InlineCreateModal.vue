@@ -6,11 +6,9 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  created: [record: Record<string, any>]
+  'created': [record: Record<string, any>]
   'update:open': [value: boolean]
 }>()
-
-const toast = useToast()
 
 // ─── Detectare mobil ───
 const isMobile = computed(() => {

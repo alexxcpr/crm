@@ -44,7 +44,7 @@ export function useProfiles() {
     const fresh = await apiFetch<ModuvisSession>('/user/me')
     clearEntitySchemaCache()
     useState<ModuvisSession | null>('auth:data').value = fresh
-    clearNuxtState((key) => key.startsWith('schema-'))
+    clearNuxtState(key => key.startsWith('schema-'))
     return fresh
   }
 

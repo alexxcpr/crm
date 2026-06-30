@@ -1,22 +1,21 @@
 <template>
   <div class="relative flex items-center justify-center min-h-screen overflow-hidden" style="background: radial-gradient(ellipse at 50% 35%, #1a1028 0%, #0d0818 30%, #06040c 60%, #020204 100%);">
-
     <!-- Gradient corners - GTA V style -->
-    <div class="absolute top-0 left-0 w-full h-full pointer-events-none" style="background: radial-gradient(circle at 0% 0%, rgba(130,50,200,0.6) 0%, rgba(60,15,110,0.38) 35%, rgba(20,8,50,0.18) 65%, transparent 95%);"></div>
-    <div class="absolute top-0 right-0 w-full h-full pointer-events-none" style="background: radial-gradient(circle at 100% 0%, rgba(100,40,170,0.55) 0%, rgba(45,15,95,0.33) 35%, rgba(18,8,45,0.15) 65%, transparent 95%);"></div>
-    <div class="absolute bottom-0 left-0 w-full h-full pointer-events-none" style="background: radial-gradient(circle at 0% 100%, rgba(110,40,175,0.55) 0%, rgba(45,10,85,0.33) 35%, rgba(18,8,45,0.15) 65%, transparent 95%);"></div>
-    <div class="absolute bottom-0 right-0 w-full h-full pointer-events-none" style="background: radial-gradient(circle at 100% 100%, rgba(140,50,210,0.6) 0%, rgba(55,15,95,0.38) 35%, rgba(20,8,50,0.18) 65%, transparent 95%);"></div>
+    <div class="absolute top-0 left-0 w-full h-full pointer-events-none" style="background: radial-gradient(circle at 0% 0%, rgba(130,50,200,0.6) 0%, rgba(60,15,110,0.38) 35%, rgba(20,8,50,0.18) 65%, transparent 95%);" />
+    <div class="absolute top-0 right-0 w-full h-full pointer-events-none" style="background: radial-gradient(circle at 100% 0%, rgba(100,40,170,0.55) 0%, rgba(45,15,95,0.33) 35%, rgba(18,8,45,0.15) 65%, transparent 95%);" />
+    <div class="absolute bottom-0 left-0 w-full h-full pointer-events-none" style="background: radial-gradient(circle at 0% 100%, rgba(110,40,175,0.55) 0%, rgba(45,10,85,0.33) 35%, rgba(18,8,45,0.15) 65%, transparent 95%);" />
+    <div class="absolute bottom-0 right-0 w-full h-full pointer-events-none" style="background: radial-gradient(circle at 100% 100%, rgba(140,50,210,0.6) 0%, rgba(55,15,95,0.38) 35%, rgba(20,8,50,0.18) 65%, transparent 95%);" />
 
     <div class="w-full max-w-md px-4 relative z-10">
       <!-- Logo -->
       <div class="flex justify-center mb-8">
         <div class="relative flex items-center justify-center">
-          <div class="absolute w-3xl h-192 rounded-full blur-3xl pointer-events-none" style="background: radial-gradient(circle, rgba(230,215,255,0.9) 0%, rgba(200,175,245,0.65) 25%, rgba(160,135,220,0.4) 50%, transparent 70%);"></div>
+          <div class="absolute w-3xl h-192 rounded-full blur-3xl pointer-events-none" style="background: radial-gradient(circle, rgba(230,215,255,0.9) 0%, rgba(200,175,245,0.65) 25%, rgba(160,135,220,0.4) 50%, transparent 70%);" />
           <img
             src="/moduvis_logo_v3_no_bg.png"
             alt="Moduvis Logo"
             class="relative h-36 w-auto drop-shadow-xl"
-          />
+          >
         </div>
       </div>
 

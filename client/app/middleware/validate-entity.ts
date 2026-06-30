@@ -13,8 +13,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
     const { apiFetch } = useApi()
     await apiFetch(`/v1/schema/${entitySlug}`)
     knownSlugs.add(entitySlug)
-  }
-  catch {
+  } catch {
     return abortNavigation({
       statusCode: 404,
       message: `Entitatea "${entitySlug}" nu exista.`

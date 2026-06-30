@@ -26,6 +26,7 @@ const inlineCreateEntitySlug = computed(() => entitySlug.value!)
 
 const {
   getRelationOptions,
+  getRelationOptionLabel,
   isRelationOptionsLoading,
   shouldRefreshRelationOptions,
   refreshRelationOptions,
@@ -44,6 +45,21 @@ watch(open, (isOpen) => {
 
 const items = computed(() => getRelationOptions(props.field, searchQuery.value))
 const loading = computed(() => isRelationOptionsLoading(props.field, searchQuery.value))
+const displayItems = computed(() => {
+  const currentItems = items.value
+  const selectedValue = props.modelValue ? String(props.modelValue) : ''
+  if (!selectedValue || currentItems.some(item => item.value === selectedValue)) {
+    return currentItems
+  }
+
+  const selectedLabel = getRelationOptionLabel(props.field, selectedValue)
+  if (!selectedLabel) return currentItems
+
+  return [
+    { label: selectedLabel, value: selectedValue },
+    ...currentItems
+  ]
+})
 
 function onInlineCreated(record: Record<string, unknown>) {
   if (!record.id) return
@@ -80,11 +96,12 @@ onUnmounted(() => {
 })
 
 function onUpdate(val: string | string[] | undefined) {
-  if (Array.isArray(val)) {
-    emit('update:modelValue', val[0] ?? null)
-  } else {
-    emit('update:modelValue', val ?? null)
+  const nextValue = Array.isArray(val) ? val[0] ?? null : val ?? null
+  const selectedItem = items.value.find(item => item.value === nextValue)
+  if (selectedItem) {
+    upsertRelationOption(props.field, selectedItem)
   }
+  emit('update:modelValue', nextValue)
 }
 </script>
 
@@ -94,7 +111,7 @@ function onUpdate(val: string | string[] | undefined) {
       <USelectMenu
         v-model:open="open"
         :model-value="modelValue ?? undefined"
-        :items="items"
+        :items="displayItems"
         value-key="value"
         :loading="loading"
         :placeholder="field.placeholder ?? `Selecteaza ${field.name.toLowerCase()}...`"

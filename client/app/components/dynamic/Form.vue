@@ -1,5 +1,5 @@
 ﻿<script setup lang="ts">
-import type { Field, UiTab } from '~/types/schema'
+import type { Field } from '~/types/schema'
 import type { Form, TabsItem, FormSubmitEvent } from '@nuxt/ui'
 import { buildZodSchema } from '~/utils/buildZodSchema'
 import { INLINE_CREATE_DEPTH_KEY } from '~/utils/inlineCreate'
@@ -30,7 +30,6 @@ const {
 } = useEntitySchema(props.entity)
 
 const {
-  loading: dataLoading,
   error: dataError,
   fetchOne,
   create,
@@ -174,14 +173,11 @@ function initFormState(record?: Record<string, any> | null) {
   for (const field of formFields.value) {
     if (record && record[field.column_name] !== undefined) {
       formState[field.slug] = record[field.column_name]
-    } 
-    else if (field.default_value != null) {
+    } else if (field.default_value != null) {
       formState[field.slug] = castDefault(field)
-    } 
-    else if (field.data_type === 'boolean') {
+    } else if (field.data_type === 'boolean') {
       formState[field.slug] = false
-    } 
-    else {
+    } else {
       formState[field.slug] = null
     }
   }
@@ -221,8 +217,7 @@ watch(() => schema.value, async (sch) => {
     }
     captureInitialState()
     initialLoading.value = false
-  }
-  else {
+  } else {
     initFormState()
     captureInitialState()
   }
@@ -242,11 +237,9 @@ async function onSubmit(event: FormSubmitEvent<Record<string, unknown>>) {
 
     if (intent === 'copy') {
       result = await create(payload)
-    }
-    else if (isEditMode.value && props.recordId) {
+    } else if (isEditMode.value && props.recordId) {
       result = await update(props.recordId, payload)
-    } 
-    else {
+    } else {
       result = await create(payload)
     }
 
@@ -278,9 +271,9 @@ async function onSubmit(event: FormSubmitEvent<Record<string, unknown>>) {
         color: 'success'
       })
       captureInitialState()
+      bypassNextNavigationGuard()
       emit('saved', result)
-    } 
-    else {
+    } else {
       if (intent === 'copy') {
         closeCopyWindow()
       }
@@ -292,8 +285,7 @@ async function onSubmit(event: FormSubmitEvent<Record<string, unknown>>) {
         color: 'error'
       })
     }
-  } 
-  finally {
+  } finally {
     submitting.value = false
     submitIntent.value = 'save'
   }
@@ -353,13 +345,17 @@ function buildPayload(validated: Record<string, unknown>): Record<string, any> {
   return payload
 }
 
+function updateFormField(payload: { slug: string, value: any }) {
+  formState[payload.slug] = payload.value
+}
+
 const loading = computed(() => schemaLoading.value || initialLoading.value)
 
 const { visibleActions, executeAction: executeEntityAction } = useEntityActions(computed(() => props.entity))
 const executingAction = ref<string | null>(null)
 const showActionsSlideover = ref(false)
 
-async function handleAction(actionSlug: string, actionName: string) {
+async function handleAction(actionSlug: string) {
   if (!props.recordId) return
   executingAction.value = actionSlug
   const success = await executeEntityAction(actionSlug, props.recordId)
@@ -411,6 +407,15 @@ function confirmLeave() {
 function cancelLeave() {
   showLeaveConfirm.value = false
   leaveTarget.value = null
+}
+
+function bypassNextNavigationGuard() {
+  bypassGuard.value = true
+  nextTick(() => {
+    if (bypassGuard.value) {
+      bypassGuard.value = false
+    }
+  })
 }
 
 function revertForm() {
@@ -523,7 +528,12 @@ onUnmounted(() => {
       <div class="flex-1 min-w-0 space-y-6">
         <!-- Single group: render directly -->
         <template v-if="groups.length <= 1">
-          <DynamicFormGrid :fields="getFieldsByGroup(groups[0] ?? 'general')" :form-state="formState" :autofocus-first="!isEditMode" />
+          <DynamicFormGrid
+            :fields="getFieldsByGroup(groups[0] ?? 'general')"
+            :form-state="formState"
+            :autofocus-first="!isEditMode"
+            @update-field="updateFormField"
+          />
         </template>
 
         <!-- Multiple groups: use tabs -->
@@ -543,11 +553,15 @@ onUnmounted(() => {
         >
           <template v-for="(group, idx) in groups" :key="group" #[group]>
             <div class="pt-2 md:pt-0">
-              <DynamicFormGrid :fields="getFieldsByGroup(group)" :form-state="formState" :autofocus-first="!isEditMode && idx === 0" />
+              <DynamicFormGrid
+                :fields="getFieldsByGroup(group)"
+                :form-state="formState"
+                :autofocus-first="!isEditMode && idx === 0"
+                @update-field="updateFormField"
+              />
             </div>
           </template>
         </UTabs>
-
       </div>
 
       <!-- Right: Entity Actions sidebar (doar pe desktop) -->
@@ -583,7 +597,7 @@ onUnmounted(() => {
                 type="button"
                 class="flex min-w-0 flex-1 items-center gap-3 rounded-lg p-1 text-left disabled:pointer-events-none disabled:opacity-70"
                 :disabled="executingAction === action.slug"
-                @click="handleAction(action.slug, action.name)"
+                @click="handleAction(action.slug)"
               >
                 <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-white">
                   <UIcon
@@ -715,7 +729,6 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
-
   </UForm>
 
   <!-- Delete Confirm Modal -->
@@ -787,7 +800,7 @@ onUnmounted(() => {
                 type="button"
                 class="flex min-w-0 flex-1 items-center gap-3 rounded-lg p-1 text-left disabled:pointer-events-none disabled:opacity-70"
                 :disabled="executingAction === action.slug"
-                @click="handleAction(action.slug, action.name)"
+                @click="handleAction(action.slug)"
               >
                 <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-white">
                   <UIcon

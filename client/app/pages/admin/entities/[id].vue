@@ -83,8 +83,7 @@ async function onConfirmDeleteField() {
   const success = await deleteField(deletingField.value.id_field)
   if (success) {
     toast.add({ title: 'Camp sters', color: 'success' })
-  }
-  else {
+  } else {
     toast.add({ title: 'Eroare la stergere', description: fieldsError.value ?? '', color: 'error' })
   }
 
@@ -130,8 +129,7 @@ async function onConfirmDeleteTab() {
   const success = await deleteTab(deletingTab.value.id_ui_tab)
   if (success) {
     toast.add({ title: 'Tab sters', color: 'success' })
-  }
-  else {
+  } else {
     toast.add({ title: 'Eroare la stergere', description: tabsError.value ?? '', color: 'error' })
   }
 
@@ -263,7 +261,12 @@ function getModuleName(moduleId: string | null): string {
           <h3 class="text-base font-semibold">
             Tab-uri
           </h3>
-          <UButton label="Adauga tab" icon="i-lucide-plus" size="sm" @click="openAddTab" />
+          <UButton
+            label="Adauga tab"
+            icon="i-lucide-plus"
+            size="sm"
+            @click="openAddTab"
+          />
         </div>
 
         <div v-if="tabs.length === 0 && !tabsLoading" class="text-sm text-muted py-4 text-center">
@@ -282,13 +285,34 @@ function getModuleName(moduleId: string | null): string {
           >
             <UIcon name="i-lucide-folder" class="size-5 text-muted shrink-0" />
             <div class="flex-1 min-w-0">
-              <div class="font-medium truncate">{{ tab.name }}</div>
-              <div class="text-xs text-muted">{{ tab.slug }}</div>
+              <div class="font-medium truncate">
+                {{ tab.name }}
+              </div>
+              <div class="text-xs text-muted">
+                {{ tab.slug }}
+              </div>
             </div>
-            <UBadge v-if="tab.is_system" label="System" color="warning" variant="subtle" size="sm" />
-            <UBadge :label="String(tab.rank)" color="neutral" variant="subtle" size="sm" />
+            <UBadge
+              v-if="tab.is_system"
+              label="System"
+              color="warning"
+              variant="subtle"
+              size="sm"
+            />
+            <UBadge
+              :label="String(tab.rank)"
+              color="neutral"
+              variant="subtle"
+              size="sm"
+            />
             <div class="flex items-center gap-1">
-              <UButton icon="i-lucide-pencil" color="neutral" variant="ghost" size="xs" @click="openEditTab(tab)" />
+              <UButton
+                icon="i-lucide-pencil"
+                color="neutral"
+                variant="ghost"
+                size="xs"
+                @click="openEditTab(tab)"
+              />
               <UButton
                 icon="i-lucide-trash-2"
                 color="error"

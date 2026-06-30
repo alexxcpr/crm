@@ -14,7 +14,7 @@ export interface ContactDto {
   telefon1: string | null
   telefon2: string | null
   pozitie: string | null
-  email_alternativ: string | nulll
+  email_alternativ: string | null
 }
 export interface Contact {
   id: number
@@ -27,43 +27,23 @@ export interface Contact {
   telefon1: string | null
   telefon2: string | null
   pozitie: string | null
-  emailAlternativ: string | nulll
+  emailAlternativ: string | null
 }
 
-export interface SursaDto {
-  // TODO
-}
-export interface Sursa {
-  // TODO
-}
+export type SursaDto = Record<string, never>
+export type Sursa = Record<string, never>
 
-export interface FazaDto {
-  // TODO
-}
-export interface Faza {
-  // TODO
-}
+export type FazaDto = Record<string, never>
+export type Faza = Record<string, never>
 
-export interface ProiectTipDto {
-  // TODO
-}
-export interface ProiectTip {
-  // TODO
-}
+export type ProiectTipDto = Record<string, never>
+export type ProiectTip = Record<string, never>
 
-export interface CompanieDto {
-  // TODO
-}
-export interface Companie {
-  // TODO
-}
+export type CompanieDto = Record<string, never>
+export type Companie = Record<string, never>
 
-export interface PipelineStareDto {
-  // TODO
-}
-export interface PipelineStare {
-  // TODO
-}
+export type PipelineStareDto = Record<string, never>
+export type PipelineStare = Record<string, never>
 
 export interface UserDto {
   id: number

@@ -80,16 +80,16 @@ const literalInput = ref('')
 const sourceOptions = computed(() =>
   props.dataSources.map(ds => ({
     label: `${ds.label} (${ds.entitySlug})`,
-    value: ds.nodeId,
-  })),
+    value: ds.nodeId
+  }))
 )
 
 const fieldSelectOptions = computed(() =>
   fieldOptions.value.map(f => ({
     label: `${f.name} (${f.column_name})`,
     value: f.column_name,
-    fieldLabel: f.name,
-  })),
+    fieldLabel: f.name
+  }))
 )
 
 function openFieldPicker(index: number) {
@@ -129,7 +129,7 @@ function onPickField(columnName: string, fieldLabel?: string) {
     sourceNodeId: pickSourceNodeId.value,
     fieldSlug: columnName,
     fieldLabel: fieldLabel ?? columnName,
-    sourceLabel: ds?.label ?? pickSourceNodeId.value,
+    sourceLabel: ds?.label ?? pickSourceNodeId.value
   })
   closePickers()
 }
@@ -138,7 +138,7 @@ function onAddLiteral() {
   if (activeIndex.value === null || !literalInput.value.trim()) return
   addToken(activeIndex.value, {
     type: 'literal',
-    value: literalInput.value.trim(),
+    value: literalInput.value.trim()
   })
   closePickers()
 }
@@ -163,13 +163,6 @@ function tokenLabel(token: FormulaToken): string {
   if (token.type === 'group_start') return '('
   if (token.type === 'group_end') return ')'
   return ''
-}
-
-function tokenVariant(token: FormulaToken): 'field' | 'operator' | 'group' | 'literal' {
-  if (token.type === 'field') return 'field'
-  if (token.type === 'operator') return 'operator'
-  if (token.type === 'group_start' || token.type === 'group_end') return 'group'
-  return 'literal'
 }
 </script>
 
@@ -336,7 +329,13 @@ function tokenVariant(token: FormulaToken): 'field' | 'operator' | 'group' | 'li
               onPickField(v, opt?.fieldLabel)
             }"
           />
-          <UButton icon="i-lucide-x" variant="ghost" color="neutral" size="xs" @click="closePickers" />
+          <UButton
+            icon="i-lucide-x"
+            variant="ghost"
+            color="neutral"
+            size="xs"
+            @click="closePickers"
+          />
         </div>
 
         <!-- Inline Literal Input panel -->
@@ -351,8 +350,20 @@ function tokenVariant(token: FormulaToken): 'field' | 'operator' | 'group' | 'li
             class="flex-1"
             @keyup.enter="onAddLiteral"
           />
-          <UButton label="Adauga" variant="solid" color="primary" size="xs" @click="onAddLiteral" />
-          <UButton icon="i-lucide-x" variant="ghost" color="neutral" size="xs" @click="closePickers" />
+          <UButton
+            label="Adauga"
+            variant="solid"
+            color="primary"
+            size="xs"
+            @click="onAddLiteral"
+          />
+          <UButton
+            icon="i-lucide-x"
+            variant="ghost"
+            color="neutral"
+            size="xs"
+            @click="closePickers"
+          />
         </div>
       </div>
     </div>

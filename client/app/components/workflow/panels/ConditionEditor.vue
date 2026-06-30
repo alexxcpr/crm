@@ -33,7 +33,7 @@ function addCondition() {
     id: crypto.randomUUID ? crypto.randomUUID() : `cond_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     leftOperand: { sourceType: 'static', value: '' },
     operator: 'equals',
-    rightOperand: { sourceType: 'static', value: '' },
+    rightOperand: { sourceType: 'static', value: '' }
   })
   emitConditions()
 }
@@ -105,7 +105,7 @@ function hasTypeMismatch(index: number): boolean {
 
 const combinatorOptions = [
   { label: 'ȘI (AND)', value: 'and' },
-  { label: 'SAU (OR)', value: 'or' },
+  { label: 'SAU (OR)', value: 'or' }
 ]
 </script>
 

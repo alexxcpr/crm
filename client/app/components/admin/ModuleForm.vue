@@ -68,8 +68,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
 
     if (isEdit.value && props.module) {
       result = await updateModule(props.module.id_module, payload)
-    } 
-    else {
+    } else {
       result = await createModule(payload)
     }
 
@@ -79,16 +78,14 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         color: 'success'
       })
       emit('saved', result)
-    }
-    else {
+    } else {
       toast.add({
         title: 'Eroare',
         description: error.value ?? 'A aparut o eroare.',
         color: 'error'
       })
     }
-  } 
-  finally {
+  } finally {
     submitting.value = false
   }
 }

@@ -80,8 +80,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         rank: event.data.rank
       }
       result = await updateEntity(props.entity.id_entity, payload)
-    } 
-    else {
+    } else {
       const payload: CreateEntityPayload = {
         name: event.data.name,
         slug: event.data.slug,
@@ -100,16 +99,14 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         color: 'success'
       })
       emit('saved', result)
-    } 
-    else {
+    } else {
       toast.add({
         title: 'Eroare',
         description: error.value ?? 'A aparut o eroare.',
         color: 'error'
       })
     }
-  } 
-  finally {
+  } finally {
     submitting.value = false
   }
 }

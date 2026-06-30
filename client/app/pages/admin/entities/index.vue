@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h } from 'vue'
-import type { AdminEntity, AdminModule } from '~/types/admin'
+import type { AdminEntity } from '~/types/admin'
 import type { TableColumn } from '@nuxt/ui'
 
 const UCheckbox = resolveComponent('UCheckbox')
@@ -79,8 +79,7 @@ async function onConfirmDelete() {
   const success = await deleteEntity(deletingEntity.value.id_entity)
   if (success) {
     toast.add({ title: 'Entitate stearsa', color: 'success' })
-  }
-  else {
+  } else {
     toast.add({ title: 'Eroare la stergere', description: error.value ?? '', color: 'error' })
   }
 

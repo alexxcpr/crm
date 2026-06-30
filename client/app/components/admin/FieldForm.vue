@@ -2,7 +2,6 @@
 import { z } from 'zod'
 import type { Field, UiTab } from '~/types/schema'
 import type { AdminEntity, FieldPayload, UpdateFieldPayload } from '~/types/admin'
-import type { FormSubmitEvent } from '@nuxt/ui'
 
 const props = defineProps<{
   entityId: string
@@ -242,7 +241,7 @@ function selectGridColumn(col: number) {
 // ─── Submit ───
 const submitting = ref(false)
 
-async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
+async function onSubmit() {
   submitting.value = true
 
   try {
@@ -288,8 +287,7 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
         col_span: state.col_span
       }
       result = await updateField(props.field.id_field, payload)
-    } 
-    else {
+    } else {
       const payload: FieldPayload = {
         name: state.name,
         slug: state.slug,
@@ -323,16 +321,14 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof formSchema>>) {
         color: 'success'
       })
       emit('saved', result)
-    } 
-    else {
+    } else {
       toast.add({
         title: 'Eroare',
         description: error.value ?? 'A aparut o eroare.',
         color: 'error'
       })
     }
-  } 
-  finally {
+  } finally {
     submitting.value = false
   }
 }

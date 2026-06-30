@@ -8,7 +8,9 @@ const { signOut } = useAuth()
 const toast = useToast()
 const account = reactive({ loginUsername: '', currentPassword: '' })
 const password = reactive({ currentPassword: '', newPassword: '', confirmPassword: '' })
-watch(session, value => { account.loginUsername = value?.login_username ?? '' }, { immediate: true })
+watch(session, (value) => {
+  account.loginUsername = value?.login_username ?? ''
+}, { immediate: true })
 
 const accountSchema = z.object({ loginUsername: z.string().min(2), currentPassword: z.string().min(1) })
 const passwordSchema = z.object({
@@ -33,17 +35,37 @@ async function updatePassword(event: FormSubmitEvent<typeof password>) {
 <template>
   <div class="space-y-6">
     <UPageCard title="Credential de autentificare" description="Username-ul contului este separat de username-ul profilului." variant="subtle">
-      <UForm :schema="accountSchema" :state="account" class="space-y-4 max-w-sm" @submit="updateAccount">
-        <UFormField label="Login username" name="loginUsername"><UInput v-model="account.loginUsername" class="w-full" /></UFormField>
-        <UFormField label="Parola curenta" name="currentPassword"><UInput v-model="account.currentPassword" type="password" class="w-full" /></UFormField>
+      <UForm
+        :schema="accountSchema"
+        :state="account"
+        class="space-y-4 max-w-sm"
+        @submit="updateAccount"
+      >
+        <UFormField label="Login username" name="loginUsername">
+          <UInput v-model="account.loginUsername" class="w-full" />
+        </UFormField>
+        <UFormField label="Parola curenta" name="currentPassword">
+          <UInput v-model="account.currentPassword" type="password" class="w-full" />
+        </UFormField>
         <UButton type="submit" label="Schimba username-ul" />
       </UForm>
     </UPageCard>
     <UPageCard title="Parola" description="Schimbarea parolei inchide toate sesiunile active." variant="subtle">
-      <UForm :schema="passwordSchema" :state="password" class="space-y-4 max-w-sm" @submit="updatePassword">
-        <UFormField label="Parola curenta" name="currentPassword"><UInput v-model="password.currentPassword" type="password" class="w-full" /></UFormField>
-        <UFormField label="Parola noua" name="newPassword"><UInput v-model="password.newPassword" type="password" class="w-full" /></UFormField>
-        <UFormField label="Confirma parola" name="confirmPassword"><UInput v-model="password.confirmPassword" type="password" class="w-full" /></UFormField>
+      <UForm
+        :schema="passwordSchema"
+        :state="password"
+        class="space-y-4 max-w-sm"
+        @submit="updatePassword"
+      >
+        <UFormField label="Parola curenta" name="currentPassword">
+          <UInput v-model="password.currentPassword" type="password" class="w-full" />
+        </UFormField>
+        <UFormField label="Parola noua" name="newPassword">
+          <UInput v-model="password.newPassword" type="password" class="w-full" />
+        </UFormField>
+        <UFormField label="Confirma parola" name="confirmPassword">
+          <UInput v-model="password.confirmPassword" type="password" class="w-full" />
+        </UFormField>
         <UButton type="submit" label="Schimba parola" />
       </UForm>
     </UPageCard>

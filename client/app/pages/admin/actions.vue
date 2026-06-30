@@ -27,7 +27,11 @@ const filteredActions = computed(() => {
 function parseTriggerEvents(events: any): string[] {
   if (!events) return []
   if (typeof events === 'string') {
-    try { return JSON.parse(events) } catch { return [] }
+    try {
+      return JSON.parse(events)
+    } catch {
+      return []
+    }
   }
   return Array.isArray(events) ? events : []
 }
@@ -116,7 +120,7 @@ async function onSubmit() {
       is_active: formIsActive.value,
       id_workflow: formWorkflowId.value === 'none' ? undefined : (formWorkflowId.value || undefined),
       trigger_events: formTriggerEvents.value,
-      description: formDescription.value || undefined,
+      description: formDescription.value || undefined
     })
     if (result) {
       toast.add({ title: 'Actiune actualizata', color: 'success' })
@@ -133,7 +137,7 @@ async function onSubmit() {
       is_active: formIsActive.value,
       id_workflow: formWorkflowId.value === 'none' ? undefined : (formWorkflowId.value || undefined),
       trigger_events: formTriggerEvents.value,
-      description: formDescription.value || undefined,
+      description: formDescription.value || undefined
     })
     if (result) {
       toast.add({ title: 'Actiune creata', color: 'success' })
@@ -414,7 +418,12 @@ function getDropdownItems(action: any) {
 
           <div>
             <label class="text-xs font-medium mb-1 block">Descriere (optional)</label>
-            <UTextarea v-model="formDescription" placeholder="Explica ce face actiunea..." size="sm" :rows="2" />
+            <UTextarea
+              v-model="formDescription"
+              placeholder="Explica ce face actiunea..."
+              size="sm"
+              :rows="2"
+            />
           </div>
 
           <div class="flex items-center gap-6">

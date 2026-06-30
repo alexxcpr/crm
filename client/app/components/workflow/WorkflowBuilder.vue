@@ -58,7 +58,7 @@ async function resolveEntityNames() {
       if (name && node.data) {
         node.data = {
           ...node.data,
-          parameters: { ...node.data.parameters, entityName: name },
+          parameters: { ...node.data.parameters, entityName: name }
         }
       }
     }
@@ -68,7 +68,7 @@ async function resolveEntityNames() {
       if (name && node.data) {
         node.data = {
           ...node.data,
-          parameters: { ...node.data.parameters, relationEntityName: name },
+          parameters: { ...node.data.parameters, relationEntityName: name }
         }
       }
     }
@@ -82,7 +82,7 @@ async function enrichBeforeSave(exported: { nodes: any[], connections: any[] }):
   const fetchPromises = dataSources.value.map(ds => fetchEntitySchema(ds.entitySlug))
   await Promise.all(fetchPromises)
 
-  const enrichedNodes = exported.nodes.map(node => {
+  const enrichedNodes = exported.nodes.map((node) => {
     if (node.type !== 'app_get_related') return node
     if (!node.parameters) return node
 
@@ -96,10 +96,10 @@ async function enrichBeforeSave(exported: { nodes: any[], connections: any[] }):
     const relField = srcSource.fields.find(f => f.slug === relFieldSlug)
     if (!relField?.relation_entity_slug || !relField?.column_name) return node
 
-    const isStart = srcSource.entitySlug === startEntitySlug.value &&
-      (nodes.value.find(n => n.id === srcNodeId)?.data?.nodeType === 'start' ||
-       nodes.value.find(n => n.id === srcNodeId)?.data?.nodeType === 'trigger' ||
-       nodes.value.find(n => n.id === srcNodeId)?.data?.nodeType === 'webhook_trigger')
+    const isStart = srcSource.entitySlug === startEntitySlug.value
+      && (nodes.value.find(n => n.id === srcNodeId)?.data?.nodeType === 'start'
+        || nodes.value.find(n => n.id === srcNodeId)?.data?.nodeType === 'trigger'
+        || nodes.value.find(n => n.id === srcNodeId)?.data?.nodeType === 'webhook_trigger')
 
     const recordIdExpr = isStart
       ? `={{$('${srcNodeId}').first().json.body.record.${relField.column_name}}}`
@@ -112,7 +112,7 @@ async function enrichBeforeSave(exported: { nodes: any[], connections: any[] }):
       parameters: {
         ...node.parameters,
         relationEntitySlug: relField.relation_entity_slug,
-        relationRecordIdExpr: recordIdExpr,
+        relationRecordIdExpr: recordIdExpr
       }
     }
   })
@@ -210,7 +210,7 @@ async function save() {
     toast.add({
       title: 'Lipseste nodul de start',
       description: 'Adauga un nod START inainte de a salva.',
-      color: 'error',
+      color: 'error'
     })
     return
   }
@@ -218,7 +218,7 @@ async function save() {
     toast.add({
       title: 'Prea multe noduri de start',
       description: `Ai ${triggerNodes.length} noduri de start. Un workflow poate avea un singur punct de intrare.`,
-      color: 'error',
+      color: 'error'
     })
     return
   }
@@ -239,7 +239,7 @@ async function save() {
         toast.add({
           title: `Camp obligatoriu necompletat in nodul "${node.data.label}"`,
           description: `Campul "${field.label}" este obligatoriu. Completeaza-l inainte de a salva.`,
-          color: 'error',
+          color: 'error'
         })
         return
       }
@@ -252,7 +252,7 @@ async function save() {
   for (const edge of edges.value) {
     nodesWithInput.add(edge.target)
   }
-  const orphanNodes = nodes.value.filter(n => {
+  const orphanNodes = nodes.value.filter((n) => {
     if (TRIGGER_TYPES.has(n.data?.nodeType)) return false
     return !nodesWithInput.has(n.id)
   })
@@ -261,14 +261,14 @@ async function save() {
     toast.add({
       title: 'Noduri fara intrare',
       description: `Urmatoarele noduri nu au nicio conexiune de intrare si nu vor fi executate vreodata: ${names}. Conecteaza-le sau sterge-le.`,
-      color: 'error',
+      color: 'error'
     })
     return
   }
 
   const dataSourceByNodeId = new Map(dataSources.value.map(ds => [ds.nodeId, ds]))
   const listSourceIds = new Set(
-    dataSources.value.filter(ds => ds.cardinality === 'list').map(ds => ds.nodeId),
+    dataSources.value.filter(ds => ds.cardinality === 'list').map(ds => ds.nodeId)
   )
 
   for (const node of nodes.value) {
@@ -280,7 +280,7 @@ async function save() {
       toast.add({
         title: `Lista lipsa in nodul "${node.data.label}"`,
         description: 'Alege un nod "Citeste Inregistrari" care intoarce mai multe inregistrari.',
-        color: 'error',
+        color: 'error'
       })
       return
     }
@@ -290,7 +290,7 @@ async function save() {
       toast.add({
         title: `Conexiune lipsa in nodul "${node.data.label}"`,
         description: 'Conecteaza nodul care citeste lista direct la nodul "Pentru fiecare".',
-        color: 'error',
+        color: 'error'
       })
       return
     }
@@ -305,7 +305,7 @@ async function save() {
     toast.add({
       title: `Sursa lista folosita direct in nodul "${node.data.label}"`,
       description: 'Listele trebuie parcurse prin nodul "Pentru fiecare" inainte sa alegi campuri din ele.',
-      color: 'error',
+      color: 'error'
     })
     return
   }

@@ -26,13 +26,17 @@ function formatTimestamp(val: string): string {
     return val
   }
 }
-
 </script>
 
 <template>
   <span v-if="value === null || value === undefined || value === ''" class="text-muted">-</span>
 
-  <UBadge v-else-if="field.ui_type === 'checkbox'" :color="value ? 'success' : 'warning'" variant="subtle" size="sm">
+  <UBadge
+    v-else-if="field.ui_type === 'checkbox'"
+    :color="value ? 'success' : 'warning'"
+    variant="subtle"
+    size="sm"
+  >
     {{ value ? 'Da' : 'Nu' }}
   </UBadge>
 

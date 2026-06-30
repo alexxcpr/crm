@@ -30,7 +30,7 @@ const operatorOptions = [
   { label: 'Mai mare', value: 'gt' },
   { label: 'Mai mic', value: 'lt' },
   { label: 'Mai mare sau egal', value: 'gte' },
-  { label: 'Mai mic sau egal', value: 'lte' },
+  { label: 'Mai mic sau egal', value: 'lte' }
 ]
 
 // ─── Row management ───
@@ -39,7 +39,7 @@ function addFilter() {
   filters.value.push({
     field: '',
     operator: 'eq',
-    valueSource: { sourceType: 'static', value: '' },
+    valueSource: { sourceType: 'static', value: '' }
   })
   emitUpdate()
 }
@@ -95,31 +95,31 @@ function updateSourceField(index: number, fieldSlug: string) {
 // ─── Field options (from target entity) ───
 
 const targetFieldOptions = computed(() =>
-  props.targetEntityFields.map((f) => ({
+  props.targetEntityFields.map(f => ({
     label: `${f.name} (${f.column_name})`,
-    value: f.column_name,
-  })),
+    value: f.column_name
+  }))
 )
 
 // ─── Data source options ───
 
 const dataSourceOptions = computed(() =>
-  props.dataSources.map((ds) => ({
+  props.dataSources.map(ds => ({
     label: `${ds.label} (${ds.entitySlug})`,
-    value: ds.nodeId,
-  })),
+    value: ds.nodeId
+  }))
 )
 
 function getFieldsForSource(nodeId: string | undefined): Field[] {
   if (!nodeId) return []
-  const ds = props.dataSources.find((s) => s.nodeId === nodeId)
+  const ds = props.dataSources.find(s => s.nodeId === nodeId)
   return ds?.fields ?? []
 }
 
 function getSourceFieldOptions(nodeId: string | undefined) {
-  return getFieldsForSource(nodeId).map((f) => ({
+  return getFieldsForSource(nodeId).map(f => ({
     label: `${f.name} (${f.column_name})`,
-    value: f.column_name,
+    value: f.column_name
   }))
 }
 </script>

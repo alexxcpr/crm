@@ -65,29 +65,29 @@ export interface OperatorDef {
 
 export const OPERATOR_DEFS: OperatorDef[] = [
   // Universali
-  { moduvisValue: 'equals',       label: 'Egal cu',              n8nOperation: 'equals',       types: ['string', 'number', 'date', 'boolean'], unary: false },
-  { moduvisValue: 'notEquals',    label: 'Diferit de',           n8nOperation: 'notEquals',    types: ['string', 'number', 'date', 'boolean'], unary: false },
-  { moduvisValue: 'isNull',       label: 'Este gol (null)',      n8nOperation: 'isEmpty',      types: ['null'], unary: true },
-  { moduvisValue: 'isNotNull',    label: 'Nu este gol',          n8nOperation: 'isNotEmpty',   types: ['null'], unary: true },
+  { moduvisValue: 'equals', label: 'Egal cu', n8nOperation: 'equals', types: ['string', 'number', 'date', 'boolean'], unary: false },
+  { moduvisValue: 'notEquals', label: 'Diferit de', n8nOperation: 'notEquals', types: ['string', 'number', 'date', 'boolean'], unary: false },
+  { moduvisValue: 'isNull', label: 'Este gol (null)', n8nOperation: 'isEmpty', types: ['null'], unary: true },
+  { moduvisValue: 'isNotNull', label: 'Nu este gol', n8nOperation: 'isNotEmpty', types: ['null'], unary: true },
   // String
-  { moduvisValue: 'contains',     label: 'Contine',              n8nOperation: 'contains',     types: ['string'], unary: false },
-  { moduvisValue: 'startsWith',   label: 'Incepe cu',            n8nOperation: 'startsWith',   types: ['string'], unary: false },
-  { moduvisValue: 'endsWith',     label: 'Se termina cu',        n8nOperation: 'endsWith',     types: ['string'], unary: false },
-  { moduvisValue: 'regex',        label: 'Regex',                n8nOperation: 'regex',        types: ['string'], unary: false },
+  { moduvisValue: 'contains', label: 'Contine', n8nOperation: 'contains', types: ['string'], unary: false },
+  { moduvisValue: 'startsWith', label: 'Incepe cu', n8nOperation: 'startsWith', types: ['string'], unary: false },
+  { moduvisValue: 'endsWith', label: 'Se termina cu', n8nOperation: 'endsWith', types: ['string'], unary: false },
+  { moduvisValue: 'regex', label: 'Regex', n8nOperation: 'regex', types: ['string'], unary: false },
   // Number
-  { moduvisValue: 'larger',       label: 'Mai mare decat',       n8nOperation: 'larger',       types: ['number'], unary: false },
-  { moduvisValue: 'smaller',      label: 'Mai mic decat',        n8nOperation: 'smaller',      types: ['number'], unary: false },
-  { moduvisValue: 'largerEqual',  label: 'Mai mare sau egal',   n8nOperation: 'largerEqual',  types: ['number'], unary: false },
-  { moduvisValue: 'smallerEqual', label: 'Mai mic sau egal',    n8nOperation: 'smallerEqual', types: ['number'], unary: false },
-  { moduvisValue: 'divisibleBy',  label: 'Divizibil cu',         n8nOperation: 'divisibleBy',  types: ['number'], unary: false },
+  { moduvisValue: 'larger', label: 'Mai mare decat', n8nOperation: 'larger', types: ['number'], unary: false },
+  { moduvisValue: 'smaller', label: 'Mai mic decat', n8nOperation: 'smaller', types: ['number'], unary: false },
+  { moduvisValue: 'largerEqual', label: 'Mai mare sau egal', n8nOperation: 'largerEqual', types: ['number'], unary: false },
+  { moduvisValue: 'smallerEqual', label: 'Mai mic sau egal', n8nOperation: 'smallerEqual', types: ['number'], unary: false },
+  { moduvisValue: 'divisibleBy', label: 'Divizibil cu', n8nOperation: 'divisibleBy', types: ['number'], unary: false },
   // Date
-  { moduvisValue: 'after',        label: 'Dupa',                 n8nOperation: 'after',        types: ['date'], unary: false },
-  { moduvisValue: 'before',       label: 'Inainte de',           n8nOperation: 'before',       types: ['date'], unary: false },
-  { moduvisValue: 'afterEqual',   label: 'Dupa sau egal',       n8nOperation: 'afterEqual',   types: ['date'], unary: false },
-  { moduvisValue: 'beforeEqual',  label: 'Inainte sau egal',    n8nOperation: 'beforeEqual',  types: ['date'], unary: false },
+  { moduvisValue: 'after', label: 'Dupa', n8nOperation: 'after', types: ['date'], unary: false },
+  { moduvisValue: 'before', label: 'Inainte de', n8nOperation: 'before', types: ['date'], unary: false },
+  { moduvisValue: 'afterEqual', label: 'Dupa sau egal', n8nOperation: 'afterEqual', types: ['date'], unary: false },
+  { moduvisValue: 'beforeEqual', label: 'Inainte sau egal', n8nOperation: 'beforeEqual', types: ['date'], unary: false },
   // Boolean
-  { moduvisValue: 'true',         label: 'Este adevarat',        n8nOperation: 'true',         types: ['boolean'], unary: true },
-  { moduvisValue: 'false',        label: 'Este fals',            n8nOperation: 'false',        types: ['boolean'], unary: true },
+  { moduvisValue: 'true', label: 'Este adevarat', n8nOperation: 'true', types: ['boolean'], unary: true },
+  { moduvisValue: 'false', label: 'Este fals', n8nOperation: 'false', types: ['boolean'], unary: true }
 ]
 
 export function getOperatorsForType(dataType?: string): OperatorDef[] {

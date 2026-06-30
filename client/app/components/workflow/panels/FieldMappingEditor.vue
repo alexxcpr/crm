@@ -74,38 +74,38 @@ function updateSourceField(index: number, fieldSlug: string) {
 }
 
 // ─── Source type options ───
-const sourceTypeOptions: { label: string; value: FieldValueSource }[] = [
+const sourceTypeOptions: { label: string, value: FieldValueSource }[] = [
   { label: 'Valoare fixa', value: 'static' },
-  { label: 'Din registry (nod anterior)', value: 'node_output' },
+  { label: 'Din registry (nod anterior)', value: 'node_output' }
 ]
 
 // ─── Data source options for the dropdown ───
 const dataSourceOptions = computed(() =>
-  props.dataSources.map((ds) => ({
+  props.dataSources.map(ds => ({
     label: `${ds.label} (${ds.entitySlug})`,
-    value: ds.nodeId,
-  })),
+    value: ds.nodeId
+  }))
 )
 
 // ─── Get fields for a specific source ───
 function getFieldsForSource(nodeId: string | undefined): Field[] {
   if (!nodeId) return []
-  const ds = props.dataSources.find((s) => s.nodeId === nodeId)
+  const ds = props.dataSources.find(s => s.nodeId === nodeId)
   return ds?.fields ?? []
 }
 
 function getSourceFieldOptions(nodeId: string | undefined) {
-  return getFieldsForSource(nodeId).map((f) => ({
+  return getFieldsForSource(nodeId).map(f => ({
     label: `${f.name} (${f.column_name})`,
-    value: f.column_name,
+    value: f.column_name
   }))
 }
 
 const targetFieldOptions = computed(() =>
-  (props.targetEntityFields ?? []).map((f) => ({
+  (props.targetEntityFields ?? []).map(f => ({
     label: `${f.name} (${f.column_name})`,
-    value: f.column_name,
-  })),
+    value: f.column_name
+  }))
 )
 </script>
 

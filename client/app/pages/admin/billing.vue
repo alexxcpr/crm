@@ -47,8 +47,7 @@ async function saveBilling() {
 async function handlePortal() {
   try {
     await openCustomerPortal()
-  }
-  catch {
+  } catch {
     toast.add({
       title: 'Nu am putut deschide portalul',
       description: 'Verifica daca tenantul are customer Stripe si daca portalul este configurat.',

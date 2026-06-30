@@ -51,7 +51,7 @@ export function useEntityActions(entitySlug?: string | Ref<string | undefined>) 
     try {
       await apiFetch(`/v1/actions/${slug.value}/${actionSlug}/execute`, {
         method: 'POST',
-        body: { recordId },
+        body: { recordId }
       })
       toast.add({ title: 'Actiune executata cu succes', color: 'success' })
       return true
@@ -64,7 +64,7 @@ export function useEntityActions(entitySlug?: string | Ref<string | undefined>) 
   }
 
   const visibleActions = computed(() =>
-    actions.value.filter(a => a.show_in_ui && a.is_active),
+    actions.value.filter(a => a.show_in_ui && a.is_active)
   )
 
   watch(slug, () => {
@@ -77,6 +77,6 @@ export function useEntityActions(entitySlug?: string | Ref<string | undefined>) 
     loading,
     error,
     fetchActions,
-    executeAction,
+    executeAction
   }
 }
