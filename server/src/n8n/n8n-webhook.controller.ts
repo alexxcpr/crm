@@ -221,6 +221,22 @@ export class N8nWebhookController {
 
     const result = await this.handleDataOperation(tenantSlug, workflowToken, async (actor) => {
       if (!query.entity) throw new BadRequestException('Query param "entity" is required');
+      if (this.hasEmptyWorkflowFilter(query.filter)) {
+        if (query.limit === '1' || query.limit === 1) {
+          return { data: null };
+        }
+
+        return {
+          data: [],
+          meta: {
+            total: 0,
+            page: Number.parseInt(String(query.page ?? '1'), 10) || 1,
+            limit: query.limit === 'all' ? 0 : Number.parseInt(String(query.limit ?? '25'), 10) || 25,
+            totalPages: 0,
+          },
+        };
+      }
+
       const list = await this.dataService.findAll(query.entity, query, actor, {
         tableOnly: false,
       });
@@ -241,6 +257,25 @@ export class N8nWebhookController {
   }
 
   // ─── Data CRUD routes (query params — used by n8n when entity/id are dynamic expressions) ───
+
+  private hasEmptyWorkflowFilter(filter: unknown): boolean {
+    if (!filter || typeof filter !== 'object') return false;
+
+    return Object.values(filter).some((value) => this.containsEmptyFilterValue(value));
+  }
+
+  private containsEmptyFilterValue(value: unknown): boolean {
+    if (value === null || value === undefined || value === '') return true;
+    if (Array.isArray(value)) {
+      return value.some((item) => this.containsEmptyFilterValue(item));
+    }
+    if (typeof value !== 'object') return false;
+
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) return true;
+
+    return entries.some(([, item]) => this.containsEmptyFilterValue(item));
+  }
 
   @Get(':tenantSlug/data-resolve')
   async getDataResolve(
