@@ -121,7 +121,7 @@ watch(calendarDate, (newValue) => {
 watch(calendarDate, (newValue) => {
   if (props.field.ui_type !== 'datepicker') return
   dateText.value = formatDateForDisplay(newValue)
-})
+}, { immediate: true })
 
 // Auto-commit: parsează textul pe măsură ce utilizatorul tastează
 watch(dateText, (newVal) => {
