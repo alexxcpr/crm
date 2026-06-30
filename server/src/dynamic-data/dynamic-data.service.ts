@@ -65,6 +65,7 @@ export class DynamicDataService {
     const scope = await this.authorization.require(actor, entity.id_entity, 'read');
     const tableName = entity.table_name;
     const page = Math.max(1, parseInt(query.page) || 1);
+    const fetchAll = query.limit === 'all';
     const parsedLimit = Number.parseInt(String(query.limit ?? ''), 10);
     const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 25;
     const offset = (page - 1) * limit;
@@ -94,8 +95,12 @@ export class DynamicDataService {
       if (orderBy.length) dataQuery.orderBy(orderBy as any);
     } else dataQuery.orderBy(`${tableName}.date_created`, 'desc');
 
-    const [data, [{ total }]] = await Promise.all([dataQuery.limit(limit).offset(offset), countQuery]);
+    const pagedDataQuery = fetchAll ? dataQuery : dataQuery.limit(limit).offset(offset);
+    const [data, [{ total }]] = await Promise.all([pagedDataQuery, countQuery]);
     const totalNumber = Number(total);
+    if (fetchAll) {
+      return { data, meta: { total: totalNumber, page, limit: totalNumber, totalPages: totalNumber > 0 ? 1 : 0 } };
+    }
     return { data, meta: { total: totalNumber, page, limit, totalPages: Math.ceil(totalNumber / limit) } };
   }
 

@@ -684,9 +684,7 @@ export class WorkflowSyncService {
             })
           }
 
-          if (limit != null) {
-            queryParams.push({ name: 'limit', value: String(limit) })
-          }
+          queryParams.push({ name: 'limit', value: limit != null ? String(limit) : 'all' })
 
           return {
             method: 'GET',

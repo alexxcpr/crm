@@ -163,6 +163,37 @@ describe('WorkflowSyncService validation nodes', () => {
     expect(forEachNode.parameters.jsCode).toContain('_foreach_index');
   });
 
+  it('trimite limit=all pentru app_get_record fara limita configurata', () => {
+    const service = makeService();
+    const workflow = {
+      name: 'Toate contactele',
+      slug: 'toate_contactele',
+      nodes: [
+        {
+          id: 'start',
+          type: 'start',
+          position: { x: 0, y: 0 },
+          parameters: { entity: 'contacts' },
+        },
+        {
+          id: 'fetch_contacts',
+          type: 'app_get_record',
+          position: { x: 250, y: 0 },
+          parameters: { entity: 'contacts', filters: [] },
+        },
+      ],
+      connections: [{ source: 'start', target: 'fetch_contacts' }],
+    };
+
+    const translated = (service as any).translateToN8n(workflow);
+    const fetchNode = translated.nodes.find((node: any) => node.id === 'fetch_contacts');
+
+    expect(fetchNode.parameters.queryParameters.parameters).toContainEqual({
+      name: 'limit',
+      value: 'all',
+    });
+  });
+
   it('citeaza literalurile text din formulele set_data', () => {
     const service = makeService();
     const workflow = {
