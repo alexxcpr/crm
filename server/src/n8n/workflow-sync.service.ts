@@ -113,7 +113,9 @@ export class WorkflowSyncService {
 
     let n8nId = workflow.n8n_workflow_id;
     if (!n8nId) {
-      n8nId = await this.syncWorkflow(workflowId);
+      throw new Error(
+        `Workflow "${workflow.slug}" is not synced to n8n. Save or sync it before activation.`,
+      );
     }
 
     const hasWebhookTrigger = this.workflowHasActivatableTrigger(workflow);
@@ -186,15 +188,14 @@ export class WorkflowSyncService {
       );
     }
 
-    // Always sync before execution to ensure n8n has the latest node translations
-    const n8nId = await this.syncWorkflow(workflowId);
+    const n8nId = workflow.n8n_workflow_id;
+    if (!n8nId) {
+      throw new Error(
+        `Workflow "${workflow.slug}" is not synced to n8n. Save or sync it before execution.`,
+      );
+    }
 
-    // Ensure the workflow is activated in n8n so the webhook URL is live
-    await this.n8nClient.activateWorkflow(n8nId);
-
-    // Brief delay to let n8n finish processing the update — without this n8n may
-    // execute the previous version of the workflow (before the latest sync).
-    await new Promise(resolve => setTimeout(resolve, 300));
+    // Execution uses the version already synced from the workflow save action.
 
     const tenantSlug = this.tenantContext.isAvailable
       ? this.tenantContext.slug

@@ -86,7 +86,7 @@ export class WorkflowService {
       .update(patch)
       .returning('*');
 
-    if (existing.n8n_workflow_id && (dto.nodes || dto.connections)) {
+    if (dto.nodes !== undefined || dto.connections !== undefined) {
       await this.syncService.syncWorkflow(id);
     }
 

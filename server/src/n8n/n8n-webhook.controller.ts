@@ -234,7 +234,7 @@ export class N8nWebhookController {
     });
 
     this.logger.log(
-      `Webhook data LIST: ${tenantSlug}/${query.entity} filters=${JSON.stringify(query.filter ?? {})} limit=${query.limit ?? 'none'}`,
+      `Webhook data LIST: ${tenantSlug}/${query.entity} filters=${JSON.stringify(query.filter ?? {})} limit=${query.limit ?? 'none'} returned=${Array.isArray((result as any)?.data) ? (result as any).data.length : ((result as any)?.data ? 1 : 0)} total=${(result as any)?.meta?.total ?? 'n/a'}`,
     );
 
     return result;
@@ -327,7 +327,7 @@ export class N8nWebhookController {
     });
 
     this.logger.log(
-      `Webhook data PUT (resolve): ${tenantSlug}/${entitySlug}/${id}`,
+      `Webhook data PUT (resolve): ${tenantSlug}/${entitySlug}/${id} fields=${Object.keys(body ?? {}).join(',') || 'none'}`,
     );
 
     return result;

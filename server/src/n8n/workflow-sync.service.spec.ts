@@ -16,7 +16,58 @@ function makeService() {
   );
 }
 
+function makeExecutableService(workflow: Record<string, any>) {
+  const first = jest.fn().mockResolvedValue(workflow);
+  const where = jest.fn().mockReturnValue({ first });
+  const knex = jest.fn().mockReturnValue({ where });
+  const n8nClient = {
+    activateWorkflow: jest.fn(),
+    executeWebhook: jest.fn().mockResolvedValue({ ok: true }),
+  };
+  const service = new WorkflowSyncService(
+    n8nClient as any,
+    {
+      isAvailable: true,
+      slug: 'tenant',
+      dbName: 'tenant_db',
+      knex,
+    } as any,
+    {
+      get: jest.fn((_key: string, fallback: string) => fallback),
+    } as any,
+    {
+      signAsync: jest.fn().mockResolvedValue('workflow-token'),
+    } as any,
+  );
+
+  return { service, n8nClient };
+}
+
 describe('WorkflowSyncService validation nodes', () => {
+  it('executa workflow-ul sincronizat fara sync sau activare inainte de rulare', async () => {
+    const { service, n8nClient } = makeExecutableService({
+      id_workflow: 'wf-id',
+      slug: 'actualizare-contacte',
+      n8n_workflow_id: 'n8n-id',
+      nodes: [{ id: 'start', type: 'start', parameters: { entity: 'contacts' } }],
+      connections: [],
+    });
+    const syncSpy = jest.spyOn(service, 'syncWorkflow');
+
+    await service.executeWorkflow('wf-id', {
+      userId: 'user-id',
+      profileId: 'profile-id',
+    });
+
+    expect(syncSpy).not.toHaveBeenCalled();
+    expect(n8nClient.activateWorkflow).not.toHaveBeenCalled();
+    expect(n8nClient.executeWebhook).toHaveBeenCalledWith(
+      'crm-tenant-actualizare-contacte',
+      expect.objectContaining({ workflowToken: 'workflow-token' }),
+      'n8n-id',
+    );
+  });
+
   it('traduce stop_error in stopAndError cu mesaj prefixat', () => {
     const service = makeService();
     const workflow = {
