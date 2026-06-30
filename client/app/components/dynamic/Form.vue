@@ -4,6 +4,13 @@ import type { Form, TabsItem, FormSubmitEvent } from '@nuxt/ui'
 import { buildZodSchema } from '~/utils/buildZodSchema'
 import { INLINE_CREATE_DEPTH_KEY } from '~/utils/inlineCreate'
 
+type ActiveProfile = {
+  id_profile: string
+  display_name: string | null
+  username: string
+  email: string
+}
+
 const props = defineProps<{
   entity: string
   recordId?: string
@@ -42,6 +49,11 @@ const {
   seedSelectedRelationOptions
 } = useRelationOptionsCache()
 
+const {
+  seedEntityRecordHandoff,
+  consumeEntityRecordHandoff
+} = useEntityRecordHandoff()
+
 provide(INLINE_CREATE_DEPTH_KEY, 0)
 
 const isEditMode = computed(() => !!props.recordId)
@@ -53,7 +65,7 @@ const systemData = reactive({
   profile_display: null as string | null
 })
 const originalProfileId = ref<string | null>(null)
-const activeProfiles = ref<Array<{ id_profile: string, display_name: string | null, username: string, email: string }>>([])
+const activeProfiles = ref<ActiveProfile[]>([])
 const profileOptions = computed(() => activeProfiles.value.map(profile => ({
   label: profile.display_name || profile.username || profile.email,
   value: profile.id_profile
@@ -192,6 +204,29 @@ function castDefault(field: Field): any {
   return val
 }
 
+function applyRecordState(record: Record<string, any> | null) {
+  seedSelectedRelationOptions(formFields.value, record)
+  initFormState(record)
+  if (!record) return
+
+  systemData.date_created = record.date_created || null
+  systemData.date_updated = record.date_updated || null
+  systemData.id_profile = record.id_profile || undefined
+  originalProfileId.value = systemData.id_profile ?? null
+  systemData.profile_display = record.profile_display || null
+}
+
+async function fetchActiveProfiles() {
+  if (!capabilities.value.change_ownership) return
+  activeProfiles.value = await apiFetch<ActiveProfile[]>('/user/profiles/active')
+}
+
+function fetchActiveProfilesInBackground() {
+  fetchActiveProfiles().catch((err) => {
+    console.error('[DynamicForm] Eroare la incarcarea profilelor active:', err)
+  })
+}
+
 // ─── Incarcarea record-ului (edit mode) ───
 watch(() => schema.value, async (sch) => {
   if (!sch) return
@@ -201,22 +236,25 @@ watch(() => schema.value, async (sch) => {
   })
 
   if (isEditMode.value && props.recordId) {
-    initialLoading.value = true
-    const record = await fetchOne(props.recordId)
-    seedSelectedRelationOptions(formFields.value, record)
-    initFormState(record)
-    if (record) {
-      systemData.date_created = record.date_created || null
-      systemData.date_updated = record.date_updated || null
-      systemData.id_profile = record.id_profile || undefined
-      originalProfileId.value = systemData.id_profile ?? null
-      systemData.profile_display = record.profile_display || null
-      if (capabilities.value.change_ownership) {
-        activeProfiles.value = await apiFetch('/user/profiles/active')
-      }
+    const handedOffRecord = consumeEntityRecordHandoff(props.entity, props.recordId)
+    if (handedOffRecord) {
+      applyRecordState(handedOffRecord)
+      captureInitialState()
+      fetchActiveProfilesInBackground()
+      return
     }
-    captureInitialState()
-    initialLoading.value = false
+
+    initialLoading.value = true
+    try {
+      const record = await fetchOne(props.recordId)
+      applyRecordState(record)
+      await fetchActiveProfiles().catch((err) => {
+        console.error('[DynamicForm] Eroare la incarcarea profilelor active:', err)
+      })
+      captureInitialState()
+    } finally {
+      initialLoading.value = false
+    }
   } else {
     initFormState()
     captureInitialState()
@@ -266,6 +304,8 @@ async function onSubmit(event: FormSubmitEvent<Record<string, unknown>>) {
         if (result.id_profile) {
           systemData.id_profile = result.id_profile
         }
+      } else {
+        seedEntityRecordHandoff(props.entity, result)
       }
       captureInitialState()
 
@@ -351,7 +391,10 @@ function updateFormField(payload: { slug: string, value: any }) {
   formState[payload.slug] = payload.value
 }
 
-const loading = computed(() => schemaLoading.value || initialLoading.value)
+const loading = computed(() =>
+  (schemaLoading.value && !schema.value)
+  || (isEditMode.value && initialLoading.value)
+)
 
 const { visibleActions, executeAction: executeEntityAction } = useEntityActions(computed(() => props.entity))
 const executingAction = ref<string | null>(null)
@@ -499,7 +542,7 @@ onUnmounted(() => {
 
 <template>
   <!-- Loading state -->
-  <div v-if="loading && !schema" class="space-y-6 p-6">
+  <div v-if="loading" class="space-y-6 p-6">
     <USkeleton class="h-8 w-48" />
     <div class="grid grid-cols-3 gap-4">
       <USkeleton v-for="i in 6" :key="i" class="h-10" />
