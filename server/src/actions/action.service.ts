@@ -412,11 +412,15 @@ export class ActionService {
             action.id_workflow,
             this.buildWorkflowInput(action, payload),
           );
+          const normalized = await this.normalizeWorkflowOutput(
+            payload.entityId,
+            collected,
+          );
           if (event !== EntityEvent.BeforeDelete) {
-            Object.assign(payload.data, collected);
+            Object.assign(payload.data, normalized);
           }
           this.logger.log(
-            `Before workflow: ${action.slug} -> ${Object.keys(collected).join(', ')}`,
+            `Before workflow: ${action.slug} -> ${Object.keys(normalized).join(', ')}`,
           );
         } catch (err) {
           const msg = err.message ?? 'Eroare necunoscuta';
@@ -443,6 +447,31 @@ export class ActionService {
         });
       }
     }
+  }
+
+  private async normalizeWorkflowOutput(
+    entityId: string,
+    collected: Record<string, any>,
+  ): Promise<Record<string, any>> {
+    const fields = await this.knex('field')
+      .select('slug', 'column_name')
+      .where('id_entity', entityId);
+
+    const slugToColumn = new Map<string, string>();
+    const columnNames = new Set<string>();
+    for (const field of fields) {
+      slugToColumn.set(field.slug, field.column_name);
+      columnNames.add(field.column_name);
+    }
+
+    const normalized: Record<string, any> = {};
+    for (const [key, value] of Object.entries(collected)) {
+      const columnName = columnNames.has(key) ? key : slugToColumn.get(key);
+      if (!columnName) continue;
+      normalized[columnName] = value;
+    }
+
+    return normalized;
   }
 
   private buildWorkflowInput(
