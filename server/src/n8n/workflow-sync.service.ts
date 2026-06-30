@@ -396,7 +396,7 @@ export class WorkflowSyncService {
           break
         }
         case 'literal':
-          expr += token.value ?? ''
+          expr += this.translateFormulaLiteral(token.value)
           break
         case 'operator':
           expr += ` ${token.value} `
@@ -414,6 +414,15 @@ export class WorkflowSyncService {
   }
 
   // ─── Condition / IF node helpers ───
+
+  private translateFormulaLiteral(value: string | undefined): string {
+    const text = value ?? ''
+    const trimmed = text.trim()
+    if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+      return trimmed
+    }
+    return JSON.stringify(text)
+  }
 
   private translateConditionOperand(
     operand: any,

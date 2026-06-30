@@ -163,6 +163,60 @@ describe('WorkflowSyncService validation nodes', () => {
     expect(forEachNode.parameters.jsCode).toContain('_foreach_index');
   });
 
+  it('citeaza literalurile text din formulele set_data', () => {
+    const service = makeService();
+    const workflow = {
+      name: 'Search name',
+      slug: 'search_name',
+      nodes: [
+        {
+          id: 'start',
+          type: 'start',
+          position: { x: 0, y: 0 },
+          parameters: { entity: 'crm_contact' },
+        },
+        {
+          id: 'company',
+          type: 'app_get_record',
+          position: { x: 250, y: 0 },
+          parameters: { entity: 'crm_company', filters: [] },
+        },
+        {
+          id: 'set_search',
+          type: 'set_data',
+          position: { x: 500, y: 0 },
+          parameters: {
+            assignments: [
+              {
+                key: 'search_name',
+                tokens: [
+                  { type: 'field', sourceNodeId: 'start', fieldSlug: 'cf_nume' },
+                  { type: 'operator', value: '+' },
+                  { type: 'literal', value: ' - ' },
+                  { type: 'operator', value: '+' },
+                  { type: 'field', sourceNodeId: 'company', fieldSlug: 'cf_denumire' },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+      connections: [
+        { source: 'start', target: 'company' },
+        { source: 'company', target: 'set_search' },
+      ],
+    };
+
+    const translated = (service as any).translateToN8n(workflow);
+    const setNode = translated.nodes.find((node: any) => node.id === 'set_search');
+
+    expect(setNode.parameters.values.string).toContainEqual({
+      name: 'search_name',
+      value:
+        `={{$('start').first().json.body.record.cf_nume + " - " + $('company').first().json.data.cf_denumire}}`,
+    });
+  });
+
   it('trimite tenantul curent in headerele requesturilor CRM generate pentru n8n', () => {
     const service = makeService();
     const workflow = {
