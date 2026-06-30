@@ -254,23 +254,25 @@ async function onSubmit(event: FormSubmitEvent<Record<string, unknown>>) {
         return
       }
 
-      for (const field of formFields.value) {
-        if (result[field.column_name] !== undefined) {
-          formState[field.slug] = result[field.column_name]
+      if (isEditMode.value) {
+        for (const field of formFields.value) {
+          if (result[field.column_name] !== undefined) {
+            formState[field.slug] = result[field.column_name]
+          }
+        }
+        if (result.date_updated) {
+          systemData.date_updated = result.date_updated
+        }
+        if (result.id_profile) {
+          systemData.id_profile = result.id_profile
         }
       }
-      if (result.date_updated) {
-        systemData.date_updated = result.date_updated
-      }
-      if (result.id_profile) {
-        systemData.id_profile = result.id_profile
-      }
+      captureInitialState()
 
       toast.add({
         title: isEditMode.value ? 'Actualizat cu succes' : 'Creat cu succes',
         color: 'success'
       })
-      captureInitialState()
       bypassNextNavigationGuard()
       emit('saved', result)
     } else {
