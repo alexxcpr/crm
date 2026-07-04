@@ -15,14 +15,22 @@ const emit = defineEmits<{
 // ─── Inline-create ───
 const inlineCreateDepth = inject(INLINE_CREATE_DEPTH_KEY, 0)
 const entitySlug = computed(() => props.field.relation_entity_slug)
+const selectedRecordId = computed(() => props.modelValue ? String(props.modelValue) : '')
 const showInlineCreate = computed(() =>
   inlineCreateDepth <= MAX_INLINE_CREATE_DEPTH
   && !!entitySlug.value
   && !props.disabled
+  && !selectedRecordId.value
 )
 const inlineCreateOpen = ref(false)
 // entitySlug garantat non-null când showInlineCreate e true (verificat de v-if)
 const inlineCreateEntitySlug = computed(() => entitySlug.value!)
+const inlineEditOpen = ref(false)
+const showInlineEdit = computed(() =>
+  inlineCreateDepth <= MAX_INLINE_CREATE_DEPTH
+  && !!entitySlug.value
+  && !!selectedRecordId.value
+)
 
 const {
   getRelationOptions,
@@ -66,6 +74,10 @@ function onInlineCreated(record: Record<string, unknown>) {
   upsertRelationOption(props.field, record)
   searchQuery.value = ''
   emit('update:modelValue', String(record.id))
+}
+
+function onInlineSaved(record: Record<string, unknown>) {
+  upsertRelationOption(props.field, record)
 }
 
 function refreshOptions(search?: string, background = false) {
@@ -123,6 +135,16 @@ function onUpdate(val: string | string[] | undefined) {
         @update:search-term="onSearch"
       />
       <UButton
+        v-if="showInlineEdit"
+        icon="i-lucide-arrow-up-right"
+        color="primary"
+        variant="soft"
+        size="sm"
+        class="shrink-0"
+        :title="`Deschide ${field.name.toLowerCase()}`"
+        @click="inlineEditOpen = true"
+      />
+      <UButton
         v-if="showInlineCreate"
         icon="i-lucide-plus"
         color="primary"
@@ -140,6 +162,16 @@ function onUpdate(val: string | string[] | undefined) {
       :entity-slug="inlineCreateEntitySlug"
       :entity-label="field.name"
       @created="onInlineCreated"
+    />
+
+    <DynamicInlineEditModal
+      v-if="showInlineEdit && entitySlug"
+      :key="selectedRecordId"
+      v-model:open="inlineEditOpen"
+      :entity-slug="entitySlug"
+      :entity-label="field.name"
+      :record-id="selectedRecordId"
+      @saved="onInlineSaved"
     />
   </div>
 </template>
