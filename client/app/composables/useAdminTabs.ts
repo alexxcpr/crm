@@ -6,7 +6,7 @@ interface ApiResponse<T> {
   cod: number
 }
 
-export function useAdminTabs(entityId: MaybeRef<string>) {
+export function useAdminTabs(entityId: MaybeRef<string>, entitySlug?: MaybeRef<string | null | undefined>) {
   const { apiFetch } = useApi()
 
   const tabs = ref<AdminTab[]>([])
@@ -15,6 +15,13 @@ export function useAdminTabs(entityId: MaybeRef<string>) {
 
   function basePath() {
     return `/v1/admin/entities/${toValue(entityId)}/tabs`
+  }
+
+  function invalidateEntitySchema() {
+    const slug = entitySlug ? toValue(entitySlug) : null
+    if (slug) {
+      clearEntitySchemaCache(slug)
+    }
   }
 
   async function fetchTabs() {
@@ -52,6 +59,7 @@ export function useAdminTabs(entityId: MaybeRef<string>) {
         method: 'POST',
         body: payload
       })
+      invalidateEntitySchema()
       await fetchTabs()
       return response.data
     } catch (err: any) {
@@ -72,6 +80,7 @@ export function useAdminTabs(entityId: MaybeRef<string>) {
         method: 'PUT',
         body: payload
       })
+      invalidateEntitySchema()
       await fetchTabs()
       return response.data
     } catch (err: any) {
@@ -89,6 +98,7 @@ export function useAdminTabs(entityId: MaybeRef<string>) {
 
     try {
       await apiFetch(`${basePath()}/${tabId}`, { method: 'DELETE' })
+      invalidateEntitySchema()
       await fetchTabs()
       return true
     } catch (err: any) {
@@ -109,6 +119,7 @@ export function useAdminTabs(entityId: MaybeRef<string>) {
         method: 'DELETE',
         body: { ids }
       })
+      invalidateEntitySchema()
       await fetchTabs()
       return (res as any).mesaj ?? null
     } catch (err: any) {

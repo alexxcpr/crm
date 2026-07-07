@@ -5,6 +5,7 @@ import type { AdminEntity, FieldPayload, UpdateFieldPayload } from '~/types/admi
 
 const props = defineProps<{
   entityId: string
+  entitySlug?: string | null
   field?: Field | null
   entities: AdminEntity[]
   tabs: UiTab[]
@@ -17,7 +18,7 @@ const emit = defineEmits<{
 
 const isEdit = computed(() => !!props.field)
 const toast = useToast()
-const { createField, updateField, error } = useAdminFields(props.entityId)
+const { createField, updateField, error } = useAdminFields(props.entityId, computed(() => props.entitySlug))
 const { apiFetch } = useApi()
 
 // ─── data_type → ui_type mapping ───

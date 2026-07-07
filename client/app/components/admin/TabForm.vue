@@ -5,6 +5,7 @@ import type { FormSubmitEvent } from '@nuxt/ui'
 
 const props = defineProps<{
   entityId: string
+  entitySlug?: string | null
   tab?: AdminTab | null
 }>()
 
@@ -50,7 +51,7 @@ watch(() => state.name, (name) => {
 })
 
 const submitting = ref(false)
-const { createTab, updateTab, error } = useAdminTabs(props.entityId)
+const { createTab, updateTab, error } = useAdminTabs(props.entityId, computed(() => props.entitySlug))
 const toast = useToast()
 
 async function onSubmit(event: FormSubmitEvent<Schema>) {

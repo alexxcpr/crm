@@ -7,15 +7,16 @@ const router = useRouter()
 const toast = useToast()
 
 const entityId = computed(() => route.params.id as string)
+const entity = ref<AdminEntity | null>(null)
+const entitySlug = computed(() => entity.value?.slug ?? null)
 
 // ─── Data loading ───
 const { fetchEntity } = useAdminEntities()
-const { fields, loading: fieldsLoading, fetchFields, deleteField, error: fieldsError } = useAdminFields(entityId)
+const { fields, loading: fieldsLoading, fetchFields, deleteField, error: fieldsError } = useAdminFields(entityId, entitySlug)
 const { modules, fetchModules } = useAdminModules()
 const { entities, fetchEntities } = useAdminEntities()
-const { tabs, loading: tabsLoading, fetchTabs, deleteTab, error: tabsError } = useAdminTabs(entityId)
+const { tabs, loading: tabsLoading, fetchTabs, deleteTab, error: tabsError } = useAdminTabs(entityId, entitySlug)
 
-const entity = ref<AdminEntity | null>(null)
 const pageLoading = ref(true)
 
 async function loadData() {
@@ -357,6 +358,7 @@ function getModuleName(moduleId: string | null): string {
         <template #body>
           <AdminFieldForm
             :entity-id="entityId"
+            :entity-slug="entitySlug"
             :field="editingField"
             :entities="entities"
             :tabs="tabOptions"
@@ -403,6 +405,7 @@ function getModuleName(moduleId: string | null): string {
         <template #body>
           <AdminTabForm
             :entity-id="entityId"
+            :entity-slug="entitySlug"
             :tab="editingTab"
             @saved="onTabSaved"
             @cancel="showTabModal = false"

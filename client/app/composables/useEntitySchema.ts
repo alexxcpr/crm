@@ -9,10 +9,12 @@ export function clearEntitySchemaCache(key?: string) {
         schemaCache.delete(cacheKey)
       }
     }
+    clearNuxtState(`schema-${key}`)
     return
   }
 
   schemaCache.clear()
+  clearNuxtState(key => key.startsWith('schema-'))
 }
 
 export function useEntitySchema(entitySlug: MaybeRef<string>) {

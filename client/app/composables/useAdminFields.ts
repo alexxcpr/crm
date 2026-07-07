@@ -7,7 +7,7 @@ interface ApiResponse<T> {
   cod: number
 }
 
-export function useAdminFields(entityId: MaybeRef<string>) {
+export function useAdminFields(entityId: MaybeRef<string>, entitySlug?: MaybeRef<string | null | undefined>) {
   const { apiFetch } = useApi()
 
   const fields = ref<Field[]>([])
@@ -16,6 +16,13 @@ export function useAdminFields(entityId: MaybeRef<string>) {
 
   function basePath() {
     return `/v1/admin/entities/${toValue(entityId)}/fields`
+  }
+
+  function invalidateEntitySchema() {
+    const slug = entitySlug ? toValue(entitySlug) : null
+    if (slug) {
+      clearEntitySchemaCache(slug)
+    }
   }
 
   async function fetchFields() {
@@ -53,6 +60,7 @@ export function useAdminFields(entityId: MaybeRef<string>) {
         method: 'POST',
         body: payload
       })
+      invalidateEntitySchema()
       await fetchFields()
       return response.data
     } catch (err: any) {
@@ -73,6 +81,7 @@ export function useAdminFields(entityId: MaybeRef<string>) {
         method: 'PUT',
         body: payload
       })
+      invalidateEntitySchema()
       await fetchFields()
       return response.data
     } catch (err: any) {
@@ -90,6 +99,7 @@ export function useAdminFields(entityId: MaybeRef<string>) {
 
     try {
       await apiFetch(`${basePath()}/${fieldId}`, { method: 'DELETE' })
+      invalidateEntitySchema()
       await fetchFields()
       return true
     } catch (err: any) {
