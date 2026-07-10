@@ -43,7 +43,8 @@ function openEditMenu(menu: AdminMenu) {
   showMenuModal.value = true
 }
 
-function onMenuSaved(menu: AdminMenu) {
+async function onMenuSaved(menu: AdminMenu) {
+  await fetchMenus()
   selectedMenuId.value = menu.id_menu
   showMenuModal.value = false
   editingMenu.value = null
@@ -63,7 +64,8 @@ function openEditItem(item: AdminMenuItem) {
   showItemModal.value = true
 }
 
-function onItemSaved() {
+async function onItemSaved() {
+  await fetchMenus()
   showItemModal.value = false
   editingItem.value = null
 }

@@ -10,9 +10,9 @@ export function useAdminMenus() {
   const { apiFetch } = useApi()
   const { fetchNavigation } = useNavigation()
 
-  const menus = ref<AdminMenu[]>([])
-  const loading = ref(false)
-  const error = ref<string | null>(null)
+  const menus = useState<AdminMenu[]>('admin-menus', () => [])
+  const loading = useState('admin-menus-loading', () => false)
+  const error = useState<string | null>('admin-menus-error', () => null)
 
   async function refreshSidebar() {
     await fetchNavigation()
