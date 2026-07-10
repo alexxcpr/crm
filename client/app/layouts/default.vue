@@ -3,12 +3,17 @@ const open = ref(false)
 
 const { staticLinks, entityLinks, bottomLinks } = useNavigation()
 
+function closeOnSelect(link: any): any {
+  return {
+    ...link,
+    onSelect: () => { open.value = false },
+    children: link.children?.map(closeOnSelect)
+  }
+}
+
 const mainLinks = computed(() => [
   ...staticLinks,
-  ...entityLinks.value.map(link => ({
-    ...link,
-    onSelect: () => { open.value = false }
-  }))
+  ...entityLinks.value.map(closeOnSelect)
 ])
 
 const groups = computed(() => [{

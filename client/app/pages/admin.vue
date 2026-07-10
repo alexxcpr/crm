@@ -7,6 +7,10 @@ const links = [[{
   to: '/admin/modules',
   exact: true
 }, {
+  label: 'Meniuri',
+  icon: 'i-lucide-list-tree',
+  to: '/admin/menus'
+}, {
   label: 'Entitati',
   icon: 'i-lucide-database',
   to: '/admin/entities'

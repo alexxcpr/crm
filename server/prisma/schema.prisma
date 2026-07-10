@@ -77,6 +77,40 @@ model Module {
   @@map("module")                                  // Numele real al tabelei in Postgres va fi "module", nu "Module"
 }
 
+model Menu {
+  id_menu       String     @id @default(uuid())
+  name          String     @db.VarChar(100)
+  icon          String?    @db.VarChar(50)
+  rank          Int        @default(0)
+  is_active     Boolean    @default(true)
+  date_created  DateTime   @default(now())
+  date_updated  DateTime   @updatedAt
+
+  items         MenuItem[]
+
+  @@map("menu")
+}
+
+model MenuItem {
+  id_menu_item  String    @id @default(uuid())
+  id_menu       String
+  name          String    @db.VarChar(100)
+  icon          String?   @db.VarChar(50)
+  rank          Int       @default(0)
+  open_link     String    @db.VarChar(500)
+  link_type     String    @default("internal_route") @db.VarChar(50)
+  id_entity     String?
+  record_id     String?
+  is_active     Boolean   @default(true)
+  date_created  DateTime  @default(now())
+  date_updated  DateTime  @updatedAt
+
+  menu          Menu      @relation(fields: [id_menu], references: [id_menu], onDelete: Cascade)
+  entity        Entity?   @relation(fields: [id_entity], references: [id_entity], onDelete: SetNull)
+
+  @@map("menu_item")
+}
+
 model Entity {
   id_entity       String    @id @default(uuid())      // PK
   id_module       String?                             // FK catre module.id_module - optional, permite entitati fara modul
@@ -106,6 +140,7 @@ model Entity {
   // atunci "companies.relation_fields" va contine acel camp
 
   permissions    RolePermission[]
+  menu_items     MenuItem[]
 
   @@map("entity")
 }

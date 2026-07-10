@@ -136,3 +136,52 @@ export interface UpdateTabPayload {
   slug?: string
   rank?: number
 }
+
+// ─── Menu ───
+
+export type MenuLinkType = 'entity_list' | 'entity_create' | 'entity_record' | 'internal_route' | 'external_url'
+
+export interface AdminMenuItem {
+  id_menu_item: string
+  id_menu: string
+  name: string
+  icon: string | null
+  rank: number
+  open_link: string
+  link_type: MenuLinkType
+  id_entity: string | null
+  record_id: string | null
+  is_active: boolean
+  date_created: string
+  date_updated: string
+}
+
+export interface AdminMenu {
+  id_menu: string
+  name: string
+  icon: string | null
+  rank: number
+  is_active: boolean
+  date_created: string
+  date_updated: string
+  items?: AdminMenuItem[]
+  _count?: { items: number }
+}
+
+export interface MenuPayload {
+  name: string
+  icon?: string
+  rank?: number
+  is_active?: boolean
+}
+
+export interface MenuItemPayload {
+  name: string
+  icon?: string
+  rank?: number
+  open_link: string
+  link_type: MenuLinkType
+  id_entity?: string
+  record_id?: string
+  is_active?: boolean
+}
