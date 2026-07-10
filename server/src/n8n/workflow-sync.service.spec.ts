@@ -299,6 +299,114 @@ describe('WorkflowSyncService validation nodes', () => {
     });
   });
 
+  it('converteste campurile numerice din formulele set_data in numere', () => {
+    const service = makeService();
+    const workflow = {
+      name: 'Sold',
+      slug: 'sold',
+      nodes: [
+        {
+          id: 'start',
+          type: 'start',
+          position: { x: 0, y: 0 },
+          parameters: { entity: 'venit' },
+        },
+        {
+          id: 'sold',
+          type: 'app_get_record',
+          position: { x: 250, y: 0 },
+          parameters: { entity: 'sold', filters: [], limit: 1 },
+        },
+        {
+          id: 'calc_sold',
+          type: 'set_data',
+          position: { x: 500, y: 0 },
+          parameters: {
+            assignments: [
+              {
+                key: 'cf_sold',
+                tokens: [
+                  { type: 'field', sourceNodeId: 'sold', fieldSlug: 'cf_sold', dataType: 'numeric' },
+                  { type: 'operator', value: '+' },
+                  { type: 'field', sourceNodeId: 'start', fieldSlug: 'cf_suma', dataType: 'numeric' },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+      connections: [
+        { source: 'start', target: 'sold' },
+        { source: 'sold', target: 'calc_sold' },
+      ],
+    };
+
+    const translated = (service as any).translateToN8n(workflow);
+    const setNode = translated.nodes.find((node: any) => node.id === 'calc_sold');
+
+    expect(setNode.parameters.values.string).toContainEqual({
+      name: 'cf_sold',
+      value:
+        `={{Number($('sold').first().json.data.cf_sold ?? 0) + Number($('start').first().json.body.record.cf_suma ?? 0)}}`,
+    });
+  });
+
+  it('formateaza campurile decimal cu doua zecimale in formule text', () => {
+    const service = makeService();
+    const workflow = {
+      name: 'Mesaj sold',
+      slug: 'mesaj_sold',
+      nodes: [
+        {
+          id: 'start',
+          type: 'start',
+          position: { x: 0, y: 0 },
+          parameters: { entity: 'cheltuiala' },
+        },
+        {
+          id: 'sold',
+          type: 'app_get_record',
+          position: { x: 250, y: 0 },
+          parameters: { entity: 'sold', filters: [], limit: 1 },
+        },
+        {
+          id: 'message',
+          type: 'set_data',
+          position: { x: 500, y: 0 },
+          parameters: {
+            assignments: [
+              {
+                key: 'mesaj',
+                tokens: [
+                  { type: 'literal', value: 'Soldul este ' },
+                  { type: 'operator', value: '+' },
+                  { type: 'field', sourceNodeId: 'sold', fieldSlug: 'cf_sold', dataType: 'numeric' },
+                  { type: 'operator', value: '+' },
+                  { type: 'literal', value: ' lei. Cheltuieli totale pentru luna: ' },
+                  { type: 'operator', value: '+' },
+                  { type: 'field', sourceNodeId: 'start', fieldSlug: 'cf_luna', dataType: 'varchar' },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+      connections: [
+        { source: 'start', target: 'sold' },
+        { source: 'sold', target: 'message' },
+      ],
+    };
+
+    const translated = (service as any).translateToN8n(workflow);
+    const setNode = translated.nodes.find((node: any) => node.id === 'message');
+
+    expect(setNode.parameters.values.string).toContainEqual({
+      name: 'mesaj',
+      value:
+        `={{"Soldul este " + Number($('sold').first().json.data.cf_sold ?? 0).toFixed(2) + " lei. Cheltuieli totale pentru luna: " + $('start').first().json.body.record.cf_luna}}`,
+    });
+  });
+
   it('genereaza filtre null-safe cand valoarea vine dintr-un nod care poate intoarce data null', () => {
     const service = makeService();
     const workflow = {

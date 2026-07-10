@@ -88,7 +88,8 @@ const fieldSelectOptions = computed(() =>
   fieldOptions.value.map(f => ({
     label: `${f.name} (${f.column_name})`,
     value: f.column_name,
-    fieldLabel: f.name
+    fieldLabel: f.name,
+    dataType: f.data_type
   }))
 )
 
@@ -124,12 +125,14 @@ async function onPickSource(nodeId: string) {
 function onPickField(columnName: string, fieldLabel?: string) {
   if (activeIndex.value === null) return
   const ds = props.dataSources.find(s => s.nodeId === pickSourceNodeId.value)
+  const field = fieldOptions.value.find(f => f.column_name === columnName)
   addToken(activeIndex.value, {
     type: 'field',
     sourceNodeId: pickSourceNodeId.value,
     fieldSlug: columnName,
-    fieldLabel: fieldLabel ?? columnName,
-    sourceLabel: ds?.label ?? pickSourceNodeId.value
+    fieldLabel: fieldLabel ?? field?.name ?? columnName,
+    sourceLabel: ds?.label ?? pickSourceNodeId.value,
+    dataType: field?.data_type
   })
   closePickers()
 }

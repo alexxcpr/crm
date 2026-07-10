@@ -83,6 +83,33 @@ async function enrichBeforeSave(exported: { nodes: any[], connections: any[] }):
   await Promise.all(fetchPromises)
 
   const enrichedNodes = exported.nodes.map((node) => {
+    if (node.type === 'set_data') {
+      const assignments = (node.parameters?.assignments ?? []).map((assignment: any) => ({
+        ...assignment,
+        tokens: (assignment.tokens ?? []).map((token: any) => {
+          if (token.type !== 'field' || !token.sourceNodeId || !token.fieldSlug) return token
+
+          const source = dataSources.value.find(ds => ds.nodeId === token.sourceNodeId)
+          const field = source?.fields.find(f => f.column_name === token.fieldSlug)
+          if (!field) return token
+
+          return {
+            ...token,
+            fieldLabel: token.fieldLabel ?? field.name,
+            dataType: token.dataType ?? field.data_type
+          }
+        })
+      }))
+
+      return {
+        ...node,
+        parameters: {
+          ...node.parameters,
+          assignments
+        }
+      }
+    }
+
     if (node.type !== 'app_get_related') return node
     if (!node.parameters) return node
 

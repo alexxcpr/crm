@@ -6,6 +6,7 @@ export interface FormulaToken {
   fieldSlug?: string
   fieldLabel?: string
   sourceLabel?: string
+  dataType?: string
   value?: string
 }
 

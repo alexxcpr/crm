@@ -44,6 +44,7 @@ interface FormulaToken {
   fieldSlug?: string;
   fieldLabel?: string;
   sourceLabel?: string;
+  dataType?: string;
   value?: string;
 }
 
@@ -409,11 +410,12 @@ export class WorkflowSyncService {
     allNodes: NodeDefinition[],
     itemNodeIds: Set<string>,
   ): string {
+    const formatDecimalsForText = this.formulaProducesText(tokens)
     let expr = '={{'
     for (const token of tokens) {
       switch (token.type) {
         case 'field': {
-          expr += `${this.nodeOutputJsonPath(token.sourceNodeId!, allNodes, itemNodeIds)}.${token.fieldSlug}`
+          expr += this.translateFormulaField(token, allNodes, itemNodeIds, formatDecimalsForText)
           break
         }
         case 'literal':
@@ -443,6 +445,42 @@ export class WorkflowSyncService {
       return trimmed
     }
     return JSON.stringify(text)
+  }
+
+  private translateFormulaField(
+    token: FormulaToken,
+    allNodes: NodeDefinition[],
+    itemNodeIds: Set<string>,
+    formatDecimalsForText: boolean,
+  ): string {
+    const path = `${this.nodeOutputJsonPath(token.sourceNodeId!, allNodes, itemNodeIds)}.${token.fieldSlug}`
+    if (token.dataType === 'numeric' && formatDecimalsForText) {
+      return `Number(${path} ?? 0).toFixed(2)`
+    }
+    if (this.isNumericFormulaDataType(token.dataType)) {
+      return `Number(${path} ?? 0)`
+    }
+    return path
+  }
+
+  private formulaProducesText(tokens: FormulaToken[]): boolean {
+    return tokens.some((token) => {
+      if (token.type === 'literal') {
+        return !this.isNumericFormulaLiteral(token.value)
+      }
+      if (token.type === 'field' && token.dataType) {
+        return !this.isNumericFormulaDataType(token.dataType)
+      }
+      return false
+    })
+  }
+
+  private isNumericFormulaDataType(dataType: string | undefined): boolean {
+    return dataType === 'integer' || dataType === 'numeric'
+  }
+
+  private isNumericFormulaLiteral(value: string | undefined): boolean {
+    return /^-?\d+(\.\d+)?$/.test((value ?? '').trim())
   }
 
   private translateConditionOperand(
