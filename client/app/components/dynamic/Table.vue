@@ -3,6 +3,7 @@ import type { TableColumn } from '@nuxt/ui'
 import type { Field } from '~/types/schema'
 import type { ColumnFilters, FilterCondition } from '~/types/filters'
 import { buildApiFilters, countActiveFilterConditions, summarizeFilterConditions } from '~/utils/filterOperators'
+import { parseDashboardRouteFilters } from '~/utils/dashboardDrilldown'
 import { upperFirst } from 'scule'
 
 const props = defineProps<{
@@ -15,6 +16,7 @@ const emit = defineEmits<{
 }>()
 
 const toast = useToast()
+const route = useRoute()
 const table = useTemplateRef('table')
 const { getRelationOptionLabel } = useRelationOptionsCache()
 
@@ -48,7 +50,7 @@ const {
 const currentPage = ref(1)
 const pageSize = ref(25)
 const currentSort = ref('-date_created')
-const filters = ref<ColumnFilters>({})
+const filters = ref<ColumnFilters>(parseDashboardRouteFilters(route.query as Record<string, unknown>))
 const rowSelection = ref<Record<string, boolean>>({})
 
 const error = computed(() => schemaError.value || dataError.value)

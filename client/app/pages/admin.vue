@@ -15,6 +15,10 @@ const links = [[{
   icon: 'i-lucide-database',
   to: '/admin/entities'
 }, {
+  label: 'Dashboard-uri',
+  icon: 'i-lucide-layout-dashboard',
+  to: '/admin/dashboards'
+}, {
   label: 'Securitate',
   icon: 'i-lucide-shield-check',
   to: '/admin/security'

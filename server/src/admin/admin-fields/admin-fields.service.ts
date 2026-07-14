@@ -241,6 +241,22 @@ export class AdminFieldsService {
       );
     }
 
+    const dashboardUsage = await this.knex('ui_widget as widget')
+      .join('ui_block as block', 'block.id_ui_block', 'widget.id_ui_block')
+      .join('ui_dashboard as dashboard', 'dashboard.id_ui_dashboard', 'block.id_ui_dashboard')
+      .where((builder) => builder
+        .where('widget.id_value_field', fieldId)
+        .orWhere('widget.id_group_field', fieldId)
+        .orWhere('widget.id_series_field', fieldId)
+        .orWhere('widget.id_date_field', fieldId))
+      .select('widget.title as widget_title', 'dashboard.name as dashboard_name')
+      .first();
+    if (dashboardUsage) {
+      throw new BadRequestException(
+        `Campul "${field.name}" este folosit de widget-ul "${dashboardUsage.widget_title}" din dashboard-ul "${dashboardUsage.dashboard_name}". Elimina mai intai widget-ul sau schimba sursa lui de date.`,
+      );
+    }
+
     await this.dynamicSchema.removeColumn(entity, field);
 
     await this.knex('field').where('id_field', fieldId).del();

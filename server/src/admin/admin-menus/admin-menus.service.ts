@@ -136,6 +136,17 @@ export class AdminMenusService {
     if (dto.link_type === 'entity_record' && !dto.record_id) {
       throw new BadRequestException('ID-ul inregistrarii este obligatoriu pentru linkurile catre inregistrari.');
     }
+
+    if (dto.link_type === 'dashboard') {
+      if (!dto.id_ui_dashboard) throw new BadRequestException('Dashboard-ul este obligatoriu pentru acest tip de link.');
+      const dashboard = await this.knex('ui_dashboard')
+        .where({ id_ui_dashboard: dto.id_ui_dashboard, is_active: true })
+        .first();
+      if (!dashboard) throw new BadRequestException('Dashboard-ul selectat nu exista sau este inactiv.');
+      if (openLink !== `/dashboards/${dashboard.slug}`) {
+        throw new BadRequestException('Link-ul dashboard-ului nu corespunde dashboard-ului selectat.');
+      }
+    }
   }
 
   private validateExternalUrl(openLink: string) {
@@ -172,6 +183,7 @@ export class AdminMenusService {
       link_type: dto.link_type,
       id_entity: dto.id_entity || null,
       record_id: dto.record_id || null,
+      id_ui_dashboard: dto.id_ui_dashboard || null,
       is_active: dto.is_active ?? true,
     };
   }

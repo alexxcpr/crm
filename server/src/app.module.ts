@@ -15,6 +15,7 @@ import { HealthModule } from './health/health.module';
 import { SecurityModule } from './security/security.module';
 import { BillingModule } from './billing/billing.module';
 import { NavigationModule } from './navigation/navigation.module';
+import { DashboardModule } from './dashboards/dashboard.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { NavigationModule } from './navigation/navigation.module';
     DynamicDataModule,
     SchemaModule,
     NavigationModule,
+    DashboardModule,
     AdminModule,
     BillingModule,
     ActionsModule,

@@ -139,7 +139,7 @@ export interface UpdateTabPayload {
 
 // ─── Menu ───
 
-export type MenuLinkType = 'entity_list' | 'entity_create' | 'entity_record' | 'internal_route' | 'external_url'
+export type MenuLinkType = 'entity_list' | 'entity_create' | 'entity_record' | 'dashboard' | 'internal_route' | 'external_url'
 
 export interface AdminMenuItem {
   id_menu_item: string
@@ -151,6 +151,7 @@ export interface AdminMenuItem {
   link_type: MenuLinkType
   id_entity: string | null
   record_id: string | null
+  id_ui_dashboard: string | null
   is_active: boolean
   date_created: string
   date_updated: string
@@ -183,5 +184,6 @@ export interface MenuItemPayload {
   link_type: MenuLinkType
   id_entity?: string
   record_id?: string
+  id_ui_dashboard?: string
   is_active?: boolean
 }

@@ -14,6 +14,7 @@ export const MENU_LINK_TYPES = [
   'entity_list',
   'entity_create',
   'entity_record',
+  'dashboard',
   'internal_route',
   'external_url',
 ] as const;
@@ -72,6 +73,10 @@ export class MenuItemDto {
   @IsOptional()
   @IsUUID()
   record_id?: string;
+
+  @IsOptional()
+  @IsUUID()
+  id_ui_dashboard?: string;
 
   @IsOptional()
   @IsBoolean()

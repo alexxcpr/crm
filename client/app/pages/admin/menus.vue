@@ -11,9 +11,15 @@ const {
   deleteMenuItem
 } = useAdminMenus()
 const { entities, fetchEntities } = useAdminEntities()
+const { dashboards, fetchDashboards } = useAdminDashboards()
+const { hasFeature } = useFeatures()
 const toast = useToast()
 
-await Promise.all([fetchMenus(), fetchEntities()])
+await Promise.all([
+  fetchMenus(),
+  fetchEntities(),
+  hasFeature('reportsDashboards') ? fetchDashboards() : Promise.resolve()
+])
 
 const selectedMenuId = ref(menus.value[0]?.id_menu ?? '')
 const selectedMenu = computed(() => menus.value.find(menu => menu.id_menu === selectedMenuId.value) ?? null)
@@ -165,6 +171,7 @@ const linkTypeLabels: Record<string, string> = {
   entity_list: 'Lista',
   entity_create: 'Create',
   entity_record: 'Record',
+  dashboard: 'Dashboard',
   internal_route: 'Intern',
   external_url: 'Extern'
 }
@@ -369,6 +376,7 @@ const linkTypeLabels: Record<string, string> = {
           :menu-id="selectedMenu.id_menu"
           :item="editingItem"
           :entities="entities"
+          :dashboards="dashboards"
           @saved="onItemSaved"
           @cancel="showItemModal = false"
         />
