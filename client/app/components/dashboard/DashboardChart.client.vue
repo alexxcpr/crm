@@ -29,7 +29,18 @@ type ChartRow = {
 
 const cardRef = useTemplateRef<HTMLElement | null>('cardRef')
 const { width } = useElementSize(cardRef)
-const palette = ['#7c3aed', '#2563eb', '#0891b2', '#059669', '#ca8a04', '#ea580c', '#dc2626', '#db2777']
+// Keep every chart in sync with the primary color selected in Theme.
+// Extra series/categories use adaptive shades of the same theme color.
+const primaryPalette = [
+  'var(--ui-primary)',
+  'color-mix(in oklab, var(--ui-primary) 82%, var(--ui-bg))',
+  'color-mix(in oklab, var(--ui-primary) 82%, var(--ui-text))',
+  'color-mix(in oklab, var(--ui-primary) 64%, var(--ui-bg))',
+  'color-mix(in oklab, var(--ui-primary) 64%, var(--ui-text))',
+  'color-mix(in oklab, var(--ui-primary) 46%, var(--ui-bg))',
+  'color-mix(in oklab, var(--ui-primary) 46%, var(--ui-text))',
+  'color-mix(in oklab, var(--ui-primary) 30%, var(--ui-bg))'
+]
 const dateFormatter = new Intl.DateTimeFormat('ro-RO', {
   day: '2-digit',
   month: '2-digit',
@@ -92,7 +103,7 @@ const rows = computed<ChartRow[]>(() => {
 const donutData = computed(() => props.result.series[0]?.points ?? [])
 const x = (_: ChartRow, index: number) => index
 const y = computed(() => props.result.series.map((_, seriesIndex) => (row: ChartRow) => row.values[seriesIndex] ?? 0))
-const colors = computed(() => props.result.series.map((_, index) => palette[index % palette.length]))
+const colors = computed(() => props.result.series.map((_, index) => primaryPalette[index % primaryPalette.length]))
 const donutEvents = computed(() => ({
   [VisDonutSelectors.segment]: {
     click: (arc: { data: DashboardChartPoint }) => openPoint(arc.data)
@@ -135,7 +146,7 @@ function openPoint(point?: DashboardChartPoint) {
     <VisSingleContainer v-if="result.chartType === 'donut'" :data="donutData" class="h-80">
       <VisDonut
         :value="(point: DashboardChartPoint) => point.value"
-        :color="(_: DashboardChartPoint, index: number) => palette[index % palette.length]"
+        :color="(_: DashboardChartPoint, index: number) => primaryPalette[index % primaryPalette.length]"
         :central-label="formatValue(donutData.reduce((total, point) => total + point.value, 0))"
         central-sub-label="Total"
         :arc-width="32"
@@ -171,7 +182,7 @@ function openPoint(point?: DashboardChartPoint) {
         v-else
         :x="x"
         :y="y"
-        :color="(_: ChartRow, index: number) => palette[index % palette.length]"
+        :color="(_: ChartRow, index: number) => primaryPalette[index % primaryPalette.length]"
         :rounded-corners="4"
         :events="barEvents"
         cursor="pointer"
@@ -184,7 +195,7 @@ function openPoint(point?: DashboardChartPoint) {
 
     <div v-if="result.series.length > 1" class="mt-3 flex flex-wrap gap-3 text-xs text-muted">
       <span v-for="(series, index) in result.series" :key="series.key" class="flex items-center gap-1.5">
-        <span class="size-2.5 rounded-full" :style="{ backgroundColor: palette[index % palette.length] }" />
+        <span class="size-2.5 rounded-full" :style="{ backgroundColor: primaryPalette[index % primaryPalette.length] }" />
         {{ seriesLabel(series) }}
       </span>
     </div>

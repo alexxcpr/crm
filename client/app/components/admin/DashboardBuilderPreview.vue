@@ -43,7 +43,7 @@ defineProps<{
             <div v-if="widget.comparison_enabled" class="mt-2 h-4 w-24 rounded bg-elevated" />
           </div>
 
-          <div v-else-if="widget.chart_type === 'donut'" class="mx-auto mt-5 size-32 rounded-full bg-[conic-gradient(var(--ui-primary)_0_42%,var(--ui-color-info-500)_42%_72%,var(--ui-bg-elevated)_72%)] p-7">
+          <div v-else-if="widget.chart_type === 'donut'" class="dashboard-preview-donut mx-auto mt-5 size-32 rounded-full p-7">
             <div class="size-full rounded-full bg-default" />
           </div>
 
@@ -68,6 +68,13 @@ defineProps<{
 </template>
 
 <style scoped>
+.dashboard-preview-donut {
+  background: conic-gradient(
+    var(--ui-primary) 0 42%,
+    color-mix(in oklab, var(--ui-primary) 72%, var(--ui-bg)) 42% 72%,
+    color-mix(in oklab, var(--ui-primary) 42%, var(--ui-bg)) 72%
+  );
+}
 .dashboard-preview-widget {
   grid-column: 1 / -1;
 }
