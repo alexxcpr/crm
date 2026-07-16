@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -47,6 +47,22 @@ interface FormulaToken {
   dataType?: string;
   value?: string;
 }
+
+interface NotificationRecipient {
+  sourceType: 'static' | 'node_output';
+  profileId?: string;
+  sourceNodeId?: string;
+  sourceFieldSlug?: string;
+}
+
+interface TextTemplateToken {
+  type: 'literal' | 'field';
+  value?: string;
+  sourceNodeId?: string;
+  fieldSlug?: string;
+}
+
+const MAX_NOTIFICATION_DELAY_MS = 30 * 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class WorkflowSyncService {
@@ -211,7 +227,7 @@ export class WorkflowSyncService {
           tenant: this.tenantContext.slug,
           dbName: this.tenantContext.dbName,
           purpose: 'workflow',
-        }, { expiresIn: '15m' })
+        }, { expiresIn: '31d' })
       : null;
     const result = await this.n8nClient.executeWebhook(webhookPath, { ...inputData, workflowToken }, n8nId);
 
@@ -604,6 +620,7 @@ export class WorkflowSyncService {
     const startEntitySlug = startNode?.parameters?.entity ?? '';
     const startNodeId = startNode?.id ?? '';
     const itemNodeIds = this.computeItemNodeIds(nodes, connections);
+    this.validateNotificationDelays(nodes, connections);
 
     const n8nNodes = nodes.map((node, index) =>
       this.translateNode(node, index, tenantSlug, startEntitySlug, startNodeId, nodes, itemNodeIds),
@@ -662,6 +679,7 @@ export class WorkflowSyncService {
       app_get_related: 'n8n-nodes-base.httpRequest',
       app_update_record: 'n8n-nodes-base.httpRequest',
       app_create_record: 'n8n-nodes-base.httpRequest',
+      notification: 'n8n-nodes-base.httpRequest',
       for_each: 'n8n-nodes-base.code',
     };
 
@@ -692,7 +710,17 @@ export class WorkflowSyncService {
       type: n8nType,
       typeVersion: n8nType === 'n8n-nodes-base.httpRequest' ? 4 : 1,
       position: [node.position?.x ?? index * 250, node.position?.y ?? 0],
-      parameters: this.translateParameters(node.type, node.parameters ?? {}, tenantSlug, startEntitySlug, startNodeId, allNodes, itemNodeIds),
+      parameters: this.translateParameters(
+        node.type,
+        node.type === 'notification'
+          ? { ...(node.parameters ?? {}), sourceNodeId: node.id }
+          : (node.parameters ?? {}),
+        tenantSlug,
+        startEntitySlug,
+        startNodeId,
+        allNodes,
+        itemNodeIds,
+      ),
     };
 
     return n8nNode;
@@ -903,6 +931,44 @@ export class WorkflowSyncService {
           options: {},
         };
 
+      case 'notification': {
+        const recipient = params.recipient as NotificationRecipient | undefined;
+        const recipientProfileId = recipient?.sourceType === 'node_output'
+          ? `={{${this.nodeOutputJsonPath(recipient.sourceNodeId!, allNodes, itemNodeIds)}.${recipient.sourceFieldSlug}}}`
+          : recipient?.profileId ?? '';
+        const targetSourceNodeId = params.targetSourceNodeId as string | undefined;
+
+        const bodyParameters: { name: string; value: any }[] = [
+          { name: 'recipientProfileId', value: recipientProfileId },
+          { name: 'subject', value: this.translateTextTemplate(params.subjectTokens ?? [], allNodes, itemNodeIds) },
+          { name: 'content', value: this.translateTextTemplate(params.contentTokens ?? [], allNodes, itemNodeIds) },
+          { name: 'sourceExecutionId', value: '={{String($execution.id)}}' },
+          { name: 'sourceNodeId', value: params.sourceNodeId ?? '' },
+          { name: 'sourceRunIndex', value: '={{Number($runIndex ?? 0)}}' },
+          { name: 'sourceItemIndex', value: '={{Number($itemIndex ?? 0)}}' },
+        ];
+
+        if (targetSourceNodeId && params.targetEntitySlug) {
+          bodyParameters.push(
+            { name: 'targetEntitySlug', value: params.targetEntitySlug },
+            {
+              name: 'targetRecordId',
+              value: `={{${this.nodeOutputJsonPath(targetSourceNodeId, allNodes, itemNodeIds)}.id}}`,
+            },
+          );
+        }
+
+        return {
+          method: 'POST',
+          url: `${this.webhookBaseUrl}/v1/webhooks/n8n/${tenantSlug}/notifications`,
+          authentication: 'none',
+          sendBody: true,
+          bodyParameters: { parameters: bodyParameters },
+          ...webhookHeaders,
+          options: {},
+        };
+      }
+
       case 'condition':
       case 'validate': {
         const conditions: any[] = params.conditions ?? []
@@ -1000,6 +1066,73 @@ export class WorkflowSyncService {
 
       default:
         return params;
+    }
+  }
+
+  private translateTextTemplate(
+    tokens: TextTemplateToken[],
+    allNodes: NodeDefinition[],
+    itemNodeIds: Set<string>,
+  ): string {
+    const parts = tokens.map((token) => {
+      if (token.type === 'field' && token.sourceNodeId && token.fieldSlug) {
+        const path = `${this.nodeOutputJsonPath(token.sourceNodeId, allNodes, itemNodeIds)}.${token.fieldSlug}`;
+        return `String(${path} ?? '')`;
+      }
+      return JSON.stringify(token.value ?? '');
+    });
+    return `={{${parts.length ? parts.join(' + ') : "''"}}}`;
+  }
+
+  private validateNotificationDelays(
+    nodes: NodeDefinition[],
+    connections: ConnectionDefinition[],
+  ): void {
+    const notifications = nodes.filter((node) => node.type === 'notification');
+    if (!notifications.length) return;
+
+    const byId = new Map(nodes.map((node) => [node.id, node]));
+    const parents = new Map<string, string[]>();
+    for (const connection of connections) {
+      const current = parents.get(connection.target) ?? [];
+      current.push(connection.source);
+      parents.set(connection.target, current);
+    }
+
+    const delayMs = (node?: NodeDefinition): number => {
+      if (!node || node.type !== 'delay') return 0;
+      const duration = Number(node.parameters?.duration ?? 0);
+      const unit = node.parameters?.unit ?? 'minutes';
+      const multiplier: Record<string, number> = {
+        seconds: 1000,
+        minutes: 60_000,
+        hours: 3_600_000,
+        days: 86_400_000,
+      };
+      return Math.max(0, duration) * (multiplier[unit] ?? multiplier.minutes);
+    };
+
+    const memo = new Map<string, number>();
+    const visit = (nodeId: string, visiting: Set<string>): number => {
+      if (memo.has(nodeId)) return memo.get(nodeId)!;
+      if (visiting.has(nodeId)) {
+        throw new BadRequestException('Workflow-ul contine un ciclu inaintea unui nod de notificare.');
+      }
+      const nextVisiting = new Set(visiting).add(nodeId);
+      const upstream = parents.get(nodeId) ?? [];
+      const total = upstream.reduce((maximum, parentId) => {
+        return Math.max(maximum, visit(parentId, nextVisiting) + delayMs(byId.get(parentId)));
+      }, 0);
+      memo.set(nodeId, total);
+      return total;
+    };
+
+    for (const notification of notifications) {
+      if (visit(notification.id, new Set()) > MAX_NOTIFICATION_DELAY_MS) {
+        throw new BadRequestException(
+          `Nodul de notificare "${notification.name ?? notification.id}" depaseste durata maxima cumulata de 30 de zile.`,
+        );
+      }
     }
   }
 

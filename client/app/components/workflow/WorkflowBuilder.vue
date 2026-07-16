@@ -83,6 +83,17 @@ async function enrichBeforeSave(exported: { nodes: any[], connections: any[] }):
   await Promise.all(fetchPromises)
 
   const enrichedNodes = exported.nodes.map((node) => {
+    if (node.type === 'notification') {
+      const target = dataSources.value.find(ds => ds.nodeId === node.parameters?.targetSourceNodeId)
+      return {
+        ...node,
+        parameters: {
+          ...node.parameters,
+          targetEntitySlug: target?.entitySlug ?? ''
+        }
+      }
+    }
+
     if (node.type === 'set_data') {
       const assignments = (node.parameters?.assignments ?? []).map((assignment: any) => ({
         ...assignment,
@@ -231,6 +242,47 @@ function findListSourceReferences(value: unknown, listSourceIds: Set<string>, fo
   return found
 }
 
+function hasUpstreamPath(sourceId: string, targetId: string) {
+  const queue = [sourceId]
+  const visited = new Set<string>()
+  while (queue.length) {
+    const current = queue.shift()!
+    if (current === targetId) return true
+    if (visited.has(current)) continue
+    visited.add(current)
+    for (const edge of edges.value.filter(edge => edge.source === current)) queue.push(edge.target)
+  }
+  return false
+}
+
+function templateHasContent(tokens: any[]) {
+  return tokens.some(token => token?.type === 'field' || (token?.type === 'literal' && String(token.value ?? '').trim()))
+}
+
+function maximumDelayBefore(nodeId: string, visiting = new Set<string>(), memo = new Map<string, number>()): number {
+  if (memo.has(nodeId)) return memo.get(nodeId)!
+  if (visiting.has(nodeId)) throw new Error('cycle')
+  const nextVisiting = new Set(visiting).add(nodeId)
+  const incoming = edges.value.filter(edge => edge.target === nodeId)
+  const multipliers: Record<string, number> = {
+    seconds: 1000,
+    minutes: 60_000,
+    hours: 3_600_000,
+    days: 86_400_000
+  }
+  let maximum = 0
+  for (const edge of incoming) {
+    const parent = nodes.value.find(node => node.id === edge.source)
+    const parentDelay = parent?.data?.nodeType === 'delay'
+      ? Math.max(0, Number(parent.data?.parameters?.duration ?? 0))
+        * (multipliers[parent.data?.parameters?.unit ?? 'minutes'] ?? 60_000)
+      : 0
+    maximum = Math.max(maximum, maximumDelayBefore(edge.source, nextVisiting, memo) + parentDelay)
+  }
+  memo.set(nodeId, maximum)
+  return maximum
+}
+
 async function save() {
   const triggerNodes = nodes.value.filter(n => TRIGGER_TYPES.has(n.data?.nodeType))
   if (triggerNodes.length === 0) {
@@ -297,6 +349,60 @@ async function save() {
   const listSourceIds = new Set(
     dataSources.value.filter(ds => ds.cardinality === 'list').map(ds => ds.nodeId)
   )
+
+  for (const node of nodes.value.filter(node => node.data?.nodeType === 'notification')) {
+    const params = node.data?.parameters ?? {}
+    const recipient = params.recipient ?? {}
+    const recipientComplete = recipient.sourceType === 'static'
+      ? !!recipient.profileId
+      : !!recipient.sourceNodeId && !!recipient.sourceFieldSlug
+
+    if (!recipientComplete || !templateHasContent(params.subjectTokens ?? []) || !templateHasContent(params.contentTokens ?? [])) {
+      toast.add({
+        title: `Configuratie incompleta in nodul "${node.data.label}"`,
+        description: 'Completeaza destinatarul, subiectul si continutul notificarii.',
+        color: 'error'
+      })
+      return
+    }
+
+    const sourceIds = new Set<string>([
+      ...(recipient.sourceNodeId ? [recipient.sourceNodeId] : []),
+      ...(params.subjectTokens ?? []).map((token: any) => token.sourceNodeId).filter(Boolean),
+      ...(params.contentTokens ?? []).map((token: any) => token.sourceNodeId).filter(Boolean),
+      ...(params.targetSourceNodeId ? [params.targetSourceNodeId] : [])
+    ])
+
+    for (const sourceId of sourceIds) {
+      const source = dataSourceByNodeId.get(sourceId)
+      if (!source || source.cardinality === 'list' || !hasUpstreamPath(sourceId, node.id)) {
+        toast.add({
+          title: `Sursa invalida in nodul "${node.data.label}"`,
+          description: 'Fiecare camp trebuie sa vina dintr-un nod anterior single/item. Pentru liste foloseste "Pentru Fiecare".',
+          color: 'error'
+        })
+        return
+      }
+    }
+
+    try {
+      if (maximumDelayBefore(node.id) > 30 * 24 * 60 * 60 * 1000) {
+        toast.add({
+          title: `Intarziere prea mare in nodul "${node.data.label}"`,
+          description: 'Durata cumulata pana la notificare nu poate depasi 30 de zile.',
+          color: 'error'
+        })
+        return
+      }
+    } catch {
+      toast.add({
+        title: `Ciclu invalid inainte de "${node.data.label}"`,
+        description: 'Notificarile intarziate nu pot fi configurate pe un traseu ciclic.',
+        color: 'error'
+      })
+      return
+    }
+  }
 
   for (const node of nodes.value) {
     if (node.data?.nodeType !== 'for_each') continue

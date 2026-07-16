@@ -141,6 +141,7 @@ model Entity {
 
   permissions    RolePermission[]
   menu_items     MenuItem[]
+  target_notifications Notification[] @relation("NotificationTargetEntity")
 
   @@map("entity")
 }
@@ -243,7 +244,32 @@ model Profile {
   user User @relation(fields: [id_user], references: [id], onDelete: Cascade)
   roles ProfileRole[]
   refreshTokens RefreshToken[]
+  notifications Notification[]
   @@map("profile")
+}
+
+model Notification {
+  id_notification    String    @id @default(uuid())
+  id_profile         String
+  subject            String    @db.VarChar(255)
+  content            String
+  is_read            Boolean   @default(false)
+  date_read          DateTime?
+  id_target_entity   String?
+  target_record_id   String?
+  source_execution_id String   @db.VarChar(200)
+  source_node_id      String   @db.VarChar(200)
+  source_run_index    Int      @default(0)
+  source_item_index   Int      @default(0)
+  date_created        DateTime @default(now())
+  date_updated        DateTime @updatedAt
+
+  profile       Profile @relation(fields: [id_profile], references: [id_profile], onDelete: Cascade)
+  target_entity Entity? @relation("NotificationTargetEntity", fields: [id_target_entity], references: [id_entity], onDelete: SetNull)
+
+  @@unique([source_execution_id, source_node_id, source_run_index, source_item_index])
+  @@index([id_profile, is_read, date_created])
+  @@map("notification")
 }
 
 model Role {

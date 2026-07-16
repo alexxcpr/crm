@@ -66,6 +66,10 @@ describe('WorkflowSyncService validation nodes', () => {
       expect.objectContaining({ workflowToken: 'workflow-token' }),
       'n8n-id',
     );
+    expect((service as any).jwt.signAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ purpose: 'workflow' }),
+      { expiresIn: '31d' },
+    );
   });
 
   it('traduce stop_error in stopAndError cu mesaj prefixat', () => {
@@ -597,5 +601,98 @@ describe('WorkflowSyncService validation nodes', () => {
       name: 'cf_status',
       value: "={{$('each_contact').item.json.cf_status}}",
     });
+  });
+
+  it('traduce notificarea cu destinatar dinamic, template si record tinta', () => {
+    const service = makeService();
+    const workflow = {
+      name: 'Notificare contact',
+      slug: 'notificare_contact',
+      nodes: [
+        {
+          id: 'start',
+          type: 'start',
+          position: { x: 0, y: 0 },
+          parameters: { entity: 'contacts' },
+        },
+        {
+          id: 'notify',
+          type: 'notification',
+          position: { x: 250, y: 0 },
+          parameters: {
+            recipient: {
+              sourceType: 'node_output',
+              sourceNodeId: 'start',
+              sourceFieldSlug: 'id_profile',
+            },
+            subjectTokens: [
+              { type: 'literal', value: 'Contact ' },
+              { type: 'field', sourceNodeId: 'start', fieldSlug: 'cf_name' },
+            ],
+            contentTokens: [{ type: 'literal', value: 'A fost actualizat.' }],
+            targetSourceNodeId: 'start',
+            targetEntitySlug: 'contacts',
+          },
+        },
+      ],
+      connections: [{ source: 'start', target: 'notify' }],
+    };
+
+    const translated = (service as any).translateToN8n(workflow);
+    const notification = translated.nodes.find((node: any) => node.id === 'notify');
+
+    expect(notification.type).toBe('n8n-nodes-base.httpRequest');
+    expect(notification.parameters.url).toBe(
+      'http://localhost:4000/api/v1/webhooks/n8n/tenant/notifications',
+    );
+    expect(notification.parameters.bodyParameters.parameters).toEqual(
+      expect.arrayContaining([
+        {
+          name: 'recipientProfileId',
+          value: "={{$('start').first().json.body.record.id_profile}}",
+        },
+        {
+          name: 'subject',
+          value: `={{"Contact " + String($('start').first().json.body.record.cf_name ?? '')}}`,
+        },
+        { name: 'content', value: `={{"A fost actualizat."}}` },
+        { name: 'targetEntitySlug', value: 'contacts' },
+        {
+          name: 'targetRecordId',
+          value: "={{$('start').first().json.body.record.id}}",
+        },
+        { name: 'sourceNodeId', value: 'notify' },
+      ]),
+    );
+  });
+
+  it('respinge notificarea dupa o intarziere cumulata de peste 30 de zile', () => {
+    const service = makeService();
+    const workflow = {
+      name: 'Notificare prea tarzie',
+      slug: 'notificare_tarzie',
+      nodes: [
+        { id: 'start', type: 'start', position: { x: 0, y: 0 }, parameters: { entity: 'contacts' } },
+        { id: 'wait', type: 'delay', position: { x: 250, y: 0 }, parameters: { duration: 31, unit: 'days' } },
+        {
+          id: 'notify',
+          type: 'notification',
+          position: { x: 500, y: 0 },
+          parameters: {
+            recipient: { sourceType: 'static', profileId: 'profile-id' },
+            subjectTokens: [{ type: 'literal', value: 'Subiect' }],
+            contentTokens: [{ type: 'literal', value: 'Continut' }],
+          },
+        },
+      ],
+      connections: [
+        { source: 'start', target: 'wait' },
+        { source: 'wait', target: 'notify' },
+      ],
+    };
+
+    expect(() => (service as any).translateToN8n(workflow)).toThrow(
+      'depaseste durata maxima cumulata de 30 de zile',
+    );
   });
 });

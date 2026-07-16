@@ -15,6 +15,24 @@ export interface FormulaAssignment {
   tokens: FormulaToken[]
 }
 
+export interface NotificationRecipient {
+  sourceType: 'static' | 'node_output'
+  profileId?: string
+  sourceNodeId?: string
+  sourceFieldSlug?: string
+  fieldLabel?: string
+  sourceLabel?: string
+}
+
+export interface TextTemplateToken {
+  type: 'literal' | 'field'
+  value?: string
+  sourceNodeId?: string
+  fieldSlug?: string
+  fieldLabel?: string
+  sourceLabel?: string
+}
+
 export interface FieldMapping {
   key: string
   sourceType: FieldValueSource
@@ -134,7 +152,7 @@ export interface NodeTypeDefinition {
 export interface NodeConfigField {
   key: string
   label: string
-  type: 'text' | 'textarea' | 'select' | 'number' | 'boolean' | 'entity-select' | 'field-select' | 'field-mappings' | 'record-id-source' | 'data-source-select' | 'list-source-select' | 'relation-field-select' | 'formula-assignments' | 'target-field-select' | 'condition-editor' | 'filter-list'
+  type: 'text' | 'textarea' | 'select' | 'number' | 'boolean' | 'entity-select' | 'field-select' | 'field-mappings' | 'record-id-source' | 'data-source-select' | 'list-source-select' | 'relation-field-select' | 'formula-assignments' | 'target-field-select' | 'condition-editor' | 'filter-list' | 'notification-recipient' | 'text-template'
   placeholder?: string
   options?: { label: string, value: string }[]
   required?: boolean
@@ -258,6 +276,26 @@ export function useNodeTypes() {
       defaults: { conditions: [], combinator: 'and' },
       configFields: [
         { key: 'conditions', label: 'Conditii', type: 'condition-editor' }
+      ]
+    },
+    {
+      type: 'notification',
+      label: 'Trimite Notificare',
+      icon: 'i-lucide-bell',
+      category: 'action',
+      color: '#6366f1',
+      description: 'Trimite o notificare in aplicatie catre un profil activ.',
+      defaults: {
+        recipient: null as NotificationRecipient | null,
+        subjectTokens: [] as TextTemplateToken[],
+        contentTokens: [] as TextTemplateToken[],
+        targetSourceNodeId: ''
+      },
+      configFields: [
+        { key: 'recipient', label: 'Destinatar', type: 'notification-recipient', required: true },
+        { key: 'subjectTokens', label: 'Subiect', type: 'text-template', required: true },
+        { key: 'contentTokens', label: 'Continut', type: 'text-template', required: true },
+        { key: 'targetSourceNodeId', label: 'Record de deschis (optional)', type: 'data-source-select' }
       ]
     },
     {

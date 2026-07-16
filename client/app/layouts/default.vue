@@ -55,6 +55,8 @@ const groups = computed(() => [{
           tooltip
           class="mt-auto"
         />
+
+        <NotificationsButton :collapsed="collapsed" />
       </template>
 
       <template #footer="{ collapsed }">

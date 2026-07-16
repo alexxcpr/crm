@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Node } from '@vue-flow/core'
-import type { FieldMapping, FormulaAssignment, RecordIdSource, FilterEntry, Condition } from '~/composables/useNodeTypes'
+import type { FieldMapping, FormulaAssignment, RecordIdSource, FilterEntry, Condition, NotificationRecipient, TextTemplateToken } from '~/composables/useNodeTypes'
 import type { DataSource } from '~/composables/useWorkflowDataRegistry'
 import type { Field } from '~/types/schema'
 
@@ -343,6 +343,22 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
           v-else-if="field.type === 'filter-list'"
           :model-value="(localParams[field.key] as FilterEntry[]) ?? []"
           :target-entity-fields="targetEntityFields"
+          :data-sources="fieldSelectableDataSources"
+          :fetch-source-fields="fetchSourceFields"
+          @update:model-value="onParamChange(field.key, $event)"
+        />
+
+        <WorkflowPanelsNotificationRecipientEditor
+          v-else-if="field.type === 'notification-recipient'"
+          :model-value="(localParams[field.key] as NotificationRecipient | null) ?? null"
+          :data-sources="fieldSelectableDataSources"
+          :fetch-source-fields="fetchSourceFields"
+          @update:model-value="onParamChange(field.key, $event)"
+        />
+
+        <WorkflowPanelsTextTemplateEditor
+          v-else-if="field.type === 'text-template'"
+          :model-value="(localParams[field.key] as TextTemplateToken[]) ?? []"
           :data-sources="fieldSelectableDataSources"
           :fetch-source-fields="fetchSourceFields"
           @update:model-value="onParamChange(field.key, $event)"

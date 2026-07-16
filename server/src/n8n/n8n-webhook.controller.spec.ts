@@ -13,6 +13,7 @@ function makeController() {
     {} as any,
     {} as any,
     {} as any,
+    {} as any,
   );
 
   jest

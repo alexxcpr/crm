@@ -16,6 +16,7 @@ import { SecurityModule } from './security/security.module';
 import { BillingModule } from './billing/billing.module';
 import { NavigationModule } from './navigation/navigation.module';
 import { DashboardModule } from './dashboards/dashboard.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { DashboardModule } from './dashboards/dashboard.module';
     SchemaModule,
     NavigationModule,
     DashboardModule,
+    NotificationsModule,
     AdminModule,
     BillingModule,
     ActionsModule,

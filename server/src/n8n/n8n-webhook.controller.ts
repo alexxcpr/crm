@@ -23,6 +23,8 @@ import { DynamicDataService } from 'src/dynamic-data/dynamic-data.service';
 import * as crypto from 'crypto';
 import { JwtService } from '@nestjs/jwt';
 import { AuthenticatedUser } from 'src/security/security.types';
+import { CreateWorkflowNotificationDto } from 'src/notifications/dto';
+import { NotificationsService } from 'src/notifications/notifications.service';
 
 const EMPTY_WORKFLOW_FILTER_VALUE = '__MODUVIS_EMPTY_FILTER__';
 
@@ -50,6 +52,7 @@ export class N8nWebhookController {
     private readonly tenantContext: TenantContext,
     private readonly billingClient: BillingApiClient,
     private readonly jwt: JwtService,
+    private readonly notifications: NotificationsService,
   ) {
     this.webhookSecret = config.get<string>('N8N_WEBHOOK_SECRET', '');
   }
@@ -264,6 +267,20 @@ export class N8nWebhookController {
     if (!filter || typeof filter !== 'object') return false;
 
     return Object.values(filter).some((value) => this.containsEmptyFilterValue(value));
+  }
+
+  @Post(':tenantSlug/notifications')
+  @HttpCode(HttpStatus.OK)
+  async createNotification(
+    @Param('tenantSlug') tenantSlug: string,
+    @Body() body: CreateWorkflowNotificationDto,
+    @Headers('x-webhook-secret') secret?: string,
+    @Headers('x-workflow-token') workflowToken?: string,
+  ) {
+    this.verifyDataAccess(secret);
+    return this.handleDataOperation(tenantSlug, workflowToken, (actor) =>
+      this.notifications.createFromWorkflow(body, actor),
+    );
   }
 
   private containsEmptyFilterValue(value: unknown): boolean {
