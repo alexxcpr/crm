@@ -9,6 +9,14 @@ export interface DataSource {
   cardinality: 'single' | 'list' | 'item'
 }
 
+const currentProfileFields = [
+  { column_name: 'id_profile', name: 'ID profil', slug: '_system_profile_id', data_type: 'uuid', ui_type: 'text' },
+  { column_name: 'id_user', name: 'ID utilizator', slug: '_system_user_id', data_type: 'uuid', ui_type: 'text' },
+  { column_name: 'username', name: 'Username profil', slug: '_system_profile_username', data_type: 'varchar', ui_type: 'text' },
+  { column_name: 'email', name: 'Email profil', slug: '_system_profile_email', data_type: 'varchar', ui_type: 'email' },
+  { column_name: 'display_name', name: 'Nume afisat', slug: '_system_profile_display_name', data_type: 'varchar', ui_type: 'text' }
+] as Field[]
+
 /**
  * Computes a data registry from the workflow node graph.
  * Each data-producing node (start, app_get_record, app_get_related)
@@ -73,7 +81,17 @@ export function useWorkflowDataRegistry(
         const data = nodeData(node)
         const nodeType: string = data.nodeType ?? ''
 
-        if (nodeType === 'app_get_related') {
+        if (nodeType === 'system_get_current_profile') {
+          sources.push({
+            nodeId: node.id,
+            label: data.label || 'Profil curent',
+            entitySlug: 'profile',
+            fields: currentProfileFields,
+            cardinality: 'single'
+          })
+          processed.add(node.id)
+          changed = true
+        } else if (nodeType === 'app_get_related') {
           const srcNodeId: string = data.parameters?.sourceNodeId ?? ''
           const relFieldSlug: string = data.parameters?.relationField ?? ''
           if (!srcNodeId || !relFieldSlug) continue
@@ -196,6 +214,7 @@ export function useWorkflowDataRegistry(
   async function fetchSourceFields(nodeId: string): Promise<Field[]> {
     const source = dataSources.value.find(s => s.nodeId === nodeId)
     if (!source) return []
+    if (source.fields.length > 0) return source.fields
     return fetchEntitySchema(source.entitySlug)
   }
 

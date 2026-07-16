@@ -72,6 +72,78 @@ describe('WorkflowSyncService validation nodes', () => {
     );
   });
 
+  it('traduce Profil curent si expune id_profile din wrapper-ul data', () => {
+    const service = makeService();
+    const workflow = {
+      name: 'Profil initiator',
+      slug: 'profil-initiator',
+      nodes: [
+        {
+          id: 'start',
+          type: 'start',
+          position: { x: 0, y: 0 },
+          parameters: { entity: 'contacts' },
+        },
+        {
+          id: 'current-profile',
+          type: 'system_get_current_profile',
+          position: { x: 250, y: 0 },
+          parameters: {},
+        },
+        {
+          id: 'set-profile',
+          type: 'set_data',
+          position: { x: 500, y: 0 },
+          parameters: {
+            assignments: [
+              {
+                key: 'initiator_profile_id',
+                tokens: [
+                  {
+                    type: 'field',
+                    sourceNodeId: 'current-profile',
+                    fieldSlug: 'id_profile',
+                    dataType: 'uuid',
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+      connections: [
+        { source: 'start', target: 'current-profile' },
+        { source: 'current-profile', target: 'set-profile' },
+      ],
+    };
+
+    const translated = (service as any).translateToN8n(workflow);
+    const profileNode = translated.nodes.find((node: any) => node.id === 'current-profile');
+    const setNode = translated.nodes.find((node: any) => node.id === 'set-profile');
+
+    expect(profileNode).toMatchObject({
+      type: 'n8n-nodes-base.httpRequest',
+      parameters: {
+        method: 'GET',
+        url: 'http://localhost:4000/api/v1/webhooks/n8n/tenant/current-profile',
+        authentication: 'none',
+      },
+    });
+    expect(profileNode.parameters.headerParameters.parameters).toEqual(
+      expect.arrayContaining([
+        { name: 'x-tenant', value: 'tenant' },
+        {
+          name: 'x-workflow-token',
+          value: "={{ $('start').first().json.body.workflowToken }}",
+        },
+      ]),
+    );
+    expect(setNode.parameters.values.string).toContainEqual({
+      name: 'initiator_profile_id',
+      value: "={{$('current-profile').first().json.data.id_profile}}",
+    });
+  });
+
   it('traduce stop_error in stopAndError cu mesaj prefixat', () => {
     const service = makeService();
     const workflow = {

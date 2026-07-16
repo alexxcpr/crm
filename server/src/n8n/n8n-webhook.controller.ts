@@ -147,6 +147,25 @@ export class N8nWebhookController {
 
   // ─── Data CRUD routes for n8n workflow nodes (path params — used when entity/id are hardcoded) ───
 
+  @Get(':tenantSlug/current-profile')
+  async getCurrentProfile(
+    @Param('tenantSlug') tenantSlug: string,
+    @Headers('x-webhook-secret') secret?: string,
+    @Headers('x-workflow-token') workflowToken?: string,
+  ) {
+    this.verifyDataAccess(secret);
+
+    return this.handleDataOperation(tenantSlug, workflowToken, async (actor) => ({
+      data: {
+        id_profile: actor.profile.id_profile,
+        id_user: actor.profile.id_user,
+        username: actor.profile.username,
+        email: actor.profile.email,
+        display_name: actor.profile.display_name,
+      },
+    }));
+  }
+
   @Get(':tenantSlug/data/:entitySlug/:id')
   async getData(
     @Param('tenantSlug') tenantSlug: string,

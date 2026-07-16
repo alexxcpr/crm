@@ -387,7 +387,13 @@ export class WorkflowSyncService {
   private isHttpWrapperNode(nodeId: string, nodes: NodeDefinition[]): boolean {
     const node = nodes.find(n => n.id === nodeId)
     if (!node) return false
-    const httpTypes = new Set(['app_get_record', 'app_get_related', 'app_create_record', 'app_update_record'])
+    const httpTypes = new Set([
+      'app_get_record',
+      'app_get_related',
+      'app_create_record',
+      'app_update_record',
+      'system_get_current_profile',
+    ])
     return httpTypes.has(node.type)
   }
 
@@ -681,6 +687,7 @@ export class WorkflowSyncService {
       app_create_record: 'n8n-nodes-base.httpRequest',
       notification: 'n8n-nodes-base.httpRequest',
       for_each: 'n8n-nodes-base.code',
+      system_get_current_profile: 'n8n-nodes-base.httpRequest',
     };
 
     // Detect self-update (same entity as start, no external recordId) → translate as set node
@@ -749,6 +756,15 @@ export class WorkflowSyncService {
     };
 
     switch (nodeType) {
+      case 'system_get_current_profile':
+        return {
+          method: 'GET',
+          url: `${this.webhookBaseUrl}/v1/webhooks/n8n/${tenantSlug}/current-profile`,
+          authentication: 'none',
+          ...webhookHeaders,
+          options: {},
+        };
+
       case 'app_get_record': {
           const filters: any[] = params.filters ?? []
           const limit: number | null = params.limit ?? null

@@ -142,7 +142,7 @@ export interface NodeTypeDefinition {
   type: string
   label: string
   icon: string
-  category: 'trigger' | 'action' | 'logic' | 'integration'
+  category: 'trigger' | 'system' | 'action' | 'logic' | 'integration'
   color: string
   description: string
   defaults: Record<string, any>
@@ -196,6 +196,16 @@ export function useNodeTypes() {
       configFields: [
         { key: 'entity', label: 'Entitate de start', type: 'entity-select', required: true }
       ]
+    },
+    {
+      type: 'system_get_current_profile',
+      label: 'Profil curent',
+      icon: 'i-lucide-user-round-check',
+      category: 'system',
+      color: '#6366f1',
+      description: 'Returneaza profilul activ care a initiat executia workflow-ului.',
+      defaults: {},
+      configFields: []
     },
     {
       type: 'app_get_record',
@@ -410,6 +420,7 @@ export function useNodeTypes() {
 
   const categories = [
     { key: 'trigger', label: 'Triggers', icon: 'i-lucide-play' },
+    { key: 'system', label: 'Sistem', icon: 'i-lucide-settings' },
     { key: 'action', label: 'Actiuni', icon: 'i-lucide-database' },
     { key: 'logic', label: 'Logica', icon: 'i-lucide-git-branch' },
     { key: 'integration', label: 'Integratii', icon: 'i-lucide-plug' }
