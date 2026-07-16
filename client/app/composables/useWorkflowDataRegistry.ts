@@ -17,6 +17,12 @@ const currentProfileFields = [
   { column_name: 'display_name', name: 'Nume afisat', slug: '_system_profile_display_name', data_type: 'varchar', ui_type: 'text' }
 ] as Field[]
 
+// These nodes preserve the workflow data context for downstream producers,
+// but must not be exposed themselves in data-source dropdowns.
+const transparentDataContextNodeTypes = new Set([
+  'app_update_record'
+])
+
 /**
  * Computes a data registry from the workflow node graph.
  * Each data-producing node (start, app_get_record, app_get_related)
@@ -52,6 +58,25 @@ export function useWorkflowDataRegistry(
   function computeRegistrySync() {
     const sources: DataSource[] = []
     const processed = new Set<string>()
+
+    function resolveUpstreamSource(nodeId: string, visited = new Set<string>()): DataSource | undefined {
+      const registeredSource = sources.find(source => source.nodeId === nodeId)
+      if (registeredSource) return registeredSource
+      if (visited.has(nodeId)) return undefined
+
+      visited.add(nodeId)
+      const node = nodes.value.find(candidate => candidate.id === nodeId)
+      if (!node || !transparentDataContextNodeTypes.has(nodeData(node).nodeType ?? '')) {
+        return undefined
+      }
+
+      for (const incomingEdge of edges.value.filter(edge => edge.target === nodeId)) {
+        const upstreamSource = resolveUpstreamSource(incomingEdge.source, visited)
+        if (upstreamSource) return upstreamSource
+      }
+
+      return undefined
+    }
 
     // 1. START node
     const startNode = nodes.value.find((n) => {
@@ -146,7 +171,7 @@ export function useWorkflowDataRegistry(
         } else if (nodeType === 'set_data') {
           const inEdge = edges.value.find(e => e.target === node.id)
           if (!inEdge) continue
-          const predecessor = sources.find(s => s.nodeId === inEdge.source)
+          const predecessor = resolveUpstreamSource(inEdge.source)
           if (!predecessor) continue
 
           // Merge predecessor fields with computed fields from assignments

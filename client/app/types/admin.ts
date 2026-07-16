@@ -187,3 +187,39 @@ export interface MenuItemPayload {
   id_ui_dashboard?: string
   is_active?: boolean
 }
+
+// Integrations
+
+export type SmtpSecurityMode = 'none' | 'starttls' | 'tls'
+
+export interface SmtpIntegration {
+  id_integration: string
+  type: 'smtp'
+  name: string
+  host: string
+  port: number
+  security: SmtpSecurityMode
+  username: string | null
+  fromName: string | null
+  fromEmail: string
+  rejectUnauthorized: boolean
+  hasPassword: boolean
+  is_active: boolean
+  usageCount: number
+  date_created: string
+  date_updated: string
+}
+
+export interface SmtpIntegrationPayload {
+  name: string
+  host: string
+  port: number
+  security: SmtpSecurityMode
+  username?: string
+  password?: string
+  clearPassword?: boolean
+  fromName?: string
+  fromEmail: string
+  rejectUnauthorized: boolean
+  isActive: boolean
+}

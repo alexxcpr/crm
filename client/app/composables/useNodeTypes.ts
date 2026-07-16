@@ -33,6 +33,15 @@ export interface TextTemplateToken {
   sourceLabel?: string
 }
 
+export interface WorkflowValueSource {
+  sourceType: 'static' | 'node_output'
+  value?: string
+  sourceNodeId?: string
+  sourceFieldSlug?: string
+  fieldLabel?: string
+  sourceLabel?: string
+}
+
 export interface FieldMapping {
   key: string
   sourceType: FieldValueSource
@@ -152,10 +161,11 @@ export interface NodeTypeDefinition {
 export interface NodeConfigField {
   key: string
   label: string
-  type: 'text' | 'textarea' | 'select' | 'number' | 'boolean' | 'entity-select' | 'field-select' | 'field-mappings' | 'record-id-source' | 'data-source-select' | 'list-source-select' | 'relation-field-select' | 'formula-assignments' | 'target-field-select' | 'condition-editor' | 'filter-list' | 'notification-recipient' | 'text-template'
+  type: 'text' | 'textarea' | 'select' | 'number' | 'boolean' | 'entity-select' | 'field-select' | 'field-mappings' | 'record-id-source' | 'data-source-select' | 'list-source-select' | 'relation-field-select' | 'formula-assignments' | 'target-field-select' | 'condition-editor' | 'filter-list' | 'notification-recipient' | 'text-template' | 'integration-select' | 'workflow-value-source'
   placeholder?: string
   options?: { label: string, value: string }[]
   required?: boolean
+  inputKind?: 'email' | 'text' | 'textarea'
 }
 
 export function useNodeTypes() {
@@ -268,12 +278,18 @@ export function useNodeTypes() {
       category: 'action',
       color: '#8b5cf6',
       description: 'Trimite un email catre un destinatar',
-      defaults: { to: '', subject: '', body: '' },
+      defaults: {
+        integrationId: '',
+        integrationName: '',
+        to: { sourceType: 'static', value: '' } as WorkflowValueSource,
+        subject: { sourceType: 'static', value: '' } as WorkflowValueSource,
+        content: { sourceType: 'static', value: '' } as WorkflowValueSource
+      },
       configFields: [
-        { key: 'from', label: 'De la', type: 'text', placeholder: 'noreply@company.ro' },
-        { key: 'to', label: 'Catre', type: 'text', placeholder: '{{$json.email}}', required: true },
-        { key: 'subject', label: 'Subiect', type: 'text', required: true },
-        { key: 'body', label: 'Continut', type: 'textarea', required: true }
+        { key: 'integrationId', label: 'Integrare SMTP', type: 'integration-select', required: true },
+        { key: 'to', label: 'Catre', type: 'workflow-value-source', inputKind: 'email', required: true },
+        { key: 'subject', label: 'Subiect', type: 'workflow-value-source', inputKind: 'text', required: true },
+        { key: 'content', label: 'Continut', type: 'workflow-value-source', inputKind: 'textarea', required: true }
       ]
     },
     {

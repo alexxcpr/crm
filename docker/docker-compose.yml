@@ -81,6 +81,7 @@ services:
       N8N_API_URL: http://n8n:5678
       N8N_API_KEY: ${N8N_API_KEY}
       N8N_WEBHOOK_SECRET: ${N8N_WEBHOOK_SECRET}
+      INTEGRATIONS_ENCRYPTION_KEY: ${INTEGRATIONS_ENCRYPTION_KEY}
       APP_WEBHOOK_BASE_URL: https://${DEFAULT_TENANT_SLUG:-dev}.${DOMAIN_BASE}/api #in productie de preferat aici http://backend:4000/api daca ca sunt in aceeasi retea
     depends_on:
       postgres:

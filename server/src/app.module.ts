@@ -17,6 +17,7 @@ import { BillingModule } from './billing/billing.module';
 import { NavigationModule } from './navigation/navigation.module';
 import { DashboardModule } from './dashboards/dashboard.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { IntegrationsModule } from './integrations/integrations.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     NavigationModule,
     DashboardModule,
     NotificationsModule,
+    IntegrationsModule,
     AdminModule,
     BillingModule,
     ActionsModule,

@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { N8nApiClient, N8nWorkflowJson } from './n8n-api.client';
 import { withValidationPrefix } from './workflow-error.utils';
+import { isEmail } from 'class-validator';
 
 const EMPTY_WORKFLOW_FILTER_VALUE = '__MODUVIS_EMPTY_FILTER__';
 
@@ -62,6 +63,13 @@ interface TextTemplateToken {
   fieldSlug?: string;
 }
 
+interface WorkflowValueSource {
+  sourceType: 'static' | 'node_output';
+  value?: string;
+  sourceNodeId?: string;
+  sourceFieldSlug?: string;
+}
+
 const MAX_NOTIFICATION_DELAY_MS = 30 * 24 * 60 * 60 * 1000;
 
 @Injectable()
@@ -96,6 +104,7 @@ export class WorkflowSyncService {
       throw new Error(`Workflow ${workflowId} not found`);
     }
 
+    await this.validateEmailIntegrations(workflow);
     const n8nJson = this.translateToN8n(workflow);
 
     if (workflow.n8n_workflow_id) {
@@ -348,6 +357,17 @@ export class WorkflowSyncService {
     return source.value;
   }
 
+  @OnEvent('integration.replaced')
+  async onIntegrationReplaced(payload: { workflowIds?: string[] }) {
+    for (const workflowId of payload.workflowIds ?? []) {
+      try {
+        await this.syncWorkflow(workflowId);
+      } catch (error) {
+        this.logger.error(`Workflow ${workflowId} nu a putut fi resincronizat dupa inlocuirea integrarii.`, error);
+      }
+    }
+  }
+
   private resolveFilterValue(
     source: RecordIdSource,
     allNodes: NodeDefinition[],
@@ -364,6 +384,86 @@ export class WorkflowSyncService {
     }
 
     return source.value || EMPTY_WORKFLOW_FILTER_VALUE;
+  }
+
+  private resolveWorkflowValue(
+    source: WorkflowValueSource | string | undefined,
+    allNodes: NodeDefinition[],
+    itemNodeIds: Set<string>,
+  ): string {
+    if (typeof source === 'string') return source;
+    if (source?.sourceType === 'node_output' && source.sourceNodeId && source.sourceFieldSlug) {
+      const path = this.nodeOutputJsonPath(source.sourceNodeId, allNodes, itemNodeIds);
+      return `={{String(${path}?.${source.sourceFieldSlug} ?? '')}}`;
+    }
+    return source?.value ?? '';
+  }
+
+  private async validateEmailIntegrations(workflow: { nodes: any; connections: any }): Promise<void> {
+    const nodes: NodeDefinition[] = typeof workflow.nodes === 'string'
+      ? JSON.parse(workflow.nodes)
+      : workflow.nodes ?? [];
+    const connections: ConnectionDefinition[] = typeof workflow.connections === 'string'
+      ? JSON.parse(workflow.connections)
+      : workflow.connections ?? [];
+
+    for (const node of nodes.filter((item) => item.type === 'email')) {
+      const params = node.parameters ?? {};
+      const integrationId = String(params.integrationId ?? '');
+      if (!integrationId) {
+        throw new BadRequestException(`Alege integrarea SMTP in nodul "${node.name ?? node.id}".`);
+      }
+      const integration = await this.knex('integration_definition')
+        .where({ id_integration: integrationId, type: 'smtp', is_active: true })
+        .whereNull('date_deleted')
+        .first();
+      if (!integration) {
+        throw new BadRequestException(`Integrarea SMTP din nodul "${node.name ?? node.id}" lipseste sau este inactiva.`);
+      }
+
+      const values: Array<{ key: string; label: string; value: WorkflowValueSource | string | undefined }> = [
+        { key: 'to', label: 'Catre', value: params.to },
+        { key: 'subject', label: 'Subiect', value: params.subject },
+        { key: 'content', label: 'Continut', value: params.content ?? params.body },
+      ];
+      for (const field of values) {
+        const source = typeof field.value === 'string'
+          ? { sourceType: 'static' as const, value: field.value }
+          : field.value;
+        if (!source) throw new BadRequestException(`Campul ${field.label} este obligatoriu in nodul "${node.name ?? node.id}".`);
+        if (source.sourceType === 'static') {
+          const value = String(source.value ?? '').trim();
+          if (!value) throw new BadRequestException(`Campul ${field.label} este gol in nodul "${node.name ?? node.id}".`);
+          if (field.key === 'to' && (value.includes(',') || value.includes(';') || !isEmail(value))) {
+            throw new BadRequestException(`Campul Catre din nodul "${node.name ?? node.id}" trebuie sa fie un singur email valid.`);
+          }
+          continue;
+        }
+        if (!source.sourceNodeId || !source.sourceFieldSlug) {
+          throw new BadRequestException(`Sursa dinamica pentru ${field.label} este incompleta in nodul "${node.name ?? node.id}".`);
+        }
+        const sourceNode = nodes.find((candidate) => candidate.id === source.sourceNodeId);
+        if (!sourceNode || !this.hasWorkflowPath(source.sourceNodeId, node.id, connections)) {
+          throw new BadRequestException(`Sursa pentru ${field.label} trebuie sa fie un nod anterior lui "${node.name ?? node.id}".`);
+        }
+        if (sourceNode.type === 'app_get_record' && Number(sourceNode.parameters?.limit) !== 1) {
+          throw new BadRequestException(`Sursa pentru ${field.label} este o lista. Foloseste nodul Pentru Fiecare.`);
+        }
+      }
+    }
+  }
+
+  private hasWorkflowPath(sourceId: string, targetId: string, connections: ConnectionDefinition[]): boolean {
+    const queue = [sourceId];
+    const visited = new Set<string>();
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      if (current === targetId) return true;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      for (const connection of connections.filter((item) => item.source === current)) queue.push(connection.target);
+    }
+    return false;
   }
 
   private workflowHasActivatableTrigger(workflow: { nodes: any }): boolean {
@@ -393,6 +493,7 @@ export class WorkflowSyncService {
       'app_create_record',
       'app_update_record',
       'system_get_current_profile',
+      'email',
     ])
     return httpTypes.has(node.type)
   }
@@ -674,7 +775,7 @@ export class WorkflowSyncService {
       trigger: 'n8n-nodes-base.webhook',
       webhook_trigger: 'n8n-nodes-base.webhook',
       http_request: 'n8n-nodes-base.httpRequest',
-      email: 'n8n-nodes-base.emailSend',
+      email: 'n8n-nodes-base.httpRequest',
       condition: 'n8n-nodes-base.if',
       validate: 'n8n-nodes-base.if',
       stop_error: 'n8n-nodes-base.stopAndError',
@@ -940,10 +1041,19 @@ export class WorkflowSyncService {
 
       case 'email':
         return {
-          fromEmail: params.from ?? '',
-          toEmail: params.to ?? '={{$json.email}}',
-          subject: params.subject ?? '',
-          text: params.body ?? '',
+          method: 'POST',
+          url: `${this.webhookBaseUrl}/v1/webhooks/n8n/${tenantSlug}/email`,
+          authentication: 'none',
+          sendBody: true,
+          bodyParameters: {
+            parameters: [
+              { name: 'integrationId', value: params.integrationId ?? '' },
+              { name: 'to', value: this.resolveWorkflowValue(params.to, allNodes, itemNodeIds) },
+              { name: 'subject', value: this.resolveWorkflowValue(params.subject, allNodes, itemNodeIds) },
+              { name: 'content', value: this.resolveWorkflowValue(params.content ?? params.body, allNodes, itemNodeIds) },
+            ],
+          },
+          ...webhookHeaders,
           options: {},
         };
 

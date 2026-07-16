@@ -25,6 +25,8 @@ import { JwtService } from '@nestjs/jwt';
 import { AuthenticatedUser } from 'src/security/security.types';
 import { CreateWorkflowNotificationDto } from 'src/notifications/dto';
 import { NotificationsService } from 'src/notifications/notifications.service';
+import { SmtpMailService } from 'src/integrations/smtp-mail.service';
+import { WorkflowEmailDto } from 'src/integrations/dto/integration.dto';
 
 const EMPTY_WORKFLOW_FILTER_VALUE = '__MODUVIS_EMPTY_FILTER__';
 
@@ -53,6 +55,7 @@ export class N8nWebhookController {
     private readonly billingClient: BillingApiClient,
     private readonly jwt: JwtService,
     private readonly notifications: NotificationsService,
+    private readonly smtp: SmtpMailService,
   ) {
     this.webhookSecret = config.get<string>('N8N_WEBHOOK_SECRET', '');
   }
@@ -299,6 +302,20 @@ export class N8nWebhookController {
     this.verifyDataAccess(secret);
     return this.handleDataOperation(tenantSlug, workflowToken, (actor) =>
       this.notifications.createFromWorkflow(body, actor),
+    );
+  }
+
+  @Post(':tenantSlug/email')
+  @HttpCode(HttpStatus.OK)
+  async sendEmail(
+    @Param('tenantSlug') tenantSlug: string,
+    @Body() body: WorkflowEmailDto,
+    @Headers('x-webhook-secret') secret?: string,
+    @Headers('x-workflow-token') workflowToken?: string,
+  ) {
+    this.verifyDataAccess(secret);
+    return this.handleDataOperation(tenantSlug, workflowToken, () =>
+      this.smtp.sendWorkflowEmail(body.integrationId, body.to, body.subject, body.content),
     );
   }
 

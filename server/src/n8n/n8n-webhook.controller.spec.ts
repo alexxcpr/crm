@@ -104,6 +104,7 @@ function makeAuthenticatedController(options: {
     } as any,
     jwt as any,
     {} as any,
+    {} as any,
   );
 }
 
@@ -131,6 +132,7 @@ describe('N8nWebhookController current-profile', () => {
   it('refuza executia fara workflow token', async () => {
     const controller = new N8nWebhookController(
       { get: jest.fn((_key: string, fallback: string) => fallback) } as any,
+      {} as any,
       {} as any,
       {} as any,
       {} as any,

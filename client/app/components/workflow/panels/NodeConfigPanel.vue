@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Node } from '@vue-flow/core'
-import type { FieldMapping, FormulaAssignment, RecordIdSource, FilterEntry, Condition, NotificationRecipient, TextTemplateToken } from '~/composables/useNodeTypes'
+import type { FieldMapping, FormulaAssignment, RecordIdSource, FilterEntry, Condition, NotificationRecipient, TextTemplateToken, WorkflowValueSource } from '~/composables/useNodeTypes'
 import type { DataSource } from '~/composables/useWorkflowDataRegistry'
 import type { Field } from '~/types/schema'
 
@@ -20,6 +20,7 @@ const emit = defineEmits<{
 
 const { getNodeType } = useNodeTypes()
 const { entities, fetchEntities } = useAdminEntities()
+const { integrations, fetchIntegrations } = useAdminIntegrations()
 
 // ─── Target entity fields (for field-mappings in create/update nodes) ───
 const targetEntityFields = ref<Field[]>([])
@@ -82,6 +83,14 @@ const nodeTypeDef = computed(() => {
   return getNodeType(props.node.data.nodeType)
 })
 
+const smtpIntegrationOptions = computed(() => integrations.value
+  .filter(item => item.is_active || item.id_integration === localParams.value.integrationId)
+  .map(item => ({
+    label: `${item.name} (${item.fromEmail})${item.is_active ? '' : ' - inactiva'}`,
+    value: item.id_integration,
+    disabled: !item.is_active
+  })))
+
 const localLabel = ref('')
 const localParams = ref<Record<string, any>>({})
 const isSwitchingNode = ref(false)
@@ -97,6 +106,10 @@ watch(() => props.node, (newNode) => {
   }
 }, { immediate: true })
 
+watch(() => props.node?.data?.nodeType, (nodeType) => {
+  if (nodeType === 'email') fetchIntegrations()
+}, { immediate: true })
+
 function onLabelChange() {
   if (!props.node) return
   emit('updateLabel', props.node.id, localLabel.value)
@@ -104,6 +117,14 @@ function onLabelChange() {
 
 function onParamChange(key: string, value: any) {
   localParams.value[key] = value
+  if (!props.node) return
+  emit('updateParameters', props.node.id, { ...localParams.value })
+}
+
+function onIntegrationChange(id: string) {
+  const integration = integrations.value.find(item => item.id_integration === id)
+  localParams.value.integrationId = id
+  localParams.value.integrationName = integration?.name ?? ''
   if (!props.node) return
   emit('updateParameters', props.node.id, { ...localParams.value })
 }
@@ -260,6 +281,18 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
         />
 
         <USelect
+          v-else-if="field.type === 'integration-select'"
+          :model-value="localParams[field.key] ?? ''"
+          size="sm"
+          class="w-full"
+          :items="smtpIntegrationOptions"
+          value-key="value"
+          label-key="label"
+          placeholder="Alege integrarea SMTP..."
+          @update:model-value="onIntegrationChange"
+        />
+
+        <USelect
           v-else-if="field.type === 'list-source-select'"
           :model-value="localParams[field.key] ?? ''"
           size="sm"
@@ -360,6 +393,15 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
           v-else-if="field.type === 'text-template'"
           :model-value="(localParams[field.key] as TextTemplateToken[]) ?? []"
           :data-sources="fieldSelectableDataSources"
+          :fetch-source-fields="fetchSourceFields"
+          @update:model-value="onParamChange(field.key, $event)"
+        />
+
+        <WorkflowPanelsWorkflowValueSourceEditor
+          v-else-if="field.type === 'workflow-value-source'"
+          :model-value="(localParams[field.key] as WorkflowValueSource | null) ?? null"
+          :data-sources="fieldSelectableDataSources"
+          :input-kind="field.inputKind"
           :fetch-source-fields="fetchSourceFields"
           @update:model-value="onParamChange(field.key, $event)"
         />

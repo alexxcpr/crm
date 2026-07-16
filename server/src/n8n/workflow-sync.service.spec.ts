@@ -44,6 +44,40 @@ function makeExecutableService(workflow: Record<string, any>) {
 }
 
 describe('WorkflowSyncService validation nodes', () => {
+  it('traduce nodul email prin endpointul intern fara credenciale SMTP', () => {
+    const service = makeService();
+    const translated = (service as any).translateToN8n({
+      name: 'Email contact',
+      slug: 'email_contact',
+      nodes: [
+        { id: 'start', type: 'start', position: { x: 0, y: 0 }, parameters: { entity: 'contacts' } },
+        {
+          id: 'email',
+          type: 'email',
+          position: { x: 250, y: 0 },
+          parameters: {
+            integrationId: 'integration-id',
+            to: { sourceType: 'node_output', sourceNodeId: 'start', sourceFieldSlug: 'cf_email' },
+            subject: { sourceType: 'static', value: 'Bun venit' },
+            content: { sourceType: 'node_output', sourceNodeId: 'start', sourceFieldSlug: 'cf_mesaj' },
+          },
+        },
+      ],
+      connections: [{ source: 'start', target: 'email' }],
+    });
+    const email = translated.nodes.find((node: any) => node.id === 'email');
+
+    expect(email.type).toBe('n8n-nodes-base.httpRequest');
+    expect(email.parameters.url).toBe('http://localhost:4000/api/v1/webhooks/n8n/tenant/email');
+    expect(email.parameters.bodyParameters.parameters).toEqual(expect.arrayContaining([
+      { name: 'integrationId', value: 'integration-id' },
+      { name: 'to', value: "={{String($('start').first().json.body.record?.cf_email ?? '')}}" },
+      { name: 'subject', value: 'Bun venit' },
+      { name: 'content', value: "={{String($('start').first().json.body.record?.cf_mesaj ?? '')}}" },
+    ]));
+    expect(JSON.stringify(email)).not.toContain('password');
+  });
+
   it('executa workflow-ul sincronizat fara sync sau activare inainte de rulare', async () => {
     const { service, n8nClient } = makeExecutableService({
       id_workflow: 'wf-id',

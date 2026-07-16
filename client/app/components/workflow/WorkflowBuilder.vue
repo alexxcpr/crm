@@ -158,11 +158,30 @@ async function enrichBeforeSave(exported: { nodes: any[], connections: any[] }):
   return { ...exported, nodes: enrichedNodes }
 }
 
+function normalizeLegacyEmailNodes(inputNodes: any[]) {
+  return inputNodes.map((node) => {
+    if (node.type !== 'email') return node
+    const params = { ...(node.parameters ?? {}) }
+    const asSource = (value: unknown) => value && typeof value === 'object'
+      ? value
+      : { sourceType: 'static', value: String(value ?? '') }
+    const normalized = {
+      ...params,
+      to: asSource(params.to),
+      subject: asSource(params.subject),
+      content: asSource(params.content ?? params.body)
+    }
+    delete normalized.from
+    delete normalized.body
+    return { ...node, parameters: normalized }
+  })
+}
+
 watch(isDirty, val => emit('dirty', val))
 
 onMounted(async () => {
   if (props.initialNodes?.length || props.initialConnections?.length) {
-    loadWorkflow(props.initialNodes ?? [], props.initialConnections ?? [])
+    loadWorkflow(normalizeLegacyEmailNodes(props.initialNodes ?? []), props.initialConnections ?? [])
     await resolveEntityNames()
   } else {
     initStartNode()
@@ -213,6 +232,7 @@ function onDeleteSelectedNode() {
 
 const toast = useToast()
 const { getNodeType } = useNodeTypes()
+const { integrations: smtpIntegrations, fetchIntegrations: fetchSmtpIntegrations } = useAdminIntegrations()
 
 const TRIGGER_TYPES = new Set(['start', 'trigger', 'webhook_trigger'])
 
@@ -221,6 +241,12 @@ function isMissingRequiredValue(value: unknown) {
   if (typeof value === 'string') return value.trim() === ''
   if (Array.isArray(value)) return value.length === 0
   return false
+}
+
+function workflowValueComplete(value: any) {
+  if (!value || typeof value !== 'object') return false
+  if (value.sourceType === 'static') return String(value.value ?? '').trim().length > 0
+  return value.sourceType === 'node_output' && !!value.sourceNodeId && !!value.sourceFieldSlug
 }
 
 function findListSourceReferences(value: unknown, listSourceIds: Set<string>, found = new Set<string>()) {
@@ -275,7 +301,7 @@ function maximumDelayBefore(nodeId: string, visiting = new Set<string>(), memo =
     const parent = nodes.value.find(node => node.id === edge.source)
     const parentDelay = parent?.data?.nodeType === 'delay'
       ? Math.max(0, Number(parent.data?.parameters?.duration ?? 0))
-        * (multipliers[parent.data?.parameters?.unit ?? 'minutes'] ?? 60_000)
+      * (multipliers[parent.data?.parameters?.unit ?? 'minutes'] ?? 60_000)
       : 0
     maximum = Math.max(maximum, maximumDelayBefore(edge.source, nextVisiting, memo) + parentDelay)
   }
@@ -349,6 +375,58 @@ async function save() {
   const listSourceIds = new Set(
     dataSources.value.filter(ds => ds.cardinality === 'list').map(ds => ds.nodeId)
   )
+
+  const emailNodes = nodes.value.filter(node => node.data?.nodeType === 'email')
+  if (emailNodes.length > 0) await fetchSmtpIntegrations(true)
+  const activeIntegrationIds = new Set(
+    smtpIntegrations.value.filter(item => item.is_active).map(item => item.id_integration)
+  )
+
+  for (const node of emailNodes) {
+    const params = node.data?.parameters ?? {}
+    if (!activeIntegrationIds.has(String(params.integrationId ?? ''))) {
+      toast.add({
+        title: `Integrare SMTP invalida in nodul "${node.data.label}"`,
+        description: 'Alege un cont SMTP activ din Administrare > Integrari.',
+        color: 'error'
+      })
+      return
+    }
+
+    for (const [key, label] of [['to', 'Catre'], ['subject', 'Subiect'], ['content', 'Continut']] as const) {
+      const value = params[key]
+      if (!workflowValueComplete(value)) {
+        toast.add({
+          title: `Configuratie incompleta in nodul "${node.data.label}"`,
+          description: `Campul "${label}" trebuie sa aiba o valoare fixa sau un camp dintr-un nod anterior.`,
+          color: 'error'
+        })
+        return
+      }
+      if (key === 'to' && value.sourceType === 'static') {
+        const email = String(value.value ?? '').trim()
+        if (email.includes(',') || email.includes(';') || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          toast.add({
+            title: `Destinatar invalid in nodul "${node.data.label}"`,
+            description: 'Catre trebuie sa fie o singura adresa de email valida.',
+            color: 'error'
+          })
+          return
+        }
+      }
+      if (value.sourceType === 'node_output') {
+        const source = dataSourceByNodeId.get(value.sourceNodeId)
+        if (!source || source.cardinality === 'list' || !hasUpstreamPath(value.sourceNodeId, node.id)) {
+          toast.add({
+            title: `Sursa invalida in nodul "${node.data.label}"`,
+            description: `Campul "${label}" trebuie sa vina dintr-un nod anterior single/item. Pentru liste foloseste "Pentru Fiecare".`,
+            color: 'error'
+          })
+          return
+        }
+      }
+    }
+  }
 
   for (const node of nodes.value.filter(node => node.data?.nodeType === 'notification')) {
     const params = node.data?.parameters ?? {}

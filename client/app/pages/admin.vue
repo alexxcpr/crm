@@ -27,6 +27,10 @@ const links = [[{
   icon: 'i-lucide-credit-card',
   to: '/admin/billing'
 }, {
+  label: 'Integrari',
+  icon: 'i-lucide-plug',
+  to: '/admin/integrations'
+}, {
   label: 'Workflow-uri',
   icon: 'i-lucide-workflow',
   to: '/admin/workflows'

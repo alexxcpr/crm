@@ -18,6 +18,7 @@ const isTrigger = computed(() => ['start', 'trigger', 'webhook_trigger'].include
 const isTerminal = computed(() => props.data.nodeType === 'stop_error')
 const isSetData = computed(() => props.data.nodeType === 'set_data')
 const isForEach = computed(() => props.data.nodeType === 'for_each')
+const isEmail = computed(() => props.data.nodeType === 'email')
 
 // Resolve entity display info from node parameters
 const entityDisplay = computed(() => {
@@ -40,6 +41,11 @@ const setDataInfo = computed(() => {
 const forEachInfo = computed(() => {
   if (!isForEach.value) return null
   return props.data.parameters?.sourceNodeId ? 'Iterare lista configurata' : 'Alege lista de parcurs'
+})
+
+const emailInfo = computed(() => {
+  if (!isEmail.value) return null
+  return props.data.parameters?.integrationName || 'Alege integrarea SMTP'
 })
 </script>
 
@@ -77,6 +83,12 @@ const forEachInfo = computed(() => {
         class="text-[10px] text-gray-600 dark:text-gray-300 truncate font-medium"
       >
         {{ forEachInfo }}
+      </p>
+      <p
+        v-else-if="emailInfo"
+        class="text-[10px] text-gray-600 dark:text-gray-300 truncate font-medium"
+      >
+        {{ emailInfo }}
       </p>
       <p
         v-else-if="entityDisplay"
