@@ -5,6 +5,7 @@ import { returnValidResponse } from 'src/utils/crud.utils';
 import { CreateFieldDto, UpdateFieldDto } from '../dto/field.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from 'src/guards/roles.guard';
+import { ReorderDto } from '../dto/reorder.dto';
 
 @Controller('v1/admin/entities/:entityId/fields')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -34,6 +35,15 @@ export class AdminFieldsController {
     ) {
         const field = await this.fieldsService.create(entityId, dto);
         return returnValidResponse('Campul a fost creat cu succes.', field);
+    }
+
+    @Put('reorder/ranks')
+    async reorder(
+        @Param('entityId') entityId: string,
+        @Body() dto: ReorderDto,
+    ) {
+        const fields = await this.fieldsService.reorder(entityId, dto.items);
+        return returnValidResponse('Ordinea campurilor a fost actualizata.', fields);
     }
 
     @Put(':fieldId')

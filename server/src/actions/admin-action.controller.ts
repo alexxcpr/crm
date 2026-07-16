@@ -15,6 +15,7 @@ import { RolesGuard } from 'src/guards/roles.guard';
 import { returnValidResponse } from 'src/utils/crud.utils';
 import { ActionService } from './action.service';
 import { CreateActionDto, UpdateActionDto } from './dto';
+import { ReorderDto } from 'src/admin/dto/reorder.dto';
 
 @Controller('v1/admin/actions')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -36,6 +37,12 @@ export class AdminActionController {
   async create(@Body() dto: CreateActionDto) {
     const result = await this.actionService.create(dto);
     return returnValidResponse('Actiunea a fost creata cu succes.', result.data);
+  }
+
+  @Put('reorder/ranks')
+  async reorder(@Body() dto: ReorderDto) {
+    const result = await this.actionService.reorder(dto.items);
+    return returnValidResponse('Ordinea actiunilor a fost actualizata.', result.data);
   }
 
   @Put(':id')

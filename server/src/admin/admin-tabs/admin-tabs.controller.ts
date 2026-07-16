@@ -5,6 +5,7 @@ import { RolesGuard } from 'src/guards/roles.guard';
 import { AdminTabsService } from './admin-tabs.service';
 import { returnValidResponse } from 'src/utils/crud.utils';
 import { CreateTabDto, UpdateTabDto } from '../dto/tab.dto';
+import { ReorderDto } from '../dto/reorder.dto';
 
 @Controller('v1/admin/entities/:entityId/tabs')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -34,6 +35,15 @@ export class AdminTabsController {
   ) {
     const tab = await this.tabsService.create(entityId, dto);
     return returnValidResponse('Tab-ul a fost creat cu succes.', tab);
+  }
+
+  @Put('reorder/ranks')
+  async reorder(
+    @Param('entityId') entityId: string,
+    @Body() dto: ReorderDto,
+  ) {
+    const tabs = await this.tabsService.reorder(entityId, dto.items);
+    return returnValidResponse('Ordinea tab-urilor a fost actualizata.', tabs);
   }
 
   @Put(':tabId')

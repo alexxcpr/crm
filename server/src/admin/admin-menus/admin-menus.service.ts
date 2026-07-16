@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { MenuDto, MenuItemDto } from '../dto/menu.dto';
+import type { RankedItemDto } from '../dto/reorder.dto';
+import { reorderRanks } from '../rank-reorder.util';
 
 @Injectable()
 export class AdminMenusService {
@@ -37,16 +39,26 @@ export class AdminMenusService {
   }
 
   async create(dto: MenuDto) {
+    const maxRank = await this.knex('menu').max('rank as max_rank').first();
     const [menu] = await this.knex('menu')
       .insert({
         name: dto.name,
         icon: dto.icon || null,
-        rank: dto.rank ?? 0,
+        rank: dto.rank ?? Number(maxRank?.max_rank ?? 0) + 1,
         is_active: dto.is_active ?? true,
       })
       .returning('*');
 
     return menu;
+  }
+
+  async reorder(items: RankedItemDto[]) {
+    await reorderRanks(this.knex, {
+      table: 'menu',
+      idColumn: 'id_menu',
+      items,
+    });
+    return this.findAll();
   }
 
   async update(id: string, dto: MenuDto) {
@@ -79,11 +91,45 @@ export class AdminMenusService {
     await this.ensureMenu(menuId);
     await this.validateItem(dto);
 
+    if (dto.rank === undefined || dto.rank === 0) {
+      const maxRank = await this.knex('menu_item')
+        .where('id_menu', menuId)
+        .max('rank as max_rank')
+        .first();
+      dto.rank = Number(maxRank?.max_rank ?? 0) + 1;
+    }
+
     const [item] = await this.knex('menu_item')
       .insert(this.toItemInsert(menuId, dto))
       .returning('*');
 
     return item;
+  }
+
+  async reorderItems(items: RankedItemDto[]) {
+    const ids = items.map((item) => item.id);
+    const menuItems = await this.knex('menu_item')
+      .select('id_menu_item', 'id_menu')
+      .whereIn('id_menu_item', ids);
+
+    if (menuItems.length !== items.length) {
+      throw new BadRequestException('Lista de reordonare contine elemente inexistente.');
+    }
+
+    const menuIds = new Set(menuItems.map((item) => item.id_menu));
+    if (menuIds.size !== 1) {
+      throw new BadRequestException('Elementele pot fi reordonate doar in interiorul aceluiasi meniu.');
+    }
+
+    const menuId = menuItems[0].id_menu;
+    await reorderRanks(this.knex, {
+      table: 'menu_item',
+      idColumn: 'id_menu_item',
+      items,
+      scope: { id_menu: menuId },
+    });
+    const menu = await this.findOne(menuId);
+    return menu.items;
   }
 
   async updateItem(id: string, dto: MenuItemDto) {

@@ -6,15 +6,20 @@ const props = defineProps<{
   fields: Field[]
   tabs?: UiTab[]
   loading?: boolean
+  reordering?: boolean
 }>()
 
 const emit = defineEmits<{
   add: []
   edit: [field: Field]
   delete: [field: Field]
+  reorder: [tabId: string | null, fields: Field[]]
 }>()
 
+const fieldsRoot = ref<HTMLElement | null>(null)
+
 const columns: TableColumn<Field>[] = [
+  { id: 'drag', header: '', meta: { class: { th: 'w-8', td: 'w-8' } } },
   { id: 'edit', header: '', meta: { class: { th: 'w-10', td: 'w-10' } } },
 
   { accessorKey: 'rank', header: 'Ordine', meta: { class: { th: 'w-20', td: 'w-20' } } },
@@ -44,17 +49,26 @@ const fieldsByGroup = computed(() => {
     return a.rank - b.rank
   })
 
-  const blocks: { group: string, fields: Field[] }[] = []
+  const blocks: { key: string, tabId: string | null, group: string, fields: Field[] }[] = []
   for (const f of sorted) {
     const tab = f.id_ui_tab ? tabMap.get(f.id_ui_tab) : null
     const g = tab?.name || 'Fara tab'
+    const key = tab?.id_ui_tab ?? '__none__'
     const last = blocks[blocks.length - 1]
-    if (last && last.group === g)
+    if (last && last.key === key)
       last.fields.push(f)
     else
-      blocks.push({ group: g, fields: [f] })
+      blocks.push({ key, tabId: tab?.id_ui_tab ?? null, group: g, fields: [f] })
   }
   return blocks
+})
+
+useRankedTableDrag(fieldsRoot, {
+  onReorder(group, oldIndex, newIndex) {
+    const block = fieldsByGroup.value.find(item => item.key === group)
+    if (!block) return
+    emit('reorder', block.tabId, normalizeRankOrder(moveRankedItem(block.fields, oldIndex, newIndex)))
+  }
 })
 
 function getDropdownItems(field: Field) {
@@ -75,7 +89,7 @@ function getDropdownItems(field: Field) {
 </script>
 
 <template>
-  <div>
+  <div ref="fieldsRoot">
     <div class="flex items-center justify-between mb-4">
       <h3 class="text-base font-semibold">
         Campuri
@@ -101,7 +115,9 @@ function getDropdownItems(field: Field) {
     <div v-else class="space-y-8">
       <section
         v-for="block in fieldsByGroup"
-        :key="block.group"
+        :key="block.key"
+        :data-rank-group="block.key"
+        :data-rank-disabled="reordering || loading"
         class="rounded-lg border border-default overflow-hidden bg-elevated/30"
       >
         <div
@@ -127,6 +143,17 @@ function getDropdownItems(field: Field) {
           class="w-full"
           :ui="{ td: 'whitespace-normal wrap-break-word max-w-xs' }"
         >
+          <template #drag-cell>
+            <UButton
+              class="rank-drag-handle cursor-grab active:cursor-grabbing"
+              icon="i-lucide-grip-vertical"
+              color="neutral"
+              variant="ghost"
+              size="xs"
+              aria-label="Muta campul"
+            />
+          </template>
+
           <template #edit-cell="{ row }">
             <UButton
               icon="i-lucide-pencil"

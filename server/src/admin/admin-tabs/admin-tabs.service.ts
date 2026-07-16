@@ -1,12 +1,22 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { CreateTabDto, UpdateTabDto } from '../dto/tab.dto';
+import type { RankedItemDto } from '../dto/reorder.dto';
+import { reorderRanks } from '../rank-reorder.util';
 
 @Injectable()
 export class AdminTabsService {
   constructor(private readonly tenantContext: TenantContext) {}
 
   private get knex() { return this.tenantContext.knex; }
+
+  private async ensureEntityExists(entityId: string) {
+    const entity = await this.knex('entity').where('id_entity', entityId).first();
+    if (!entity) {
+      throw new NotFoundException(`Entitatea cu id "${entityId}" nu exista.`);
+    }
+    return entity;
+  }
 
   async findAllByEntity(entityId: string) {
     // Verify entity exists
@@ -127,6 +137,17 @@ export class AdminTabsService {
       .returning('*');
 
     return updated;
+  }
+
+  async reorder(entityId: string, items: RankedItemDto[]) {
+    await this.ensureEntityExists(entityId);
+    await reorderRanks(this.knex, {
+      table: 'ui_tab',
+      idColumn: 'id_ui_tab',
+      items,
+      scope: { id_entity: entityId },
+    });
+    return this.findAllByEntity(entityId);
   }
 
   async remove(entityId: string, tabId: string) {

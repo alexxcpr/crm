@@ -5,6 +5,7 @@ import { returnValidResponse } from 'src/utils/crud.utils';
 import { CreateEntityDto, UpdateEntityDto } from '../dto/entity.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from 'src/guards/roles.guard';
+import { ReorderDto } from '../dto/reorder.dto';
 
 @Controller('v1/admin/entities')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -28,6 +29,12 @@ export class AdminEntitiesController {
     async create(@Body() dto: CreateEntityDto) {
         const entity = await this.entitiesService.create(dto);
         return returnValidResponse('Entitatea a fost creata cu succes.', entity)
+    }
+
+    @Put('reorder/ranks')
+    async reorder(@Body() dto: ReorderDto) {
+        const entities = await this.entitiesService.reorder(dto.items);
+        return returnValidResponse('Ordinea entitatilor a fost actualizata.', entities);
     }
 
     @Put(':id')

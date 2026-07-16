@@ -7,6 +7,7 @@ import { RolesGuard } from 'src/guards/roles.guard';
 import { AdminModulesService } from './admin-modules.service';
 import { returnValidResponse } from 'src/utils/crud.utils';
 import { ModuleDto } from '../dto/module.dto';
+import { ReorderDto } from '../dto/reorder.dto';
 
 @Controller('v1/admin/modules')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -40,6 +41,13 @@ export class AdminModulesController {
     ){
         const mod = await this.modulesService.update(id, dto);
         return returnValidResponse('Modulul a fost actualizat cu succes.', mod); 
+    }
+
+    @Put('reorder/ranks')
+    @Roles('admin')
+    async reorder(@Body() dto: ReorderDto) {
+        const modules = await this.modulesService.reorder(dto.items);
+        return returnValidResponse('Ordinea modulelor a fost actualizata.', modules);
     }
 
     @Delete(':id')

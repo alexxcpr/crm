@@ -14,6 +14,7 @@ import { RolesGuard } from 'src/guards/roles.guard';
 import { returnValidResponse } from 'src/utils/crud.utils';
 import { WorkflowService } from './workflow.service';
 import { CreateWorkflowDto, UpdateWorkflowDto } from './dto';
+import { ReorderDto } from 'src/admin/dto/reorder.dto';
 
 @Controller('v1/admin/workflows')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -35,6 +36,12 @@ export class AdminWorkflowController {
   async create(@Body() dto: CreateWorkflowDto) {
     const result = await this.workflowService.create(dto);
     return returnValidResponse('Workflow-ul a fost creat cu succes.', result.data);
+  }
+
+  @Put('reorder/ranks')
+  async reorder(@Body() dto: ReorderDto) {
+    const result = await this.workflowService.reorder(dto.items);
+    return returnValidResponse('Ordinea workflow-urilor a fost actualizata.', result.data);
   }
 
   @Put(':id')

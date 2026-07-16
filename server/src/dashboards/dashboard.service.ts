@@ -13,6 +13,8 @@ import {
 } from './dashboard.constants';
 import { DashboardAccessService } from './dashboard-access.service';
 import { DashboardFilterDto, DashboardWidgetDto, SaveDashboardDto } from './dto/dashboard.dto';
+import type { RankedItemDto } from 'src/admin/dto/reorder.dto';
+import { reorderRanks } from 'src/admin/rank-reorder.util';
 
 interface DashboardFieldRow {
   id_field: string;
@@ -58,6 +60,16 @@ export class DashboardService {
   async findOneAdmin(id: string) {
     await this.access.requireEnabled();
     return this.loadStructure({ id, activeOnly: false });
+  }
+
+  async reorder(items: RankedItemDto[]) {
+    await this.access.requireEnabled();
+    await reorderRanks(this.knex, {
+      table: 'ui_dashboard',
+      idColumn: 'id_ui_dashboard',
+      items,
+    });
+    return this.findAllAdmin();
   }
 
   async create(dto: SaveDashboardDto) {

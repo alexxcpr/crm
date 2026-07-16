@@ -8,6 +8,8 @@ const { actions, loading, error, fetchActions, createAction, updateAction, delet
 const { entities, fetchEntities } = useAdminEntities()
 const { workflows, fetchWorkflows } = useAdminWorkflows()
 const toast = useToast()
+const actionsTableRoot = ref<HTMLElement | null>(null)
+const { savingRank, persistRankOrder } = useRankReorder()
 
 onMounted(() => {
   fetchActions()
@@ -17,6 +19,7 @@ onMounted(() => {
 
 // ─── Filter by entity ───
 const selectedEntityId = ref<string>('')
+const canReorder = computed(() => Boolean(selectedEntityId.value))
 
 const filteredActions = computed(() => {
   const allActions = actions.value || []
@@ -38,6 +41,28 @@ function parseTriggerEvents(events: any): string[] {
 
 watch(selectedEntityId, (val) => {
   fetchActions(val || undefined)
+})
+
+useRankedTableDrag(actionsTableRoot, {
+  async onReorder(_group, oldIndex, newIndex) {
+    if (!canReorder.value) return
+    const previous = [...actions.value]
+    actions.value = normalizeRankOrder(moveRankedItem(filteredActions.value, oldIndex, newIndex))
+    try {
+      actions.value = await persistRankOrder(
+        '/v1/admin/actions/reorder/ranks',
+        actions.value,
+        action => action.id_action
+      )
+    } catch (err: any) {
+      actions.value = previous
+      toast.add({
+        title: 'Ordinea nu a putut fi salvata',
+        description: err?.data?.message || err.message,
+        color: 'error'
+      })
+    }
+  }
 })
 
 // ─── Create/Edit Modal ───
@@ -188,6 +213,7 @@ async function onConfirmDelete() {
 
 // ─── Table ───
 const columns: TableColumn<any>[] = [
+  { id: 'drag', meta: { class: { th: 'w-8', td: 'w-8' } } },
   {
     id: 'select',
     meta: { class: { th: 'w-4', td: 'w-4' } },
@@ -211,6 +237,7 @@ const columns: TableColumn<any>[] = [
   { accessorKey: 'slug', header: 'Slug' },
   { accessorKey: 'trigger_events', header: 'Triggers' },
   { accessorKey: 'workflow_name', header: 'Workflow' },
+  { accessorKey: 'rank', header: 'Ordine' },
   { accessorKey: 'is_active', header: 'Activ' },
   { accessorKey: 'show_in_ui', header: 'Vizibil' },
   { id: 'actions', header: '' }
@@ -275,68 +302,87 @@ function getDropdownItems(action: any) {
       />
     </div>
 
-    <UTable
-      ref="table"
-      v-model:row-selection="rowSelection"
-      row-key="id_action"
-      :data="filteredActions"
-      :columns="columns"
-      :loading="loading"
-      class="w-full"
+    <p v-if="!canReorder" class="mb-2 text-xs text-muted">
+      Selecteaza o entitate pentru a reordona actiunile prin drag & drop.
+    </p>
+    <div
+      ref="actionsTableRoot"
+      data-rank-group="actions"
+      :data-rank-disabled="!canReorder || savingRank || loading"
     >
-      <template #edit-cell="{ row }">
-        <UButton
-          icon="i-lucide-pencil"
-          label="Edit"
-          color="neutral"
-          variant="ghost"
-          size="xs"
-          @click="openEdit(row.original)"
-        />
-      </template>
-
-      <template #trigger_events-cell="{ row }">
-        <div class="flex gap-1 flex-wrap">
-          <UBadge
-            v-for="ev in parseTriggerEvents(row.original.trigger_events)"
-            :key="ev"
-            :label="ev"
+      <UTable
+        ref="table"
+        v-model:row-selection="rowSelection"
+        row-key="id_action"
+        :data="filteredActions"
+        :columns="columns"
+        :loading="loading"
+        class="w-full"
+      >
+        <template #drag-cell>
+          <UButton
+            :class="canReorder ? 'rank-drag-handle cursor-grab active:cursor-grabbing' : 'cursor-not-allowed opacity-35'"
+            icon="i-lucide-grip-vertical"
             color="neutral"
-            variant="subtle"
+            variant="ghost"
             size="xs"
+            :aria-label="canReorder ? 'Muta actiunea' : 'Selecteaza o entitate pentru reordonare'"
           />
-          <span v-if="!parseTriggerEvents(row.original.trigger_events).length" class="text-xs text-gray-400">Manual</span>
-        </div>
-      </template>
+        </template>
+        <template #edit-cell="{ row }">
+          <UButton
+            icon="i-lucide-pencil"
+            label="Edit"
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            @click="openEdit(row.original)"
+          />
+        </template>
 
-      <template #workflow_name-cell="{ row }">
-        <span v-if="row.original.workflow_name" class="text-xs">{{ row.original.workflow_name }}</span>
-        <span v-else class="text-xs text-gray-400">-</span>
-      </template>
+        <template #trigger_events-cell="{ row }">
+          <div class="flex gap-1 flex-wrap">
+            <UBadge
+              v-for="ev in parseTriggerEvents(row.original.trigger_events)"
+              :key="ev"
+              :label="ev"
+              color="neutral"
+              variant="subtle"
+              size="xs"
+            />
+            <span v-if="!parseTriggerEvents(row.original.trigger_events).length" class="text-xs text-gray-400">Manual</span>
+          </div>
+        </template>
 
-      <template #is_active-cell="{ row }">
-        <UBadge
-          :label="row.original.is_active ? 'Activ' : 'Inactiv'"
-          :color="row.original.is_active ? 'success' : 'neutral'"
-          variant="subtle"
-          size="sm"
-        />
-      </template>
+        <template #workflow_name-cell="{ row }">
+          <span v-if="row.original.workflow_name" class="text-xs">{{ row.original.workflow_name }}</span>
+          <span v-else class="text-xs text-gray-400">-</span>
+        </template>
 
-      <template #show_in_ui-cell="{ row }">
-        <UIcon
-          :name="row.original.show_in_ui ? 'i-lucide-eye' : 'i-lucide-eye-off'"
-          class="size-4"
-          :class="row.original.show_in_ui ? 'text-green-500' : 'text-gray-400'"
-        />
-      </template>
+        <template #is_active-cell="{ row }">
+          <UBadge
+            :label="row.original.is_active ? 'Activ' : 'Inactiv'"
+            :color="row.original.is_active ? 'success' : 'neutral'"
+            variant="subtle"
+            size="sm"
+          />
+        </template>
 
-      <template #actions-cell="{ row }">
-        <UDropdownMenu :items="getDropdownItems(row.original)">
-          <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" />
-        </UDropdownMenu>
-      </template>
-    </UTable>
+        <template #show_in_ui-cell="{ row }">
+          <UIcon
+            :name="row.original.show_in_ui ? 'i-lucide-eye' : 'i-lucide-eye-off'"
+            class="size-4"
+            :class="row.original.show_in_ui ? 'text-green-500' : 'text-gray-400'"
+          />
+        </template>
+
+        <template #actions-cell="{ row }">
+          <UDropdownMenu :items="getDropdownItems(row.original)">
+            <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" />
+          </UDropdownMenu>
+        </template>
+      </UTable>
+    </div>
 
     <div v-if="!loading && filteredActions.length === 0" class="py-12">
       <UEmpty

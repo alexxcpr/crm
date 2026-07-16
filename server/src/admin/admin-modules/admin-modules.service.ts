@@ -3,6 +3,8 @@ import { TenantContext } from 'src/tenant/tenant-context.service';
 import { ModuleDto } from '../dto/module.dto';
 import { AuthorizationService } from 'src/security/authorization.service';
 import { AuthenticatedUser } from 'src/security/security.types';
+import type { RankedItemDto } from '../dto/reorder.dto';
+import { reorderRanks } from '../rank-reorder.util';
 
 @Injectable()
 export class AdminModulesService {
@@ -63,17 +65,28 @@ export class AdminModulesService {
       throw new ConflictException(`Slug-ul "${dto.slug}" este deja folosit.`);
     }
 
+    const maxRank = await this.knex('module').max('rank as max_rank').first();
+
     const [mod] = await this.knex('module')
       .insert({
         name: dto.name,
         slug: dto.slug,
         icon: dto.icon ?? null,
-        rank: dto.rank ?? 0,
+        rank: dto.rank ?? Number(maxRank?.max_rank ?? 0) + 1,
         is_active: dto.is_active ?? true,
       })
       .returning('*');
 
     return mod;
+  }
+
+  async reorder(items: RankedItemDto[]) {
+    await reorderRanks(this.knex, {
+      table: 'module',
+      idColumn: 'id_module',
+      items,
+    });
+    return this.findAll();
   }
 
   async update(id: string, dto: ModuleDto) {

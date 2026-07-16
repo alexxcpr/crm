@@ -5,6 +5,7 @@ import { RolesGuard } from 'src/guards/roles.guard';
 import { returnValidResponse } from 'src/utils/crud.utils';
 import { MenuDto, MenuItemDto } from '../dto/menu.dto';
 import { AdminMenusService } from './admin-menus.service';
+import { ReorderDto } from '../dto/reorder.dto';
 
 @Controller('v1/admin')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -36,6 +37,12 @@ export class AdminMenusController {
     return returnValidResponse('Meniul a fost actualizat cu succes.', menu);
   }
 
+  @Put('menus/reorder/ranks')
+  async reorder(@Body() dto: ReorderDto) {
+    const menus = await this.menusService.reorder(dto.items);
+    return returnValidResponse('Ordinea meniurilor a fost actualizata.', menus);
+  }
+
   @Delete('menus/:id')
   async remove(@Param('id') id: string) {
     const result = await this.menusService.remove(id);
@@ -52,6 +59,12 @@ export class AdminMenusController {
   async updateItem(@Param('id') id: string, @Body() dto: MenuItemDto) {
     const item = await this.menusService.updateItem(id, dto);
     return returnValidResponse('Elementul de meniu a fost actualizat cu succes.', item);
+  }
+
+  @Put('menu-items/reorder/ranks')
+  async reorderItems(@Body() dto: ReorderDto) {
+    const items = await this.menusService.reorderItems(dto.items);
+    return returnValidResponse('Ordinea elementelor a fost actualizata.', items);
   }
 
   @Delete('menu-items/:id')

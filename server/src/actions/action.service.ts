@@ -15,6 +15,8 @@ import { extractValidationError } from 'src/n8n/workflow-error.utils';
 import { CreateActionDto, UpdateActionDto } from './dto';
 import { AuthorizationService } from 'src/security/authorization.service';
 import { AuthenticatedUser } from 'src/security/security.types';
+import type { RankedItemDto } from 'src/admin/dto/reorder.dto';
+import { reorderRanks } from 'src/admin/rank-reorder.util';
 
 @Injectable()
 export class ActionService {
@@ -112,6 +114,11 @@ export class ActionService {
       }
     }
 
+    const maxRank = await this.knex(this.TABLE)
+      .where('id_entity', dto.id_entity)
+      .max('rank as max_rank')
+      .first();
+
     const [row] = await this.knex(this.TABLE)
       .insert({
         id_entity: dto.id_entity,
@@ -125,7 +132,7 @@ export class ActionService {
         id_workflow: dto.id_workflow ?? null,
         config: JSON.stringify(dto.config ?? {}),
         is_active: dto.is_active ?? true,
-        rank: dto.rank ?? 0,
+        rank: dto.rank ?? Number(maxRank?.max_rank ?? 0) + 1,
         description: dto.description ?? null,
       })
       .returning('*');
@@ -134,6 +141,31 @@ export class ActionService {
       `Actiune creata: ${row.slug} pe entitate ${entity.slug}`,
     );
     return { data: row };
+  }
+
+  async reorder(items: RankedItemDto[]) {
+    const ids = items.map((item) => item.id);
+    const actions = await this.knex(this.TABLE)
+      .select('id_action', 'id_entity')
+      .whereIn('id_action', ids);
+
+    if (actions.length !== items.length) {
+      throw new BadRequestException('Lista de reordonare contine actiuni inexistente.');
+    }
+
+    const entityIds = new Set(actions.map((action) => action.id_entity));
+    if (entityIds.size !== 1) {
+      throw new BadRequestException('Actiunile pot fi reordonate doar in interiorul aceleiasi entitati.');
+    }
+
+    const entityId = actions[0].id_entity;
+    await reorderRanks(this.knex, {
+      table: this.TABLE,
+      idColumn: 'id_action',
+      items,
+      scope: { id_entity: entityId },
+    });
+    return this.findAll(entityId);
   }
 
   async update(id: string, dto: UpdateActionDto) {

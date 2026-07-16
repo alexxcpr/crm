@@ -7,8 +7,31 @@ const UCheckbox = resolveComponent('UCheckbox')
 const { workflows, loading, error, fetchWorkflows, deleteWorkflow, deleteWorkflows, activateWorkflow, deactivateWorkflow } = useAdminWorkflows()
 const toast = useToast()
 const router = useRouter()
+const workflowsTableRoot = ref<HTMLElement | null>(null)
+const { savingRank, persistRankOrder } = useRankReorder()
 
 await fetchWorkflows()
+
+useRankedTableDrag(workflowsTableRoot, {
+  async onReorder(_group, oldIndex, newIndex) {
+    const previous = [...workflows.value]
+    workflows.value = normalizeRankOrder(moveRankedItem(workflows.value, oldIndex, newIndex))
+    try {
+      workflows.value = await persistRankOrder(
+        '/v1/admin/workflows/reorder/ranks',
+        workflows.value,
+        workflow => workflow.id_workflow
+      )
+    } catch (err: any) {
+      workflows.value = previous
+      toast.add({
+        title: 'Ordinea nu a putut fi salvata',
+        description: err?.data?.message || err.message,
+        color: 'error'
+      })
+    }
+  }
+})
 
 const showDeleteConfirm = ref(false)
 const deletingWorkflow = ref<any>(null)
@@ -68,6 +91,7 @@ async function toggleActivation(wf: any) {
 }
 
 const columns: TableColumn<any>[] = [
+  { id: 'drag', meta: { class: { th: 'w-8', td: 'w-8' } } },
   {
     id: 'select',
     meta: { class: { th: 'w-4', td: 'w-4' } },
@@ -90,6 +114,7 @@ const columns: TableColumn<any>[] = [
   { accessorKey: 'name', header: 'Nume' },
   { accessorKey: 'slug', header: 'Slug' },
   { accessorKey: 'status', header: 'Status' },
+  { accessorKey: 'rank', header: 'Ordine' },
   { accessorKey: 'version', header: 'Versiune' },
   { accessorKey: 'n8n_workflow_id', header: 'n8n ID' },
   { id: 'actions', header: '' }
@@ -157,57 +182,73 @@ function getDropdownItems(wf: any) {
       </div>
     </div>
 
-    <UTable
-      ref="table"
-      v-model:row-selection="rowSelection"
-      row-key="id_workflow"
-      :data="workflows"
-      :columns="columns"
-      :loading="loading"
-      class="w-full"
+    <div
+      ref="workflowsTableRoot"
+      data-rank-group="workflows"
+      :data-rank-disabled="savingRank || loading"
     >
-      <template #edit-cell="{ row }">
-        <UButton
-          icon="i-lucide-pencil"
-          label="Edit"
-          color="neutral"
-          variant="ghost"
-          size="xs"
-          @click="router.push(`/admin/workflows/${row.original.id_workflow}`)"
-        />
-      </template>
+      <UTable
+        ref="table"
+        v-model:row-selection="rowSelection"
+        row-key="id_workflow"
+        :data="workflows"
+        :columns="columns"
+        :loading="loading"
+        class="w-full"
+      >
+        <template #drag-cell>
+          <UButton
+            class="rank-drag-handle cursor-grab active:cursor-grabbing"
+            icon="i-lucide-grip-vertical"
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            aria-label="Muta workflow-ul"
+          />
+        </template>
+        <template #edit-cell="{ row }">
+          <UButton
+            icon="i-lucide-pencil"
+            label="Edit"
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            @click="router.push(`/admin/workflows/${row.original.id_workflow}`)"
+          />
+        </template>
 
-      <template #name-cell="{ row }">
-        <NuxtLink
-          :to="`/admin/workflows/${row.original.id_workflow}`"
-          class="text-primary-500 hover:underline font-medium"
-        >
-          {{ row.original.name }}
-        </NuxtLink>
-      </template>
+        <template #name-cell="{ row }">
+          <NuxtLink
+            :to="`/admin/workflows/${row.original.id_workflow}`"
+            class="text-primary-500 hover:underline font-medium"
+          >
+            {{ row.original.name }}
+          </NuxtLink>
+        </template>
 
-      <template #status-cell="{ row }">
-        <UBadge
-          :label="statusLabels[row.original.status] ?? row.original.status"
-          :color="(statusColors[row.original.status] ?? 'neutral') as any"
-          variant="subtle"
-          size="sm"
-        />
-      </template>
+        <template #status-cell="{ row }">
+          <UBadge
+            :label="statusLabels[row.original.status] ?? row.original.status"
+            :color="(statusColors[row.original.status] ?? 'neutral') as any"
+            variant="subtle"
+            size="sm"
+          />
+        </template>
 
-      <template #n8n_workflow_id-cell="{ row }">
-        <span v-if="row.original.n8n_workflow_id" class="text-xs font-mono text-gray-500">
-          {{ row.original.n8n_workflow_id }}
-        </span>
-        <span v-else class="text-xs text-gray-400">-</span>
-      </template>
+        <template #n8n_workflow_id-cell="{ row }">
+          <span v-if="row.original.n8n_workflow_id" class="text-xs font-mono text-gray-500">
+            {{ row.original.n8n_workflow_id }}
+          </span>
+          <span v-else class="text-xs text-gray-400">-</span>
+        </template>
 
-      <template #actions-cell="{ row }">
-        <UDropdownMenu :items="getDropdownItems(row.original)">
-          <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" />
-        </UDropdownMenu>
-      </template>
-    </UTable>
+        <template #actions-cell="{ row }">
+          <UDropdownMenu :items="getDropdownItems(row.original)">
+            <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" />
+          </UDropdownMenu>
+        </template>
+      </UTable>
+    </div>
 
     <div v-if="!loading && workflows.length === 0" class="py-12">
       <UEmpty

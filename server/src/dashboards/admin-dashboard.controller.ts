@@ -5,6 +5,7 @@ import { RolesGuard } from 'src/guards/roles.guard';
 import { returnValidResponse } from 'src/utils/crud.utils';
 import { DashboardService } from './dashboard.service';
 import { SaveDashboardDto } from './dto/dashboard.dto';
+import { ReorderDto } from 'src/admin/dto/reorder.dto';
 
 @Controller('v1/admin/dashboards')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -30,6 +31,14 @@ export class AdminDashboardController {
   @Post()
   async create(@Body() dto: SaveDashboardDto) {
     return returnValidResponse('Dashboard-ul a fost creat.', await this.dashboards.create(dto));
+  }
+
+  @Put('reorder/ranks')
+  async reorder(@Body() dto: ReorderDto) {
+    return returnValidResponse(
+      'Ordinea dashboard-urilor a fost actualizata.',
+      await this.dashboards.reorder(dto.items),
+    );
   }
 
   @Put(':id')

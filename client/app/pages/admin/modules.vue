@@ -7,8 +7,31 @@ const UCheckbox = resolveComponent('UCheckbox')
 
 const { modules, loading, error, fetchModules, deleteModule, deleteModules } = useAdminModules()
 const toast = useToast()
+const modulesTableRoot = ref<HTMLElement | null>(null)
+const { savingRank, persistRankOrder } = useRankReorder()
 
 await fetchModules()
+
+useRankedTableDrag(modulesTableRoot, {
+  async onReorder(_group, oldIndex, newIndex) {
+    const previous = [...modules.value]
+    modules.value = normalizeRankOrder(moveRankedItem(modules.value, oldIndex, newIndex))
+    try {
+      modules.value = await persistRankOrder(
+        '/v1/admin/modules/reorder/ranks',
+        modules.value,
+        module => module.id_module
+      )
+    } catch (err: any) {
+      modules.value = previous
+      toast.add({
+        title: 'Ordinea nu a putut fi salvata',
+        description: err?.data?.message || err.message,
+        color: 'error'
+      })
+    }
+  }
+})
 
 // ─── Modal state ───
 const showModal = ref(false)
@@ -71,6 +94,7 @@ async function bulkDelete() {
 
 // ─── Table ───
 const columns: TableColumn<AdminModule>[] = [
+  { id: 'drag', meta: { class: { th: 'w-8', td: 'w-8' } } },
   {
     id: 'select',
     meta: { class: { th: 'w-4', td: 'w-4' } },
@@ -144,50 +168,66 @@ function getDropdownItems(mod: AdminModule) {
       </div>
     </div>
 
-    <UTable
-      ref="table"
-      v-model:row-selection="rowSelection"
-      row-key="id_module"
-      :data="modules"
-      :columns="columns"
-      :loading="loading"
-      class="w-full"
+    <div
+      ref="modulesTableRoot"
+      data-rank-group="modules"
+      :data-rank-disabled="savingRank || loading"
     >
-      <!-- Butonul Edit -->
-      <template #edit-cell="{ row }">
-        <UButton
-          icon="i-lucide-pencil"
-          label="Edit"
-          color="neutral"
-          variant="ghost"
-          size="xs"
-          @click="openEdit(row.original)"
-        />
-      </template>
+      <UTable
+        ref="table"
+        v-model:row-selection="rowSelection"
+        row-key="id_module"
+        :data="modules"
+        :columns="columns"
+        :loading="loading"
+        class="w-full"
+      >
+        <template #drag-cell>
+          <UButton
+            class="rank-drag-handle cursor-grab active:cursor-grabbing"
+            icon="i-lucide-grip-vertical"
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            aria-label="Muta modulul"
+          />
+        </template>
+        <!-- Butonul Edit -->
+        <template #edit-cell="{ row }">
+          <UButton
+            icon="i-lucide-pencil"
+            label="Edit"
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            @click="openEdit(row.original)"
+          />
+        </template>
 
-      <template #icon-cell="{ row }">
-        <div v-if="row.original.icon" class="flex items-center gap-2">
-          <UIcon :name="row.original.icon" class="size-4" />
-          <span class="text-xs text-muted">{{ row.original.icon }}</span>
-        </div>
-        <span v-else class="text-muted">-</span>
-      </template>
+        <template #icon-cell="{ row }">
+          <div v-if="row.original.icon" class="flex items-center gap-2">
+            <UIcon :name="row.original.icon" class="size-4" />
+            <span class="text-xs text-muted">{{ row.original.icon }}</span>
+          </div>
+          <span v-else class="text-muted">-</span>
+        </template>
 
-      <template #is_active-cell="{ row }">
-        <UBadge
-          :label="row.original.is_active ? 'Activ' : 'Inactiv'"
-          :color="row.original.is_active ? 'success' : 'neutral'"
-          variant="subtle"
-          size="sm"
-        />
-      </template>
+        <template #is_active-cell="{ row }">
+          <UBadge
+            :label="row.original.is_active ? 'Activ' : 'Inactiv'"
+            :color="row.original.is_active ? 'success' : 'neutral'"
+            variant="subtle"
+            size="sm"
+          />
+        </template>
 
-      <template #actions-cell="{ row }">
-        <UDropdownMenu :items="getDropdownItems(row.original)">
-          <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" />
-        </UDropdownMenu>
-      </template>
-    </UTable>
+        <template #actions-cell="{ row }">
+          <UDropdownMenu :items="getDropdownItems(row.original)">
+            <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" />
+          </UDropdownMenu>
+        </template>
+      </UTable>
+    </div>
 
     <div v-if="!loading && modules.length === 0" class="py-12">
       <UEmpty

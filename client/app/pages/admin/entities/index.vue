@@ -8,15 +8,40 @@ const UCheckbox = resolveComponent('UCheckbox')
 const { entities, loading, error, fetchEntities, deleteEntity, deleteEntities } = useAdminEntities()
 const { modules, fetchModules } = useAdminModules()
 const toast = useToast()
+const entitiesTableRoot = ref<HTMLElement | null>(null)
+const { savingRank, persistRankOrder } = useRankReorder()
 
 await Promise.all([fetchEntities(), fetchModules()])
 
 // ─── Filter by module ───
 const ALL_MODULES = '_all'
 const selectedModuleId = ref<string>(ALL_MODULES)
+const canReorder = computed(() => selectedModuleId.value !== ALL_MODULES)
 
 watch(selectedModuleId, (moduleId) => {
   fetchEntities(moduleId === ALL_MODULES ? undefined : moduleId)
+})
+
+useRankedTableDrag(entitiesTableRoot, {
+  async onReorder(_group, oldIndex, newIndex) {
+    if (!canReorder.value) return
+    const previous = [...entities.value]
+    entities.value = normalizeRankOrder(moveRankedItem(entities.value, oldIndex, newIndex))
+    try {
+      entities.value = await persistRankOrder(
+        '/v1/admin/entities/reorder/ranks',
+        entities.value,
+        entity => entity.id_entity
+      )
+    } catch (err: any) {
+      entities.value = previous
+      toast.add({
+        title: 'Ordinea nu a putut fi salvata',
+        description: err?.data?.message || err.message,
+        color: 'error'
+      })
+    }
+  }
 })
 
 const moduleFilterOptions = computed(() => [
@@ -94,6 +119,7 @@ function goToDetail(entity: AdminEntity) {
 
 // ─── Table ───
 const columns: TableColumn<AdminEntity>[] = [
+  { id: 'drag', meta: { class: { th: 'w-8', td: 'w-8' } } },
   {
     id: 'select',
     meta: { class: { th: 'w-4', td: 'w-4' } },
@@ -186,59 +212,78 @@ function getDropdownItems(entity: AdminEntity) {
       </div>
     </div>
 
-    <UTable
-      ref="table"
-      v-model:row-selection="rowSelection"
-      row-key="id_entity"
-      :data="entities"
-      :columns="columns"
-      :loading="loading"
-      class="w-full"
+    <p v-if="!canReorder" class="mb-2 text-xs text-muted">
+      Selecteaza un modul pentru a reordona entitatile prin drag & drop.
+    </p>
+    <div
+      ref="entitiesTableRoot"
+      data-rank-group="entities"
+      :data-rank-disabled="!canReorder || savingRank || loading"
     >
-      <!-- Butonul Edit -->
-      <template #edit-cell="{ row }">
-        <UButton
-          icon="i-lucide-pencil"
-          label="Edit"
-          color="neutral"
-          variant="ghost"
-          size="xs"
-          @click="openEdit(row.original)"
-        />
-      </template>
+      <UTable
+        ref="table"
+        v-model:row-selection="rowSelection"
+        row-key="id_entity"
+        :data="entities"
+        :columns="columns"
+        :loading="loading"
+        class="w-full"
+      >
+        <template #drag-cell>
+          <UButton
+            :class="canReorder ? 'rank-drag-handle cursor-grab active:cursor-grabbing' : 'cursor-not-allowed opacity-35'"
+            icon="i-lucide-grip-vertical"
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            :aria-label="canReorder ? 'Muta entitatea' : 'Selecteaza un modul pentru reordonare'"
+          />
+        </template>
+        <!-- Butonul Edit -->
+        <template #edit-cell="{ row }">
+          <UButton
+            icon="i-lucide-pencil"
+            label="Edit"
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            @click="openEdit(row.original)"
+          />
+        </template>
 
-      <!-- Butonul Deschide -->
-      <template #open-cell="{ row }">
-        <UButton
-          icon="i-lucide-external-link"
-          label="Deschide"
-          color="neutral"
-          variant="ghost"
-          size="xs"
-          @click="goToDetail(row.original)"
-        />
-      </template>
+        <!-- Butonul Deschide -->
+        <template #open-cell="{ row }">
+          <UButton
+            icon="i-lucide-external-link"
+            label="Deschide"
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            @click="goToDetail(row.original)"
+          />
+        </template>
 
-      <template #module-cell="{ row }">
-        <span>{{ getModuleName(row.original.id_module) }}</span>
-      </template>
+        <template #module-cell="{ row }">
+          <span>{{ getModuleName(row.original.id_module) }}</span>
+        </template>
 
-      <template #is_system-cell="{ row }">
-        <UBadge
-          v-if="row.original.is_system"
-          label="System"
-          color="warning"
-          variant="subtle"
-          size="sm"
-        />
-      </template>
+        <template #is_system-cell="{ row }">
+          <UBadge
+            v-if="row.original.is_system"
+            label="System"
+            color="warning"
+            variant="subtle"
+            size="sm"
+          />
+        </template>
 
-      <template #actions-cell="{ row }">
-        <UDropdownMenu :items="getDropdownItems(row.original)">
-          <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" />
-        </UDropdownMenu>
-      </template>
-    </UTable>
+        <template #actions-cell="{ row }">
+          <UDropdownMenu :items="getDropdownItems(row.original)">
+            <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" />
+          </UDropdownMenu>
+        </template>
+      </UTable>
+    </div>
 
     <div v-if="!loading && entities.length === 0" class="py-12">
       <UEmpty

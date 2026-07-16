@@ -7,6 +7,7 @@ interface WorkflowDefinition {
   n8n_workflow_id: string | null
   status: 'draft' | 'active' | 'paused'
   version: number
+  rank: number
   date_created: string
   date_updated: string
 }

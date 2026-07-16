@@ -16,6 +16,9 @@ const { fields, loading: fieldsLoading, fetchFields, deleteField, error: fieldsE
 const { modules, fetchModules } = useAdminModules()
 const { entities, fetchEntities } = useAdminEntities()
 const { tabs, loading: tabsLoading, fetchTabs, deleteTab, error: tabsError } = useAdminTabs(entityId, entitySlug)
+const tabsRoot = ref<HTMLElement | null>(null)
+const { savingRank: savingTabRank, persistRankOrder: persistTabRank } = useRankReorder()
+const { savingRank: savingFieldRank, persistRankOrder: persistFieldRank } = useRankReorder()
 
 const pageLoading = ref(true)
 
@@ -36,6 +39,52 @@ async function loadData() {
 }
 
 loadData()
+
+useRankedTableDrag(tabsRoot, {
+  async onReorder(_group, oldIndex, newIndex) {
+    const previous = [...tabs.value]
+    tabs.value = normalizeRankOrder(moveRankedItem(tabs.value, oldIndex, newIndex))
+    try {
+      tabs.value = await persistTabRank(
+        `/v1/admin/entities/${entityId.value}/tabs/reorder/ranks`,
+        tabs.value,
+        tab => tab.id_ui_tab
+      )
+      if (entitySlug.value) clearEntitySchemaCache(entitySlug.value)
+    } catch (err: any) {
+      tabs.value = previous
+      toast.add({
+        title: 'Ordinea tab-urilor nu a putut fi salvata',
+        description: err?.data?.message || err.message,
+        color: 'error'
+      })
+    }
+  }
+})
+
+async function reorderFields(_tabId: string | null, orderedFields: Field[]) {
+  const previous = [...fields.value]
+  const ranks = new Map(orderedFields.map(field => [field.id_field, field.rank]))
+  fields.value = fields.value.map(field => (
+    ranks.has(field.id_field) ? { ...field, rank: ranks.get(field.id_field)! } : field
+  ))
+
+  try {
+    fields.value = await persistFieldRank(
+      `/v1/admin/entities/${entityId.value}/fields/reorder/ranks`,
+      orderedFields,
+      field => field.id_field
+    )
+    await fetchFields()
+  } catch (err: any) {
+    fields.value = previous
+    toast.add({
+      title: 'Ordinea campurilor nu a putut fi salvata',
+      description: err?.data?.message || err.message,
+      color: 'error'
+    })
+  }
+}
 
 // ─── Entity edit modal ───
 const showEntityModal = ref(false)
@@ -278,12 +327,27 @@ function getModuleName(moduleId: string | null): string {
           <USkeleton v-for="i in 2" :key="i" class="h-12 w-full" />
         </div>
 
-        <div v-else class="space-y-2">
+        <div
+          v-else
+          ref="tabsRoot"
+          data-rank-group="tabs"
+          data-rank-direct="true"
+          :data-rank-disabled="savingTabRank || tabsLoading"
+          class="space-y-2"
+        >
           <div
             v-for="tab in tabs"
             :key="tab.id_ui_tab"
             class="flex items-center gap-3 p-3 rounded-lg border border-default bg-elevated/30"
           >
+            <UButton
+              class="rank-drag-handle cursor-grab active:cursor-grabbing"
+              icon="i-lucide-grip-vertical"
+              color="neutral"
+              variant="ghost"
+              size="xs"
+              aria-label="Muta tab-ul"
+            />
             <UIcon name="i-lucide-folder" class="size-5 text-muted shrink-0" />
             <div class="flex-1 min-w-0">
               <div class="font-medium truncate">
@@ -332,9 +396,11 @@ function getModuleName(moduleId: string | null): string {
         :fields="fields"
         :tabs="tabOptions"
         :loading="fieldsLoading"
+        :reordering="savingFieldRank"
         @add="openAddField"
         @edit="openEditField"
         @delete="confirmDeleteField"
+        @reorder="reorderFields"
       />
 
       <!-- Entity Edit Modal -->

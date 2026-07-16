@@ -13,7 +13,12 @@ const {
 const { entities, fetchEntities } = useAdminEntities()
 const { dashboards, fetchDashboards } = useAdminDashboards()
 const { hasFeature } = useFeatures()
+const { fetchNavigation } = useNavigation()
 const toast = useToast()
+const menusTableRoot = ref<HTMLElement | null>(null)
+const itemsTableRoot = ref<HTMLElement | null>(null)
+const { savingRank: savingMenuRank, persistRankOrder: persistMenuRank } = useRankReorder()
+const { savingRank: savingItemRank, persistRankOrder: persistItemRank } = useRankReorder()
 
 await Promise.all([
   fetchMenus(),
@@ -24,6 +29,59 @@ await Promise.all([
 const selectedMenuId = ref(menus.value[0]?.id_menu ?? '')
 const selectedMenu = computed(() => menus.value.find(menu => menu.id_menu === selectedMenuId.value) ?? null)
 const selectedItems = computed(() => [...(selectedMenu.value?.items ?? [])].sort((a, b) => a.rank - b.rank))
+
+useRankedTableDrag(menusTableRoot, {
+  async onReorder(_group, oldIndex, newIndex) {
+    const previous = [...menus.value]
+    menus.value = normalizeRankOrder(moveRankedItem(menus.value, oldIndex, newIndex))
+    try {
+      menus.value = await persistMenuRank(
+        '/v1/admin/menus/reorder/ranks',
+        menus.value,
+        menu => menu.id_menu
+      )
+      await fetchNavigation()
+    } catch (err: any) {
+      menus.value = previous
+      toast.add({
+        title: 'Ordinea meniurilor nu a putut fi salvata',
+        description: err?.data?.message || err.message,
+        color: 'error'
+      })
+    }
+  }
+})
+
+useRankedTableDrag(itemsTableRoot, {
+  async onReorder(_group, oldIndex, newIndex) {
+    if (!selectedMenu.value) return
+    const previous = menus.value.map(menu => ({ ...menu, items: [...(menu.items ?? [])] }))
+    const ordered = normalizeRankOrder(moveRankedItem(selectedItems.value, oldIndex, newIndex))
+    const menuId = selectedMenu.value.id_menu
+    menus.value = menus.value.map(menu => (
+      menu.id_menu === menuId ? { ...menu, items: ordered } : menu
+    ))
+
+    try {
+      const savedItems = await persistItemRank(
+        '/v1/admin/menu-items/reorder/ranks',
+        ordered,
+        item => item.id_menu_item
+      )
+      menus.value = menus.value.map(menu => (
+        menu.id_menu === menuId ? { ...menu, items: savedItems } : menu
+      ))
+      await fetchNavigation()
+    } catch (err: any) {
+      menus.value = previous
+      toast.add({
+        title: 'Ordinea elementelor nu a putut fi salvata',
+        description: err?.data?.message || err.message,
+        color: 'error'
+      })
+    }
+  }
+})
 
 watch(menus, (value) => {
   if (!value.length) {
@@ -120,6 +178,7 @@ async function onConfirmDeleteItem() {
 }
 
 const menuColumns: TableColumn<AdminMenu>[] = [
+  { id: 'drag', meta: { class: { th: 'w-8', td: 'w-8' } } },
   { id: 'select', meta: { class: { th: 'w-10', td: 'w-10' } } },
   { id: 'edit', meta: { class: { th: 'w-10', td: 'w-10' } } },
   { accessorKey: 'name', header: 'Denumire' },
@@ -131,6 +190,7 @@ const menuColumns: TableColumn<AdminMenu>[] = [
 ]
 
 const itemColumns: TableColumn<AdminMenuItem>[] = [
+  { id: 'drag', meta: { class: { th: 'w-8', td: 'w-8' } } },
   { id: 'edit', meta: { class: { th: 'w-10', td: 'w-10' } } },
   { accessorKey: 'name', header: 'Denumire' },
   { accessorKey: 'open_link', header: 'Link' },
@@ -195,65 +255,81 @@ const linkTypeLabels: Record<string, string> = {
       />
     </div>
 
-    <UTable
-      :data="menus"
-      :columns="menuColumns"
-      :loading="loading"
-      row-key="id_menu"
-      class="w-full"
+    <div
+      ref="menusTableRoot"
+      data-rank-group="menus"
+      :data-rank-disabled="savingMenuRank || loading"
     >
-      <template #select-cell="{ row }">
-        <UButton
-          :icon="selectedMenuId === row.original.id_menu ? 'i-lucide-check' : 'i-lucide-list-tree'"
-          color="neutral"
-          variant="ghost"
-          size="xs"
-          @click="selectedMenuId = row.original.id_menu"
-        />
-      </template>
+      <UTable
+        :data="menus"
+        :columns="menuColumns"
+        :loading="loading"
+        row-key="id_menu"
+        class="w-full"
+      >
+        <template #drag-cell>
+          <UButton
+            class="rank-drag-handle cursor-grab active:cursor-grabbing"
+            icon="i-lucide-grip-vertical"
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            aria-label="Muta meniul"
+          />
+        </template>
+        <template #select-cell="{ row }">
+          <UButton
+            :icon="selectedMenuId === row.original.id_menu ? 'i-lucide-check' : 'i-lucide-list-tree'"
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            @click="selectedMenuId = row.original.id_menu"
+          />
+        </template>
 
-      <template #edit-cell="{ row }">
-        <UButton
-          icon="i-lucide-pencil"
-          label="Edit"
-          color="neutral"
-          variant="ghost"
-          size="xs"
-          @click="openEditMenu(row.original)"
-        />
-      </template>
+        <template #edit-cell="{ row }">
+          <UButton
+            icon="i-lucide-pencil"
+            label="Edit"
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            @click="openEditMenu(row.original)"
+          />
+        </template>
 
-      <template #icon-cell="{ row }">
-        <div v-if="row.original.icon" class="flex items-center gap-2">
-          <UIcon :name="row.original.icon" class="size-4" />
-          <span class="text-xs text-muted">{{ row.original.icon }}</span>
-        </div>
-        <span v-else class="text-muted">-</span>
-      </template>
+        <template #icon-cell="{ row }">
+          <div v-if="row.original.icon" class="flex items-center gap-2">
+            <UIcon :name="row.original.icon" class="size-4" />
+            <span class="text-xs text-muted">{{ row.original.icon }}</span>
+          </div>
+          <span v-else class="text-muted">-</span>
+        </template>
 
-      <template #is_active-cell="{ row }">
-        <UBadge
-          :label="row.original.is_active ? 'Activ' : 'Inactiv'"
-          :color="row.original.is_active ? 'success' : 'neutral'"
-          variant="subtle"
-          size="sm"
-        />
-      </template>
+        <template #is_active-cell="{ row }">
+          <UBadge
+            :label="row.original.is_active ? 'Activ' : 'Inactiv'"
+            :color="row.original.is_active ? 'success' : 'neutral'"
+            variant="subtle"
+            size="sm"
+          />
+        </template>
 
-      <template #items-cell="{ row }">
-        <UBadge
-          :label="String(row.original.items?.length ?? row.original._count?.items ?? 0)"
-          color="neutral"
-          variant="subtle"
-        />
-      </template>
+        <template #items-cell="{ row }">
+          <UBadge
+            :label="String(row.original.items?.length ?? row.original._count?.items ?? 0)"
+            color="neutral"
+            variant="subtle"
+          />
+        </template>
 
-      <template #actions-cell="{ row }">
-        <UDropdownMenu :items="menuDropdownItems(row.original)">
-          <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" />
-        </UDropdownMenu>
-      </template>
-    </UTable>
+        <template #actions-cell="{ row }">
+          <UDropdownMenu :items="menuDropdownItems(row.original)">
+            <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" />
+          </UDropdownMenu>
+        </template>
+      </UTable>
+    </div>
 
     <div v-if="!loading && menus.length === 0" class="py-12">
       <UEmpty
@@ -284,59 +360,75 @@ const linkTypeLabels: Record<string, string> = {
         />
       </div>
 
-      <UTable
-        :data="selectedItems"
-        :columns="itemColumns"
-        :loading="loading"
-        row-key="id_menu_item"
-        class="w-full"
+      <div
+        ref="itemsTableRoot"
+        data-rank-group="menu-items"
+        :data-rank-disabled="savingItemRank || loading"
       >
-        <template #edit-cell="{ row }">
-          <UButton
-            icon="i-lucide-pencil"
-            label="Edit"
-            color="neutral"
-            variant="ghost"
-            size="xs"
-            @click="openEditItem(row.original)"
-          />
-        </template>
+        <UTable
+          :data="selectedItems"
+          :columns="itemColumns"
+          :loading="loading"
+          row-key="id_menu_item"
+          class="w-full"
+        >
+          <template #drag-cell>
+            <UButton
+              class="rank-drag-handle cursor-grab active:cursor-grabbing"
+              icon="i-lucide-grip-vertical"
+              color="neutral"
+              variant="ghost"
+              size="xs"
+              aria-label="Muta elementul"
+            />
+          </template>
+          <template #edit-cell="{ row }">
+            <UButton
+              icon="i-lucide-pencil"
+              label="Edit"
+              color="neutral"
+              variant="ghost"
+              size="xs"
+              @click="openEditItem(row.original)"
+            />
+          </template>
 
-        <template #open_link-cell="{ row }">
-          <span class="font-mono text-xs">{{ row.original.open_link }}</span>
-        </template>
+          <template #open_link-cell="{ row }">
+            <span class="font-mono text-xs">{{ row.original.open_link }}</span>
+          </template>
 
-        <template #link_type-cell="{ row }">
-          <UBadge
-            :label="linkTypeLabels[row.original.link_type] ?? row.original.link_type"
-            color="neutral"
-            variant="subtle"
-          />
-        </template>
+          <template #link_type-cell="{ row }">
+            <UBadge
+              :label="linkTypeLabels[row.original.link_type] ?? row.original.link_type"
+              color="neutral"
+              variant="subtle"
+            />
+          </template>
 
-        <template #icon-cell="{ row }">
-          <div v-if="row.original.icon" class="flex items-center gap-2">
-            <UIcon :name="row.original.icon" class="size-4" />
-            <span class="text-xs text-muted">{{ row.original.icon }}</span>
-          </div>
-          <span v-else class="text-muted">-</span>
-        </template>
+          <template #icon-cell="{ row }">
+            <div v-if="row.original.icon" class="flex items-center gap-2">
+              <UIcon :name="row.original.icon" class="size-4" />
+              <span class="text-xs text-muted">{{ row.original.icon }}</span>
+            </div>
+            <span v-else class="text-muted">-</span>
+          </template>
 
-        <template #is_active-cell="{ row }">
-          <UBadge
-            :label="row.original.is_active ? 'Activ' : 'Inactiv'"
-            :color="row.original.is_active ? 'success' : 'neutral'"
-            variant="subtle"
-            size="sm"
-          />
-        </template>
+          <template #is_active-cell="{ row }">
+            <UBadge
+              :label="row.original.is_active ? 'Activ' : 'Inactiv'"
+              :color="row.original.is_active ? 'success' : 'neutral'"
+              variant="subtle"
+              size="sm"
+            />
+          </template>
 
-        <template #actions-cell="{ row }">
-          <UDropdownMenu :items="itemDropdownItems(row.original)">
-            <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" />
-          </UDropdownMenu>
-        </template>
-      </UTable>
+          <template #actions-cell="{ row }">
+            <UDropdownMenu :items="itemDropdownItems(row.original)">
+              <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" />
+            </UDropdownMenu>
+          </template>
+        </UTable>
+      </div>
 
       <div v-if="selectedItems.length === 0" class="py-10">
         <UEmpty
@@ -394,8 +486,19 @@ const linkTypeLabels: Record<string, string> = {
           <strong>{{ deletingMenu?.name }}</strong>?
         </p>
         <div class="flex items-center gap-3 justify-end mt-4">
-          <UButton label="Anuleaza" color="neutral" variant="outline" @click="showDeleteMenuConfirm = false" />
-          <UButton label="Sterge" color="error" icon="i-lucide-trash-2" :loading="loading" @click="onConfirmDeleteMenu" />
+          <UButton
+            label="Anuleaza"
+            color="neutral"
+            variant="outline"
+            @click="showDeleteMenuConfirm = false"
+          />
+          <UButton
+            label="Sterge"
+            color="error"
+            icon="i-lucide-trash-2"
+            :loading="loading"
+            @click="onConfirmDeleteMenu"
+          />
         </div>
       </template>
     </UModal>
@@ -410,8 +513,19 @@ const linkTypeLabels: Record<string, string> = {
           <strong>{{ deletingItem?.name }}</strong>?
         </p>
         <div class="flex items-center gap-3 justify-end mt-4">
-          <UButton label="Anuleaza" color="neutral" variant="outline" @click="showDeleteItemConfirm = false" />
-          <UButton label="Sterge" color="error" icon="i-lucide-trash-2" :loading="loading" @click="onConfirmDeleteItem" />
+          <UButton
+            label="Anuleaza"
+            color="neutral"
+            variant="outline"
+            @click="showDeleteItemConfirm = false"
+          />
+          <UButton
+            label="Sterge"
+            color="error"
+            icon="i-lucide-trash-2"
+            :loading="loading"
+            @click="onConfirmDeleteItem"
+          />
         </div>
       </template>
     </UModal>

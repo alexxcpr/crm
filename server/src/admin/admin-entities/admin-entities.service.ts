@@ -2,6 +2,8 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { DynamicSchemaService } from 'src/dynamic-schema/dynamic-schema.service';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { CreateEntityDto, UpdateEntityDto } from '../dto/entity.dto';
+import type { RankedItemDto } from '../dto/reorder.dto';
+import { reorderRanks } from '../rank-reorder.util';
 
 @Injectable()
 export class AdminEntitiesService {
@@ -83,6 +85,11 @@ export class AdminEntitiesService {
     }
 
     const tableName = `ent_${dto.slug}`;
+    let maxRankQuery = this.knex('entity').max('rank as max_rank');
+    maxRankQuery = dto.id_module
+      ? maxRankQuery.where('id_module', dto.id_module)
+      : maxRankQuery.whereNull('id_module');
+    const maxRank = await maxRankQuery.first();
 
     const [entity] = await this.knex('entity')
       .insert({
@@ -93,7 +100,7 @@ export class AdminEntitiesService {
         icon: dto.icon ?? null,
         label_singular: dto.label_singular ?? null,
         label_plural: dto.label_plural ?? null,
-        rank: dto.rank ?? 0,
+        rank: dto.rank ?? Number(maxRank?.max_rank ?? 0) + 1,
         is_system: false,
       })
       .returning('*');
@@ -110,6 +117,32 @@ export class AdminEntitiesService {
     });
 
     return entity;
+  }
+
+  async reorder(items: RankedItemDto[]) {
+    const ids = items.map((item) => item.id);
+    const entities = await this.knex('entity')
+      .select('id_entity', 'id_module')
+      .whereIn('id_entity', ids);
+
+    if (entities.length !== items.length) {
+      throw new BadRequestException('Lista de reordonare contine entitati inexistente.');
+    }
+
+    const moduleIds = new Set(entities.map((entity) => entity.id_module ?? null));
+    if (moduleIds.size !== 1) {
+      throw new BadRequestException('Entitatile pot fi reordonate doar in interiorul aceluiasi modul.');
+    }
+
+    const moduleId = entities[0].id_module ?? null;
+    await reorderRanks(this.knex, {
+      table: 'entity',
+      idColumn: 'id_entity',
+      items,
+      scope: { id_module: moduleId },
+    });
+
+    return this.findAll(moduleId ?? undefined);
   }
 
   async update(id: string, dto: UpdateEntityDto) {

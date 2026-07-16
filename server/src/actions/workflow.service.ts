@@ -8,6 +8,8 @@ import {
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { WorkflowSyncService } from 'src/n8n/workflow-sync.service';
 import { CreateWorkflowDto, UpdateWorkflowDto } from './dto';
+import type { RankedItemDto } from 'src/admin/dto/reorder.dto';
+import { reorderRanks } from 'src/admin/rank-reorder.util';
 
 @Injectable()
 export class WorkflowService {
@@ -26,7 +28,8 @@ export class WorkflowService {
   async findAll() {
     const rows = await this.knex(this.TABLE)
       .select('*')
-      .orderBy('date_created', 'desc');
+      .orderBy('rank', 'asc')
+      .orderBy('date_created', 'asc');
     return { data: rows };
   }
 
@@ -48,17 +51,29 @@ export class WorkflowService {
       );
     }
 
+    const maxRank = await this.knex(this.TABLE).max('rank as max_rank').first();
+
     const [row] = await this.knex(this.TABLE)
       .insert({
         name: dto.name,
         slug: dto.slug,
         nodes: JSON.stringify(dto.nodes ?? []),
         connections: JSON.stringify(dto.connections ?? []),
+        rank: Number(maxRank?.max_rank ?? 0) + 1,
       })
       .returning('*');
 
     this.logger.log(`Workflow creat: ${row.slug} (${row.id_workflow})`);
     return { data: row };
+  }
+
+  async reorder(items: RankedItemDto[]) {
+    await reorderRanks(this.knex, {
+      table: this.TABLE,
+      idColumn: 'id_workflow',
+      items,
+    });
+    return this.findAll();
   }
 
   async update(id: string, dto: UpdateWorkflowDto) {

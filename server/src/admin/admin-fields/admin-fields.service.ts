@@ -3,6 +3,8 @@ import { DynamicSchemaService } from 'src/dynamic-schema/dynamic-schema.service'
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { CreateFieldDto, UpdateFieldDto } from '../dto/field.dto';
 import { validateGroupFieldLayout } from './field-layout.util';
+import type { RankedItemDto } from '../dto/reorder.dto';
+import { reorderRanks } from '../rank-reorder.util';
 
 @Injectable()
 export class AdminFieldsService {
@@ -220,6 +222,35 @@ export class AdminFieldsService {
       .returning('*');
 
     return updated;
+  }
+
+  async reorder(entityId: string, items: RankedItemDto[]) {
+    await this.ensureEntityExists(entityId);
+    const ids = items.map((item) => item.id);
+    const fields = await this.knex('field')
+      .select('id_field', 'id_ui_tab')
+      .where('id_entity', entityId)
+      .whereIn('id_field', ids);
+
+    if (fields.length !== items.length) {
+      throw new BadRequestException('Lista de reordonare contine campuri inexistente.');
+    }
+
+    const tabIds = new Set(fields.map((field) => field.id_ui_tab ?? null));
+    if (tabIds.size !== 1) {
+      throw new BadRequestException('Campurile pot fi reordonate doar in interiorul aceluiasi tab.');
+    }
+
+    await reorderRanks(this.knex, {
+      table: 'field',
+      idColumn: 'id_field',
+      items,
+      scope: {
+        id_entity: entityId,
+        id_ui_tab: fields[0].id_ui_tab ?? null,
+      },
+    });
+    return this.findAllByEntity(entityId);
   }
 
   async remove(entityId: string, fieldId: string) {
