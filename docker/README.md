@@ -86,6 +86,75 @@ Health endpoint:
 https://acme.stanciulescu.xyz/api/health
 ```
 
+## File storage (Hetzner Object Storage)
+
+1. Creeaza un bucket privat in aceeasi locatie cu VPS-ul, cu Versioning si Object Lock dezactivate.
+2. Creeaza credentiale S3 dedicate si limiteaza cheia la bucket prin bucket policy.
+3. Configureaza CORS pentru uploadurile directe din browser:
+
+```json
+{
+  "CORSRules": [
+    {
+      "AllowedOrigins": ["https://*.stanciulescu.xyz"],
+      "AllowedHeaders": ["*"],
+      "AllowedMethods": ["PUT", "GET", "HEAD"],
+      "ExposeHeaders": ["ETag"],
+      "MaxAgeSeconds": 3600
+    }
+  ]
+}
+```
+
+4. Adauga o lifecycle policy care sterge obiectele temporare abandonate:
+
+```json
+{
+  "Rules": [
+    {
+      "ID": "cleanup-temporary-uploads",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "_uploads/" },
+      "Expiration": { "Days": 2 },
+      "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 1 }
+    }
+  ]
+}
+```
+
+5. Completeaza variabilele `STORAGE_S3_*` din `.env`, apoi seteaza `STORAGE_ENABLED=true`.
+6. Ruleaza mai intai migrarea meta, apoi toate migrarile tenant:
+
+```powershell
+npm.cmd run db:migrate:meta
+npm.cmd run tenant:migrate-all
+```
+
+Pentru development, porneste MinIO din PowerShell:
+
+```powershell
+Set-Location D:\Projects\CRM\docker
+docker compose -f docker-compose.storage.yml up -d
+```
+
+Stack-ul local foloseste project name-ul izolat `moduvis-storage-dev`. Se opreste fara a afecta CRM-ul principal cu `docker compose -f docker-compose.storage.yml down`.
+
+Configurarea locala pentru backend este:
+
+```powershell
+$env:STORAGE_ENABLED = "true"
+$env:STORAGE_S3_ENDPOINT = "http://localhost:9000"
+$env:STORAGE_S3_REGION = "us-east-1"
+$env:STORAGE_S3_BUCKET = "moduvis-development"
+$env:STORAGE_S3_ACCESS_KEY = "moduvis"
+$env:STORAGE_S3_SECRET_KEY = "moduvis-development-secret"
+$env:STORAGE_S3_FORCE_PATH_STYLE = "true"
+```
+
+Jobul zilnic raporteaza atat metadatele fara obiect, cat si obiectele fara rezervare cunoscuta. `STORAGE_RECONCILE_MAX_OBJECTS` limiteaza numarul de obiecte S3 inspectate per tenant (implicit `10000`); jobul nu sterge automat obiectele orfane.
+
+Credentialele nu se adauga niciodata in frontend. Hetzner Object Storage nu aplica implicit criptare la rest; daca aceasta devine cerinta contractuala, fluxul direct browser-S3 trebuie inlocuit cu criptare prin backend/worker.
+
 ## Note
 
 - n8n nu are router Traefik și nu este expus public.

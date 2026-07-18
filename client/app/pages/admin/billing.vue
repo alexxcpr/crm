@@ -22,6 +22,11 @@ const canDecreaseSeats = computed(() => {
   return profileSeatsDraft.value >= billing.value.profileSeats.active
 })
 
+function formatBytes(bytes: number) {
+  if (bytes < 1_000_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`
+  return `${(bytes / 1_000_000_000).toFixed(2)} GB`
+}
+
 watch(billing, (value) => {
   if (!value) return
   profileSeatsDraft.value = value.profileSeats.contracted
@@ -126,14 +131,39 @@ onMounted(fetchBilling)
 
         <UPageCard
           title="Storage"
-          :description="`${billing.storage.quotaGb} GB disponibili`"
+          :description="`${formatBytes(billing.storage.usedBytes)} utilizati din ${billing.storage.quotaGb} GB`"
           variant="subtle"
         >
-          <p class="text-sm text-muted">
-            {{ billing.storage.includedGb }} GB inclus + {{ billing.storage.extraUnits * billing.storage.unitGb }} GB extra
-          </p>
+          <div class="space-y-2">
+            <UProgress
+              :model-value="Math.min(100, billing.storage.percentage)"
+              :color="billing.storage.overQuota ? 'error' : billing.storage.percentage >= 90 ? 'warning' : 'primary'"
+            />
+            <p class="text-sm text-muted">
+              {{ formatBytes(billing.storage.remainingBytes) }} ramasi
+              <span v-if="billing.storage.reservedBytes"> · {{ formatBytes(billing.storage.reservedBytes) }} rezervati</span>
+            </p>
+          </div>
         </UPageCard>
       </div>
+
+      <UAlert
+        v-if="billing.storage.overQuota"
+        color="error"
+        variant="subtle"
+        icon="i-lucide-hard-drive"
+        title="Spatiul contractat este depasit"
+        description="Fisierele existente pot fi descarcate sau sterse, dar uploadurile noi sunt blocate pana eliberezi spatiu sau cumperi o unitate suplimentara."
+      />
+
+      <UAlert
+        v-else-if="billing.storage.percentage >= 80"
+        color="warning"
+        variant="subtle"
+        icon="i-lucide-hard-drive"
+        title="Spatiul de stocare se apropie de limita"
+        :description="`${billing.storage.percentage.toFixed(1)}% din storage este utilizat sau rezervat.`"
+      />
 
       <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div class="space-y-4">

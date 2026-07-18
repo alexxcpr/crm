@@ -2,6 +2,7 @@
 import { z } from 'zod'
 import type { Field, UiTab } from '~/types/schema'
 import type { AdminEntity, FieldPayload, UpdateFieldPayload } from '~/types/admin'
+import { DEFAULT_FILE_MIME_TYPES, FILE_TYPE_OPTIONS } from '~/utils/fileTypes'
 
 const props = defineProps<{
   entityId: string
@@ -29,7 +30,7 @@ const dataTypeUiTypeMap: Record<string, string[]> = {
   numeric: ['number', 'currency'],
   boolean: ['checkbox'],
   datetime: ['datepicker', 'datetimepicker'],
-  uuid: ['relation']
+  uuid: ['relation', 'file']
 }
 
 const dataTypeOptions = [
@@ -39,7 +40,7 @@ const dataTypeOptions = [
   { label: 'Numar decimal (numeric)', value: 'numeric' },
   { label: 'Da/Nu (boolean)', value: 'boolean' },
   { label: 'Data si ora (datetime)', value: 'datetime' },
-  { label: 'Relatie (uuid)', value: 'uuid' }
+  { label: 'Relatie sau fisier (uuid)', value: 'uuid' }
 ]
 
 const allUiTypeOptions = [
@@ -81,6 +82,12 @@ const state = reactive({
   validation_max: (props.field?.validation_rules?.max as number) ?? undefined as number | undefined,
   validation_pattern: (props.field?.validation_rules?.pattern as string) ?? '',
   validation_error_message: (props.field?.validation_rules?.error_message as string) ?? '',
+  file_allowed_mime_types: Array.isArray(props.field?.validation_rules?.allowed_mime_types)
+    ? props.field.validation_rules.allowed_mime_types.filter((value: unknown): value is string => typeof value === 'string')
+    : [...DEFAULT_FILE_MIME_TYPES],
+  file_max_size_mb: props.field?.validation_rules?.max_file_size_bytes
+    ? Number(props.field.validation_rules.max_file_size_bytes) / 1_000_000
+    : 100,
   id_ui_tab: props.field?.id_ui_tab ?? '',
   rank: props.field?.rank ?? undefined as number | undefined,
   grid_col: props.field?.grid_col ?? 1,
@@ -130,6 +137,7 @@ watch(() => state.id_ui_tab, (newTabId) => {
 
 // ─── Computed: show sections ───
 const showRelationFields = computed(() => state.ui_type === 'relation')
+const showFileFields = computed(() => state.ui_type === 'file')
 
 const showStringValidation = computed(() =>
   ['varchar', 'text'].includes(state.data_type)
@@ -185,9 +193,19 @@ watch(() => state.id_relation_entity, (entityId) => {
   fetchRelationEntityFields(entityId ?? '')
 }, { immediate: true })
 
+watch(() => state.ui_type, (uiType) => {
+  if (uiType !== 'file') return
+  state.is_unique = false
+  state.is_filterable = false
+  state.is_sortable = false
+  state.default_value = ''
+})
+
 // ─── Zod validation ───
 const formSchema = z.object({
   name: z.string().min(1, 'Numele este obligatoriu').max(100),
+  ui_type: z.string(),
+  file_allowed_mime_types: z.array(z.string()),
   slug: z.string()
     .min(2, 'Slug-ul trebuie sa aiba minim 2 caractere')
     .max(100)
@@ -196,6 +214,14 @@ const formSchema = z.object({
   grid_col: z.coerce.number().int().min(1, 'Coloana grid trebuie sa fie intre 1 si 3').max(3, 'Coloana grid trebuie sa fie intre 1 si 3'),
   col_span: z.coerce.number().int().min(1, 'Col span trebuie sa fie intre 1 si 3').max(3, 'Col span trebuie sa fie intre 1 si 3')
 }).superRefine((data, context) => {
+  if (data.ui_type === 'file' && data.file_allowed_mime_types.length === 0) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Selecteaza cel putin un tip de fisier.',
+      path: ['file_allowed_mime_types']
+    })
+  }
+
   const endCol = data.grid_col + data.col_span - 1
 
   if (endCol > 3) {
@@ -260,6 +286,14 @@ async function onSubmit() {
     }
     if (state.validation_error_message) {
       validationRules.error_message = state.validation_error_message
+    }
+    if (showFileFields.value) {
+      validationRules.allowed_mime_types = state.file_allowed_mime_types
+        .map(value => value.trim().toLowerCase())
+        .filter(Boolean)
+      validationRules.max_file_size_bytes = Math.round(Number(state.file_max_size_mb) * 1_000_000)
+      validationRules.multiple = false
+      validationRules.max_files = 1
     }
 
     let result: Field | null
@@ -386,6 +420,41 @@ async function onSubmit() {
       </div>
     </div>
 
+    <div v-if="showFileFields" class="space-y-4">
+      <USeparator />
+      <h4 class="text-sm font-semibold text-muted uppercase tracking-wider">
+        Fisier
+      </h4>
+      <UFormField
+        label="Tipuri de fisiere permise"
+        name="file_allowed_mime_types"
+        description="Selecteaza unul sau mai multe formate acceptate la incarcare."
+        required
+      >
+        <USelectMenu
+          v-model="state.file_allowed_mime_types"
+          :items="FILE_TYPE_OPTIONS"
+          value-key="value"
+          multiple
+          searchable
+          placeholder="Selecteaza tipurile de fisiere"
+          class="w-full"
+        />
+      </UFormField>
+      <UFormField label="Dimensiune maxima (MB)" name="file_max_size_mb">
+        <UInput
+          v-model.number="state.file_max_size_mb"
+          type="number"
+          min="1"
+          max="100"
+          class="w-full"
+        />
+      </UFormField>
+      <p class="text-xs text-muted">
+        MVP-ul permite un singur fisier per camp. Limita globala ramane 100 MB.
+      </p>
+    </div>
+
     <USeparator />
 
     <!-- Section 2: UI Config -->
@@ -456,15 +525,15 @@ async function onSubmit() {
         </UFormField>
 
         <UFormField label="Unic" name="is_unique">
-          <USwitch v-model="state.is_unique" />
+          <USwitch v-model="state.is_unique" :disabled="showFileFields" />
         </UFormField>
 
         <UFormField label="Filtrabil" name="is_filterable">
-          <USwitch v-model="state.is_filterable" />
+          <USwitch v-model="state.is_filterable" :disabled="showFileFields" />
         </UFormField>
 
         <UFormField label="Sortabil" name="is_sortable">
-          <USwitch v-model="state.is_sortable" />
+          <USwitch v-model="state.is_sortable" :disabled="showFileFields" />
         </UFormField>
 
         <UFormField label="Vizibil in tabel" name="visible_in_table">

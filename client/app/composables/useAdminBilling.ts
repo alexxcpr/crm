@@ -19,6 +19,12 @@ interface BillingState {
     unitPriceEur: number
     extraUnits: number
     quotaGb: number
+    quotaBytes: number
+    usedBytes: number
+    reservedBytes: number
+    remainingBytes: number
+    percentage: number
+    overQuota: boolean
   }
   features: {
     reportsDashboards: boolean

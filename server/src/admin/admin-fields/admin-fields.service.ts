@@ -68,6 +68,14 @@ export class AdminFieldsService {
   async create(entityId: string, dto: CreateFieldDto) {
     const entity = await this.ensureEntityExists(entityId);
 
+    this.validateFileConfiguration(dto);
+    if (dto.ui_type === 'file' && dto.is_required) {
+      const [{ count }] = await this.knex(entity.table_name).count('* as count');
+      if (Number(count) > 0) {
+        throw new BadRequestException('Un camp de fisier nou nu poate fi obligatoriu cat timp entitatea are deja inregistrari.');
+      }
+    }
+
     const existingSlug = await this.knex('field')
       .where({ id_entity: entityId, slug: dto.slug })
       .first();
@@ -125,16 +133,16 @@ export class AdminFieldsService {
         help_text: dto.help_text ?? null,
         options: dto.options ? JSON.stringify(dto.options) : null,
         is_required: dto.is_required ?? false,
-        is_unique: dto.is_unique ?? false,
-        is_filterable: dto.is_filterable ?? false,
-        is_sortable: dto.is_sortable ?? true,
+        is_unique: dto.ui_type === 'file' ? false : (dto.is_unique ?? false),
+        is_filterable: dto.ui_type === 'file' ? false : (dto.is_filterable ?? false),
+        is_sortable: dto.ui_type === 'file' ? false : (dto.is_sortable ?? true),
         visible_in_table: dto.visible_in_table ?? true,
         visible_in_form: dto.visible_in_form ?? true,
         is_readonly: dto.is_readonly ?? false,
         is_system: false,
         validation_rules: dto.validation_rules ? JSON.stringify(dto.validation_rules) : null,
-        id_relation_entity: dto.id_relation_entity ?? null,
-        relation_display_field: dto.relation_display_field ?? null,
+        id_relation_entity: dto.ui_type === 'file' ? null : (dto.id_relation_entity ?? null),
+        relation_display_field: dto.ui_type === 'file' ? null : (dto.relation_display_field ?? null),
         id_ui_tab: idUiTab,
         rank: dto.rank ?? nextRank,
         grid_col: dto.grid_col ?? 1,
@@ -165,6 +173,14 @@ export class AdminFieldsService {
       );
     }
 
+    if (field.ui_type === 'file' && dto.ui_type && dto.ui_type !== 'file') {
+      throw new BadRequestException('Tipul unui camp de fisier nu poate fi schimbat dupa creare.');
+    }
+    if (field.ui_type !== 'file' && dto.ui_type === 'file') {
+      throw new BadRequestException('Un camp existent nu poate fi convertit in camp de fisier. Creeaza un camp nou.');
+    }
+    if (field.ui_type === 'file') this.validateFileConfiguration({ ...field, ...dto });
+
     await this.validateLayoutForUpdate(entityId, field, dto);
 
     // Daca tab-ul se schimba si rank-ul nu e setat explicit, recalculeaza automat
@@ -186,9 +202,9 @@ export class AdminFieldsService {
       id_relation_entity: dto.id_relation_entity !== undefined ? dto.id_relation_entity : field.id_relation_entity,
       relation_display_field: dto.relation_display_field !== undefined ? dto.relation_display_field : field.relation_display_field,
       is_required: dto.is_required ?? field.is_required,
-      is_unique: dto.is_unique ?? field.is_unique,
-      is_filterable: dto.is_filterable ?? field.is_filterable,
-      is_sortable: dto.is_sortable ?? field.is_sortable,
+      is_unique: field.ui_type === 'file' ? false : (dto.is_unique ?? field.is_unique),
+      is_filterable: field.ui_type === 'file' ? false : (dto.is_filterable ?? field.is_filterable),
+      is_sortable: field.ui_type === 'file' ? false : (dto.is_sortable ?? field.is_sortable),
       visible_in_table: dto.visible_in_table ?? field.visible_in_table,
       visible_in_form: dto.visible_in_form ?? field.visible_in_form,
       is_readonly: dto.is_readonly ?? field.is_readonly,
@@ -270,6 +286,13 @@ export class AdminFieldsService {
       throw new BadRequestException(
         `Campul "${field.name}" este un camp de sistem si nu poate fi sters.`,
       );
+    }
+
+    if (field.ui_type === 'file') {
+      const file = await this.knex('stored_file').where({ id_field: fieldId }).first();
+      if (file) {
+        throw new BadRequestException('Campul nu poate fi sters cat timp exista fisiere incarcate pentru el.');
+      }
     }
 
     const dashboardUsage = await this.knex('ui_widget as widget')
@@ -361,5 +384,32 @@ export class AdminFieldsService {
     }
 
     return query;
+  }
+
+  private validateFileConfiguration(dto: Partial<CreateFieldDto> & { ui_type?: string; data_type?: string }) {
+    if (dto.ui_type !== 'file') return;
+    if (dto.data_type !== 'uuid') {
+      throw new BadRequestException('Campurile de fisier trebuie sa foloseasca data_type "uuid".');
+    }
+    const rules = dto.validation_rules as Record<string, unknown> | undefined;
+    if (!rules) return;
+    if (rules.max_file_size_bytes !== undefined) {
+      const size = Number(rules.max_file_size_bytes);
+      if (!Number.isInteger(size) || size <= 0) {
+        throw new BadRequestException('Limita campului de fisier trebuie exprimata in bytes si sa fie pozitiva.');
+      }
+    }
+    if (rules.allowed_mime_types !== undefined) {
+      if (!Array.isArray(rules.allowed_mime_types)
+        || rules.allowed_mime_types.some((mime) => typeof mime !== 'string' || !mime.includes('/'))) {
+        throw new BadRequestException('Lista MIME a campului de fisier este invalida.');
+      }
+    }
+    if (rules.multiple === true) {
+      throw new BadRequestException('MVP-ul curent permite un singur fisier per camp.');
+    }
+    if (rules.max_files !== undefined && Number(rules.max_files) !== 1) {
+      throw new BadRequestException('MVP-ul curent permite max_files egal cu 1.');
+    }
   }
 }

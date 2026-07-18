@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { FieldWithRelation } from 'src/types/entities';
+import { isUUID } from 'class-validator';
 
 @Injectable()
 export class DynamicValidationService {
@@ -104,6 +105,11 @@ export class DynamicValidationService {
       case 'boolean':
         if (typeof value === 'boolean') return value;
         return value === 'true' || value === '1';
+      case 'uuid':
+        if (typeof value !== 'string' || !isUUID(value)) {
+          throw new BadRequestException('Valoarea UUID trimisa nu este valida.');
+        }
+        return value;
       default:
         return value;
     }

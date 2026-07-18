@@ -20,9 +20,18 @@ function validateProductionEnv(): void {
     'INTEGRATIONS_ENCRYPTION_KEY',
   ];
 
-  const missing = required.filter((key) => !process.env[key]);
-  if (missing.length > 0) {
-    throw new Error(`Missing required production env vars: ${missing.join(', ')}`);
+  if (process.env.STORAGE_ENABLED === 'true') {
+    required.push(
+      'STORAGE_S3_ENDPOINT',
+      'STORAGE_S3_REGION',
+      'STORAGE_S3_BUCKET',
+      'STORAGE_S3_ACCESS_KEY',
+      'STORAGE_S3_SECRET_KEY',
+    );
+  }
+  const allMissing = required.filter((key) => !process.env[key]);
+  if (allMissing.length > 0) {
+    throw new Error(`Missing required production env vars: ${allMissing.join(', ')}`);
   }
 }
 

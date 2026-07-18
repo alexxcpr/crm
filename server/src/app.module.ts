@@ -18,10 +18,13 @@ import { NavigationModule } from './navigation/navigation.module';
 import { DashboardModule } from './dashboards/dashboard.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { IntegrationsModule } from './integrations/integrations.module';
+import { StorageModule } from './storage/storage.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     EventsModule,
     SecurityModule,
     TenantModule,
@@ -34,6 +37,7 @@ import { IntegrationsModule } from './integrations/integrations.module';
     DashboardModule,
     NotificationsModule,
     IntegrationsModule,
+    StorageModule,
     AdminModule,
     BillingModule,
     ActionsModule,

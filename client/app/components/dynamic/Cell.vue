@@ -7,6 +7,8 @@ defineProps<{
   field: Field
 }>()
 
+const { download } = useFiles()
+
 function formatCurrency(val: number): string {
   return new Intl.NumberFormat('ro-RO', { style: 'currency', currency: 'RON' }).format(val)
 }
@@ -59,6 +61,17 @@ function formatTimestamp(val: string): string {
   <span v-else-if="field.ui_type === 'datepicker'" class="text-highlighted">
     {{ formatDate(value) }}
   </span>
+
+  <UButton
+    v-else-if="field.ui_type === 'file'"
+    color="neutral"
+    variant="link"
+    icon="i-lucide-file-down"
+    class="max-w-56 px-0"
+    @click.stop="download(String(value))"
+  >
+    <span class="truncate">{{ displayValue || 'Descarca fisierul' }}</span>
+  </UButton>
 
   <NuxtLink
     v-else-if="field.ui_type === 'relation' && field.relation_entity_slug"

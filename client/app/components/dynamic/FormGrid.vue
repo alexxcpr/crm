@@ -7,6 +7,7 @@ const props = defineProps<{
   fields: Field[]
   formState: Record<string, any>
   autofocusFirst?: boolean
+  recordId?: string
 }>()
 
 const emit = defineEmits<{
@@ -63,6 +64,7 @@ function updateField(slug: string, value: any) {
         :field="placedField.field"
         :model-value="formState[placedField.field.slug]"
         :autofocus="autofocusFirst && idx === 0"
+        :record-id="recordId"
         @update:model-value="updateField(placedField.field.slug, $event)"
       />
     </div>
@@ -82,6 +84,7 @@ function updateField(slug: string, value: any) {
           :field="placedField.field"
           :model-value="formState[placedField.field.slug]"
           :autofocus="autofocusFirst && idx === 0"
+          :record-id="recordId"
           @update:model-value="updateField(placedField.field.slug, $event)"
         />
       </div>

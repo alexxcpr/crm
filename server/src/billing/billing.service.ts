@@ -9,6 +9,7 @@ import {
   STORAGE_UNIT_GB,
   STORAGE_UNIT_PRICE_EUR,
 } from './billing.constants';
+import { StorageQuotaService } from 'src/storage/storage-quota.service';
 
 interface TenantBillingRow {
   id: string;
@@ -40,6 +41,7 @@ export class BillingService {
     private readonly tenantContext: TenantContext,
     private readonly metaDb: MetaDbService,
     private readonly config: ConfigService,
+    private readonly storageQuota: StorageQuotaService,
   ) {
     this.isProduction = this.config.get<string>('NODE_ENV') === 'production';
   }
@@ -49,6 +51,7 @@ export class BillingService {
     const activeProfiles = await this.activeProfileCount();
     const entitlements = await this.entitlements(tenant.id);
     const scheduledChanges = await this.scheduledChanges(tenant.id);
+    const storageUsage = await this.storageQuota.state(tenant.slug);
 
     const profileSeats = Number(tenant.profile_seats || tenant.max_users || BASE_INCLUDED_PROFILE_SEATS);
     const includedStorageGb = Number(tenant.included_storage_gb || BASE_INCLUDED_STORAGE_GB);
@@ -79,6 +82,12 @@ export class BillingService {
         unitPriceEur: STORAGE_UNIT_PRICE_EUR,
         extraUnits: extraStorageUnits,
         quotaGb: storageQuotaGb,
+        quotaBytes: storageUsage.quotaBytes,
+        usedBytes: storageUsage.usedBytes,
+        reservedBytes: storageUsage.reservedBytes,
+        remainingBytes: storageUsage.remainingBytes,
+        percentage: storageUsage.percentage,
+        overQuota: storageUsage.overQuota,
       },
       features,
       entitlements,

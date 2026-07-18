@@ -235,7 +235,7 @@ function fetchActiveProfilesInBackground() {
 
 function refreshRelationLabelsInBackground(recordId: string) {
   fetchOne(recordId)
-    .then((record) => seedSelectedRelationOptions(formFields.value, record))
+    .then(record => seedSelectedRelationOptions(formFields.value, record))
     .catch((err) => {
       console.error('[DynamicForm] Eroare la reincarcarea etichetelor relatiilor:', err)
     })
@@ -593,6 +593,7 @@ onUnmounted(() => {
             :fields="getFieldsByGroup(groups[0] ?? 'general')"
             :form-state="formState"
             :autofocus-first="!isEditMode"
+            :record-id="recordId"
             @update-field="updateFormField"
           />
         </template>
@@ -618,6 +619,7 @@ onUnmounted(() => {
                 :fields="getFieldsByGroup(group)"
                 :form-state="formState"
                 :autofocus-first="!isEditMode && idx === 0"
+                :record-id="recordId"
                 @update-field="updateFormField"
               />
             </div>

@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { Entity, FieldWithRelation } from 'src/types/entities';
 import { AuthorizationService } from 'src/security/authorization.service';
@@ -8,17 +8,21 @@ import { DynamicValidationService } from './dynamic-validation.service';
 import { PaginatedResponse } from './dto/query.dto';
 import { EntityEventsService } from 'src/events/entity-events.service';
 import { EntityEvent } from 'src/events/entity-event.enum';
+import { FileStorageService } from 'src/storage/file-storage.service';
 
 const DELETE_CONFLICT_REFERENCE_ID_LIMIT = 3;
 
 @Injectable()
 export class DynamicDataService {
+  private readonly logger = new Logger(DynamicDataService.name);
+
   constructor(
     private readonly tenantContext: TenantContext,
     private readonly filterParser: FilterParserService,
     private readonly validation: DynamicValidationService,
     private readonly entityEvents: EntityEventsService,
     private readonly authorization: AuthorizationService,
+    private readonly files: FileStorageService,
   ) {}
 
   private get knex() { return this.tenantContext.knex; }
@@ -56,6 +60,14 @@ export class DynamicDataService {
       const alias = `rel_${field.column_name}`;
       query.leftJoin(`${field.relation_entity!.table_name} as ${alias}`, `${tableName}.${field.column_name}`, `${alias}.id`);
       if (field.relation_display_field) selectColumns.push(`${alias}.${field.relation_display_field} as ${field.column_name}_display`);
+    }
+    for (const field of fields.filter((item) => item.ui_type === 'file')) {
+      const alias = `file_${field.column_name}`;
+      query.leftJoin(`stored_file as ${alias}`, `${tableName}.${field.column_name}`, `${alias}.id_file`);
+      selectColumns.push(`${alias}.original_name as ${field.column_name}_display`);
+      selectColumns.push(`${alias}.status as ${field.column_name}_file_status`);
+      selectColumns.push(`${alias}.size_bytes as ${field.column_name}_file_size`);
+      selectColumns.push(`${alias}.mime_type as ${field.column_name}_file_mime`);
     }
     return query;
   }
@@ -132,11 +144,28 @@ export class DynamicDataService {
     const { entity, fields } = await this.resolveEntity(entitySlug);
     await this.authorization.require(actor, entity.id_entity, 'create');
     const sanitized = await this.validation.validateAndSanitize(body, fields, entity.table_name, 'create', undefined);
+    const fileFields = fields.filter((field) => field.ui_type === 'file');
+    for (const field of fileFields) {
+      await this.files.validateFileForBinding(field, sanitized[field.column_name] ?? null, actor);
+    }
     const insertData = { ...sanitized, id_profile: actor.profileId, date_created: new Date(), date_updated: new Date() };
     const eventCtx = this.eventContext(entity, entitySlug, null, insertData, actor);
     await this.entityEvents.emit(EntityEvent.BeforeInsert, eventCtx);
     insertData.id_profile = actor.profileId;
-    const [record] = await this.knex(entity.table_name).insert(insertData).returning('*');
+    for (const field of fileFields) {
+      await this.files.validateFileForBinding(field, insertData[field.column_name] ?? null, actor);
+    }
+    let record: Record<string, any>;
+    await this.knex.transaction(async (trx) => {
+      [record] = await trx(entity.table_name).insert(insertData).returning('*');
+      for (const field of fileFields) {
+        const fileId = record[field.column_name];
+        if (fileId) {
+          await this.files.bindInTransaction(trx, fileId, entity.id_entity, field.id_field, record.id, actor);
+        }
+      }
+    });
+    record = record!;
     await this.entityEvents.emit(EntityEvent.AfterInsert, { ...eventCtx, recordId: record.id, data: record });
     return { data: record };
   }
@@ -151,6 +180,12 @@ export class DynamicDataService {
 
     const requestedOwner = body.id_profile;
     const sanitized = await this.validation.validateAndSanitize(body, fields, entity.table_name, 'update', id);
+    const fileFields = fields.filter((field) => field.ui_type === 'file');
+    for (const field of fileFields) {
+      if (Object.prototype.hasOwnProperty.call(sanitized, field.column_name)) {
+        await this.files.validateFileForBinding(field, sanitized[field.column_name] ?? null, actor, id);
+      }
+    }
     delete sanitized.id_profile;
     if (requestedOwner && requestedOwner !== existing.id_profile) {
       await this.authorization.require(actor, entity.id_entity, 'change_ownership');
@@ -160,13 +195,40 @@ export class DynamicDataService {
     }
     const eventCtx = this.eventContext(entity, entitySlug, id, sanitized, actor, existing);
     await this.entityEvents.emit(EntityEvent.BeforeUpdate, eventCtx);
-    const [record] = await this.knex(entity.table_name).where('id', id).update({ ...sanitized, date_updated: new Date() }).returning('*');
+    for (const field of fileFields) {
+      if (Object.prototype.hasOwnProperty.call(sanitized, field.column_name)) {
+        await this.files.validateFileForBinding(field, sanitized[field.column_name] ?? null, actor, id);
+      }
+    }
+    const filesToDelete: string[] = [];
+    let record: Record<string, any>;
+    await this.knex.transaction(async (trx) => {
+      [record] = await trx(entity.table_name).where('id', id).update({ ...sanitized, date_updated: new Date() }).returning('*');
+      for (const field of fileFields) {
+        if (!Object.prototype.hasOwnProperty.call(sanitized, field.column_name)) continue;
+        const previousFileId = existing[field.column_name] as string | null;
+        const nextFileId = record[field.column_name] as string | null;
+        if (nextFileId && nextFileId !== previousFileId) {
+          await this.files.bindInTransaction(trx, nextFileId, entity.id_entity, field.id_field, id, actor);
+        }
+        if (previousFileId && previousFileId !== nextFileId) {
+          await this.files.markForDeletionInTransaction(trx, previousFileId, id);
+          filesToDelete.push(previousFileId);
+        }
+      }
+    });
+    record = record!;
     await this.entityEvents.emit(EntityEvent.AfterUpdate, { ...eventCtx, data: record });
+    for (const fileId of filesToDelete) {
+      this.files.finalizeDeletion(fileId).catch((error) => {
+        this.logger.error(`Stergerea fisierului ${fileId} va fi reluata de job.`, error as Error);
+      });
+    }
     return { data: record };
   }
 
   async remove(entitySlug: string, id: string, actor: AuthenticatedUser) {
-    const { entity } = await this.resolveEntity(entitySlug);
+    const { entity, fields } = await this.resolveEntity(entitySlug);
     const scope = await this.authorization.require(actor, entity.id_entity, 'delete');
     const existingQuery = this.knex(entity.table_name).where('id', id);
     this.authorization.applyScope(existingQuery, entity.table_name, scope, actor.profileId);
@@ -174,8 +236,17 @@ export class DynamicDataService {
     if (!existing) throw new NotFoundException(`Inregistrarea cu id "${id}" nu a fost gasita.`);
     const eventCtx = this.eventContext(entity, entitySlug, id, existing, actor, existing);
     await this.entityEvents.emit(EntityEvent.BeforeDelete, eventCtx);
+    const fileFields = fields.filter((field) => field.ui_type === 'file');
+    const filesToDelete = fileFields
+      .map((field) => existing[field.column_name] as string | null)
+      .filter((fileId): fileId is string => Boolean(fileId));
     try {
-      await this.knex(entity.table_name).where('id', id).del();
+      await this.knex.transaction(async (trx) => {
+        await trx(entity.table_name).where('id', id).del();
+        for (const fileId of filesToDelete) {
+          await this.files.markForDeletionInTransaction(trx, fileId, id);
+        }
+      });
     } catch (error) {
       if (this.isForeignKeyViolation(error)) {
         throw new ConflictException(await this.buildDeleteConflictMessage(entity, id, error));
@@ -183,6 +254,11 @@ export class DynamicDataService {
       throw error;
     }
     await this.entityEvents.emit(EntityEvent.AfterDelete, eventCtx);
+    for (const fileId of filesToDelete) {
+      this.files.finalizeDeletion(fileId).catch((error) => {
+        this.logger.error(`Stergerea fisierului ${fileId} va fi reluata de job.`, error as Error);
+      });
+    }
   }
 
   private async buildDeleteConflictMessage(

@@ -256,6 +256,7 @@ defineExpose({
         :fields="getFieldsByGroup(groups[0] ?? 'general')"
         :form-state="formState"
         :autofocus-first="false"
+        :record-id="recordId"
         @update-field="updateFormField"
       />
     </template>
@@ -278,6 +279,7 @@ defineExpose({
           :fields="getFieldsByGroup(group)"
           :form-state="formState"
           :autofocus-first="false"
+          :record-id="recordId"
           @update-field="updateFormField"
         />
       </template>

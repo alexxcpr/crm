@@ -92,6 +92,10 @@ export class DynamicSchemaService {
       await this.addForeignKeyAsync(tableName, field);
     }
 
+    if (field.ui_type === 'file') {
+      await this.addFileForeignKey(tableName, columnName);
+    }
+
     if (field.is_filterable) {
        // Index automat pe campuri filterable
       await this.createIndex(tableName, columnName);
@@ -211,6 +215,15 @@ export class DynamicSchemaService {
 
     await this.knex.schema.alterTable(tableName, (table) => {
       table.foreign(field.column_name).references('id').inTable(targetEntity.table_name);
+    });
+  }
+
+  private async addFileForeignKey(tableName: string, columnName: string): Promise<void> {
+    if (!(await this.knex.schema.hasTable('stored_file'))) {
+      throw new BadRequestException('Migrarea de storage nu a fost aplicata pentru acest tenant.');
+    }
+    await this.knex.schema.alterTable(tableName, (table) => {
+      table.foreign(columnName).references('id_file').inTable('stored_file').onDelete('RESTRICT');
     });
   }
 

@@ -88,11 +88,7 @@ describe('DynamicSchemaService', () => {
       index: jest.fn(),
       dropColumn: jest.fn(),
       unique: jest.fn(),
-      foreign: jest.fn().mockReturnValue({
-        references: jest.fn().mockReturnValue({
-          inTable: jest.fn(),
-        }),
-      }),
+      foreign: jest.fn().mockReturnValue(mockColumnBuilder),
     };
 
     mockSchema = {
@@ -308,6 +304,35 @@ describe('DynamicSchemaService', () => {
     testDataType('boolean', 'boolean');
     testDataType('datetime', 'timestamp', { useTz: true });
     testDataType('uuid', 'uuid');
+
+    it('adauga FK spre stored_file pentru ui_type=file', async () => {
+      mockSchema.hasColumn.mockResolvedValue(false);
+      mockSchema.hasTable.mockResolvedValue(true);
+      const field = mockField({
+        column_name: 'cf_contract',
+        data_type: 'uuid',
+        ui_type: 'file',
+        is_filterable: false,
+      });
+
+      await service.addColumn(mockEntity(), field);
+
+      expect(mockTableBuilder.foreign).toHaveBeenCalledWith('cf_contract');
+      expect(mockColumnBuilder.references).toHaveBeenCalledWith('id_file');
+      expect(mockColumnBuilder.inTable).toHaveBeenCalledWith('stored_file');
+      expect(mockColumnBuilder.onDelete).toHaveBeenCalledWith('RESTRICT');
+    });
+
+    it('refuza campul file daca migrarea stored_file lipseste', async () => {
+      mockSchema.hasColumn.mockResolvedValue(false);
+      mockSchema.hasTable.mockResolvedValue(false);
+
+      await expect(service.addColumn(mockEntity(), mockField({
+        data_type: 'uuid',
+        ui_type: 'file',
+        is_filterable: false,
+      }))).rejects.toBeInstanceOf(BadRequestException);
+    });
 
     it('fallback la string(255) pentru data_type necunoscut', async () => {
       mockSchema.hasColumn.mockResolvedValue(false);

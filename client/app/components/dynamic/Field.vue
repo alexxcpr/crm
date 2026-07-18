@@ -8,6 +8,7 @@ const props = defineProps<{
   field: Field
   modelValue: any
   autofocus?: boolean
+  recordId?: string
 }>()
 
 const fieldRoot = ref<HTMLElement>()
@@ -551,6 +552,15 @@ const applyDateTime = () => {
         v-else-if="field.ui_type === 'relation'"
         :field="field"
         :model-value="value"
+        :disabled="field.is_readonly"
+        @update:model-value="value = $event"
+      />
+
+      <DynamicFileField
+        v-else-if="field.ui_type === 'file'"
+        :field="field"
+        :model-value="value"
+        :record-id="recordId"
         :disabled="field.is_readonly"
         @update:model-value="value = $event"
       />
