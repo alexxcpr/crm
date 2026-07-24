@@ -1,177 +1,227 @@
 <script setup lang="ts">
-import type { Node } from '@vue-flow/core'
-import type { FieldMapping, FormulaAssignment, RecordIdSource, FilterEntry, Condition, NotificationRecipient, TextTemplateToken, WorkflowValueSource } from '~/composables/useNodeTypes'
-import type { DataSource } from '~/composables/useWorkflowDataRegistry'
-import type { Field } from '~/types/schema'
+import type { Node } from "@vue-flow/core";
+import type {
+  FieldMapping,
+  FormulaAssignment,
+  RecordIdSource,
+  FilterEntry,
+  Condition,
+  NotificationRecipient,
+  TextTemplateToken,
+  WorkflowValueSource,
+} from "~/composables/useNodeTypes";
+import type { DataSource } from "~/composables/useWorkflowDataRegistry";
+import type { Field } from "~/types/schema";
 
 const props = defineProps<{
-  node: Node | null
-  dataSources?: DataSource[]
-  fetchEntitySchema?: (slug: string) => Promise<Field[]>
-  fetchSourceFields?: (nodeId: string) => Promise<Field[]>
-}>()
+  node: Node | null;
+  dataSources?: DataSource[];
+  fetchEntitySchema?: (slug: string) => Promise<Field[]>;
+  fetchSourceFields?: (nodeId: string) => Promise<Field[]>;
+}>();
 
 const emit = defineEmits<{
-  updateParameters: [nodeId: string, params: Record<string, any>]
-  updateLabel: [nodeId: string, label: string]
-  deleteNode: []
-  close: []
-}>()
+  updateParameters: [nodeId: string, params: Record<string, any>];
+  updateLabel: [nodeId: string, label: string];
+  deleteNode: [];
+  close: [];
+}>();
 
-const { getNodeType } = useNodeTypes()
-const { entities, fetchEntities } = useAdminEntities()
-const { integrations, fetchIntegrations } = useAdminIntegrations()
+const { getNodeType } = useNodeTypes();
+const { entities, fetchEntities } = useAdminEntities();
+const { integrations, fetchIntegrations } = useAdminIntegrations();
 
 // ─── Target entity fields (for field-mappings in create/update nodes) ───
-const targetEntityFields = ref<Field[]>([])
+const targetEntityFields = ref<Field[]>([]);
 
 async function fetchTargetEntityFields(entitySlug: string) {
   if (!entitySlug) {
-    targetEntityFields.value = []
-    return
+    targetEntityFields.value = [];
+    return;
   }
   if (props.fetchEntitySchema) {
-    targetEntityFields.value = await props.fetchEntitySchema(entitySlug)
+    targetEntityFields.value = await props.fetchEntitySchema(entitySlug);
   }
 }
 
 const entityOptions = computed(() =>
-  (entities.value || []).map(e => ({ label: e.name, value: e.slug }))
-)
+  (entities.value || []).map((e) => ({ label: e.name, value: e.slug })),
+);
 
 // ─── Data source select options (for app_get_related, etc.) ───
 const fieldSelectableDataSources = computed(() =>
-  (props.dataSources || []).filter(ds => ds.cardinality !== 'list')
-)
+  (props.dataSources || []).filter((ds) => ds.cardinality !== "list"),
+);
 
 const listSourceOptions = computed(() =>
   (props.dataSources || [])
-    .filter(ds => ds.cardinality === 'list')
-    .map(ds => ({
+    .filter((ds) => ds.cardinality === "list")
+    .map((ds) => ({
       label: `${ds.label} (${ds.entitySlug})`,
-      value: ds.nodeId
-    }))
-)
+      value: ds.nodeId,
+    })),
+);
 
 const dataSourceOptions = computed(() =>
-  fieldSelectableDataSources.value.map(ds => ({
-    label: `${ds.label} (${ds.entitySlug})`,
-    value: ds.nodeId
-  }))
-)
+  fieldSelectableDataSources.value
+    .filter((ds) => ds.kind === "entity")
+    .map((ds) => ({
+      label: `${ds.label} (${ds.entitySlug})`,
+      value: ds.nodeId,
+    })),
+);
+
+const documentSourceOptions = computed(() => {
+  const documentPackage = nodeTypeDef.value?.package;
+  return (props.dataSources || [])
+    .filter(
+      (ds) =>
+        ds.kind === "document" &&
+        ds.cardinality !== "list" &&
+        ds.documentPackage === documentPackage,
+    )
+    .map((ds) => ({ label: ds.label, value: ds.nodeId }));
+});
 
 // ─── Relation field options (cascading — depends on sourceNodeId) ───
 const relationFieldOptions = computed(() => {
-  const srcNodeId: string = localParams.value.sourceNodeId ?? ''
-  if (!srcNodeId) return []
-  const ds = fieldSelectableDataSources.value.find(s => s.nodeId === srcNodeId)
-  if (!ds) return []
+  const srcNodeId: string = localParams.value.sourceNodeId ?? "";
+  if (!srcNodeId) return [];
+  const ds = fieldSelectableDataSources.value.find(
+    (s) => s.nodeId === srcNodeId && s.kind === "entity",
+  );
+  if (!ds) return [];
   return ds.fields
-    .filter(f => f.ui_type === 'relation' && f.relation_entity_slug)
-    .map(f => ({
+    .filter((f) => f.ui_type === "relation" && f.relation_entity_slug)
+    .map((f) => ({
       label: `${f.name} (${f.slug} → ${f.relation_entity_slug})`,
-      value: f.slug
-    }))
-})
+      value: f.slug,
+    }));
+});
 
 onMounted(() => {
-  fetchEntities()
-})
+  fetchEntities();
+});
 
 const nodeTypeDef = computed(() => {
-  if (!props.node) return null
-  return getNodeType(props.node.data.nodeType)
-})
+  if (!props.node) return null;
+  return getNodeType(props.node.data.nodeType);
+});
 
-const smtpIntegrationOptions = computed(() => integrations.value
-  .filter(item => item.is_active || item.id_integration === localParams.value.integrationId)
-  .map(item => ({
-    label: `${item.name} (${item.fromEmail})${item.is_active ? '' : ' - inactiva'}`,
-    value: item.id_integration,
-    disabled: !item.is_active
-  })))
+const smtpIntegrationOptions = computed(() =>
+  integrations.value
+    .filter(
+      (item) =>
+        item.is_active ||
+        item.id_integration === localParams.value.integrationId,
+    )
+    .map((item) => ({
+      label: `${item.name} (${item.fromEmail})${item.is_active ? "" : " - inactiva"}`,
+      value: item.id_integration,
+      disabled: !item.is_active,
+    })),
+);
 
-const localLabel = ref('')
-const localParams = ref<Record<string, any>>({})
-const isSwitchingNode = ref(false)
+const localLabel = ref("");
+const localParams = ref<Record<string, any>>({});
+const isSwitchingNode = ref(false);
 
-watch(() => props.node, (newNode) => {
-  if (newNode) {
-    isSwitchingNode.value = true
-    localLabel.value = newNode.data.label ?? ''
-    localParams.value = { ...(newNode.data.parameters ?? {}) }
-    nextTick(() => {
-      isSwitchingNode.value = false
-    })
-  }
-}, { immediate: true })
+watch(
+  () => props.node,
+  (newNode) => {
+    if (newNode) {
+      isSwitchingNode.value = true;
+      localLabel.value = newNode.data.label ?? "";
+      localParams.value = { ...(newNode.data.parameters ?? {}) };
+      nextTick(() => {
+        isSwitchingNode.value = false;
+      });
+    }
+  },
+  { immediate: true },
+);
 
-watch(() => props.node?.data?.nodeType, (nodeType) => {
-  if (nodeType === 'email') fetchIntegrations()
-}, { immediate: true })
+watch(
+  () => props.node?.data?.nodeType,
+  (nodeType) => {
+    if (nodeType === "email") fetchIntegrations();
+  },
+  { immediate: true },
+);
 
 function onLabelChange() {
-  if (!props.node) return
-  emit('updateLabel', props.node.id, localLabel.value)
+  if (!props.node) return;
+  emit("updateLabel", props.node.id, localLabel.value);
 }
 
 function onParamChange(key: string, value: any) {
-  localParams.value[key] = value
-  if (!props.node) return
-  emit('updateParameters', props.node.id, { ...localParams.value })
+  localParams.value[key] = value;
+  if (!props.node) return;
+  emit("updateParameters", props.node.id, { ...localParams.value });
 }
 
 function onIntegrationChange(id: string) {
-  const integration = integrations.value.find(item => item.id_integration === id)
-  localParams.value.integrationId = id
-  localParams.value.integrationName = integration?.name ?? ''
-  if (!props.node) return
-  emit('updateParameters', props.node.id, { ...localParams.value })
+  const integration = integrations.value.find(
+    (item) => item.id_integration === id,
+  );
+  localParams.value.integrationId = id;
+  localParams.value.integrationName = integration?.name ?? "";
+  if (!props.node) return;
+  emit("updateParameters", props.node.id, { ...localParams.value });
 }
 
-watch(() => localParams.value.entity, (newEntity, oldEntity) => {
-  // Nu sterge fieldMappings cand se schimba nodul — doar cand userul
-  // schimba manual dropdown-ul de entitate pe acelasi nod.
-  if (isSwitchingNode.value) return
-  if (oldEntity && newEntity !== oldEntity) {
-    localParams.value.fieldMappings = []
-    localParams.value.filters = []
-    if (props.node) {
-      emit('updateParameters', props.node.id, { ...localParams.value })
+watch(
+  () => localParams.value.entity,
+  (newEntity, oldEntity) => {
+    // Nu sterge fieldMappings cand se schimba nodul — doar cand userul
+    // schimba manual dropdown-ul de entitate pe acelasi nod.
+    if (isSwitchingNode.value) return;
+    if (oldEntity && newEntity !== oldEntity) {
+      localParams.value.fieldMappings = [];
+      localParams.value.filters = [];
+      if (props.node) {
+        emit("updateParameters", props.node.id, { ...localParams.value });
+      }
     }
-  }
-})
+  },
+);
 
 // Fetch target entity schema for field-mappings autocomplete
-watch(() => localParams.value.entity, (entitySlug) => {
-  fetchTargetEntityFields(entitySlug ?? '')
-  // Also store the entity name for node display
-  if (entitySlug) {
-    const opt = entityOptions.value.find(e => e.value === entitySlug)
-    if (opt && localParams.value.entityName !== opt.label) {
-      localParams.value.entityName = opt.label
-      if (props.node) {
-        emit('updateParameters', props.node.id, { ...localParams.value })
+watch(
+  () => localParams.value.entity,
+  (entitySlug) => {
+    fetchTargetEntityFields(entitySlug ?? "");
+    // Also store the entity name for node display
+    if (entitySlug) {
+      const opt = entityOptions.value.find((e) => e.value === entitySlug);
+      if (opt && localParams.value.entityName !== opt.label) {
+        localParams.value.entityName = opt.label;
+        if (props.node) {
+          emit("updateParameters", props.node.id, { ...localParams.value });
+        }
       }
     }
-  }
-})
+  },
+);
 
-watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
-  // Nu sterge relationField cand se schimba nodul.
-  if (!isSwitchingNode.value) {
-    if (oldVal && newVal !== oldVal) {
-      localParams.value.relationField = ''
-      if (props.node) {
-        emit('updateParameters', props.node.id, { ...localParams.value })
+watch(
+  () => localParams.value.sourceNodeId,
+  (newVal, oldVal) => {
+    // Nu sterge relationField cand se schimba nodul.
+    if (!isSwitchingNode.value) {
+      if (oldVal && newVal !== oldVal) {
+        localParams.value.relationField = "";
+        if (props.node) {
+          emit("updateParameters", props.node.id, { ...localParams.value });
+        }
       }
     }
-  }
-  // Fetch source entity schema so relation field options are populated
-  if (newVal && props.fetchSourceFields) {
-    props.fetchSourceFields(newVal)
-  }
-})
+    // Fetch source entity schema so relation field options are populated
+    if (newVal && props.fetchSourceFields) {
+      props.fetchSourceFields(newVal);
+    }
+  },
+);
 </script>
 
 <template>
@@ -180,15 +230,23 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
     class="w-80 border-l border-gray-200 dark:border-gray-800 overflow-y-auto bg-gray-50 dark:bg-gray-950 flex flex-col"
   >
     <!-- Header -->
-    <div class="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-800">
+    <div
+      class="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-800"
+    >
       <div class="flex items-center gap-2 min-w-0">
         <div
           class="w-7 h-7 rounded flex items-center justify-center shrink-0"
           :style="{ backgroundColor: nodeTypeDef.color + '20' }"
         >
-          <UIcon :name="nodeTypeDef.icon" class="size-4" :style="{ color: nodeTypeDef.color }" />
+          <UIcon
+            :name="nodeTypeDef.icon"
+            class="size-4"
+            :style="{ color: nodeTypeDef.color }"
+          />
         </div>
-        <span class="text-sm font-medium truncate text-gray-700 dark:text-gray-200">
+        <span
+          class="text-sm font-medium truncate text-gray-700 dark:text-gray-200"
+        >
           {{ nodeTypeDef.label }}
         </span>
       </div>
@@ -209,7 +267,10 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
 
       <!-- Node Name -->
       <div>
-        <label class="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1 block">Nume nod</label>
+        <label
+          class="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1 block"
+          >Nume nod</label
+        >
         <UInput
           v-model="localLabel"
           size="sm"
@@ -221,7 +282,9 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
 
       <!-- Dynamic Config Fields -->
       <div v-for="field in nodeTypeDef.configFields" :key="field.key">
-        <label class="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1 block">
+        <label
+          class="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1 block"
+        >
           {{ field.label }}
           <span v-if="field.required" class="text-red-500">*</span>
         </label>
@@ -281,6 +344,18 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
         />
 
         <USelect
+          v-else-if="field.type === 'document-source-select'"
+          :model-value="localParams[field.key] ?? ''"
+          size="sm"
+          class="w-full"
+          :items="documentSourceOptions"
+          value-key="value"
+          label-key="label"
+          placeholder="Selecteaza documentul..."
+          @update:model-value="onParamChange(field.key, $event)"
+        />
+
+        <USelect
           v-else-if="field.type === 'integration-select'"
           :model-value="localParams[field.key] ?? ''"
           size="sm"
@@ -319,7 +394,12 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
         <USelect
           v-else-if="field.type === 'target-field-select'"
           :model-value="localParams[field.key] ?? ''"
-          :items="targetEntityFields.map(f => ({ label: `${f.name} (${f.column_name})`, value: f.column_name }))"
+          :items="
+            targetEntityFields.map((f) => ({
+              label: `${f.name} (${f.column_name})`,
+              value: f.column_name,
+            }))
+          "
           value-key="value"
           label-key="label"
           size="sm"
@@ -339,7 +419,9 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
 
         <WorkflowPanelsRecordIdSourceEditor
           v-else-if="field.type === 'record-id-source'"
-          :model-value="(localParams[field.key] as RecordIdSource | null) ?? null"
+          :model-value="
+            (localParams[field.key] as RecordIdSource | null) ?? null
+          "
           :data-sources="fieldSelectableDataSources"
           :fetch-source-fields="fetchSourceFields"
           @update:model-value="onParamChange(field.key, $event)"
@@ -383,7 +465,9 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
 
         <WorkflowPanelsNotificationRecipientEditor
           v-else-if="field.type === 'notification-recipient'"
-          :model-value="(localParams[field.key] as NotificationRecipient | null) ?? null"
+          :model-value="
+            (localParams[field.key] as NotificationRecipient | null) ?? null
+          "
           :data-sources="fieldSelectableDataSources"
           :fetch-source-fields="fetchSourceFields"
           @update:model-value="onParamChange(field.key, $event)"
@@ -399,7 +483,9 @@ watch(() => localParams.value.sourceNodeId, (newVal, oldVal) => {
 
         <WorkflowPanelsWorkflowValueSourceEditor
           v-else-if="field.type === 'workflow-value-source'"
-          :model-value="(localParams[field.key] as WorkflowValueSource | null) ?? null"
+          :model-value="
+            (localParams[field.key] as WorkflowValueSource | null) ?? null
+          "
           :data-sources="fieldSelectableDataSources"
           :input-kind="field.inputKind"
           :fetch-source-fields="fetchSourceFields"

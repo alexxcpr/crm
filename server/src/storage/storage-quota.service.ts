@@ -24,6 +24,7 @@ interface TenantStorageRow {
 export interface ReserveStorageInput {
   idReservation: string;
   fileId: string;
+  fileVersionId?: string;
   ownerProfileId: string;
   idempotencyKey: string;
   temporaryObjectKey: string;
@@ -147,6 +148,8 @@ export class StorageQuotaService {
             id_reservation: input.idReservation,
             tenant_id: tenant.id,
             file_id: input.fileId,
+            file_version_id:
+              input.fileVersionId ?? input.fileId,
             owner_profile_id:
               input.ownerProfileId,
             idempotency_key: input.idempotencyKey,
@@ -168,6 +171,7 @@ export class StorageQuotaService {
   async getReservation(
     fileId: string,
     slug = this.tenantContext.slug,
+    fileVersionId?: string,
   ) {
     const tenant = await this.tenantBySlug(
       this.metaDb.knex,
@@ -175,10 +179,13 @@ export class StorageQuotaService {
     );
     const row = await this.metaDb
       .knex('tenant_storage_reservation')
-      .where({
-        tenant_id: tenant.id,
-        file_id: fileId,
-      })
+      .where({ tenant_id: tenant.id })
+      .where(
+        fileVersionId
+          ? { file_version_id: fileVersionId }
+          : { file_id: fileId },
+      )
+      .orderBy('created_at', 'asc')
       .first();
     if (!row)
       throw new NotFoundException(
@@ -190,6 +197,7 @@ export class StorageQuotaService {
   async markFinalizing(
     fileId: string,
     slug = this.tenantContext.slug,
+    fileVersionId?: string,
   ) {
     return this.metaDb.knex.transaction(
       async (trx) => {
@@ -200,10 +208,12 @@ export class StorageQuotaService {
         const row = await trx(
           'tenant_storage_reservation',
         )
-          .where({
-            tenant_id: tenant.id,
-            file_id: fileId,
-          })
+          .where({ tenant_id: tenant.id })
+          .where(
+            fileVersionId
+              ? { file_version_id: fileVersionId }
+              : { file_id: fileId },
+          )
           .forUpdate()
           .first();
         if (!row)
@@ -248,6 +258,7 @@ export class StorageQuotaService {
   async complete(
     fileId: string,
     slug = this.tenantContext.slug,
+    fileVersionId?: string,
   ) {
     return this.metaDb.knex.transaction(
       async (trx) => {
@@ -259,10 +270,12 @@ export class StorageQuotaService {
         const reservation = await trx(
           'tenant_storage_reservation',
         )
-          .where({
-            tenant_id: tenant.id,
-            file_id: fileId,
-          })
+          .where({ tenant_id: tenant.id })
+          .where(
+            fileVersionId
+              ? { file_version_id: fileVersionId }
+              : { file_id: fileId },
+          )
           .forUpdate()
           .first();
         if (!reservation)
@@ -335,6 +348,7 @@ export class StorageQuotaService {
     status: 'failed' | 'expired' = 'failed',
     errorCode?: string,
     slug = this.tenantContext.slug,
+    fileVersionId?: string,
   ) {
     const tenant = await this.tenantBySlug(
       this.metaDb.knex,
@@ -345,6 +359,7 @@ export class StorageQuotaService {
       fileId,
       status,
       errorCode,
+      fileVersionId,
     );
   }
 
@@ -353,16 +368,19 @@ export class StorageQuotaService {
     fileId: string,
     status: 'failed' | 'expired',
     errorCode?: string,
+    fileVersionId?: string,
   ) {
     return this.metaDb.knex.transaction(
       async (trx) => {
         const reservation = await trx(
           'tenant_storage_reservation',
         )
-          .where({
-            tenant_id: tenantId,
-            file_id: fileId,
-          })
+          .where({ tenant_id: tenantId })
+          .where(
+            fileVersionId
+              ? { file_version_id: fileVersionId }
+              : { file_id: fileId },
+          )
           .forUpdate()
           .first();
         if (
@@ -420,6 +438,7 @@ export class StorageQuotaService {
   async deleteCompleted(
     fileId: string,
     slug = this.tenantContext.slug,
+    fileVersionId?: string,
   ) {
     const tenant = await this.tenantBySlug(
       this.metaDb.knex,
@@ -428,22 +447,26 @@ export class StorageQuotaService {
     return this.deleteCompletedForTenant(
       tenant.id,
       fileId,
+      fileVersionId,
     );
   }
 
   async deleteCompletedForTenant(
     tenantId: string,
     fileId: string,
+    fileVersionId?: string,
   ) {
     return this.metaDb.knex.transaction(
       async (trx) => {
         const reservation = await trx(
           'tenant_storage_reservation',
         )
-          .where({
-            tenant_id: tenantId,
-            file_id: fileId,
-          })
+          .where({ tenant_id: tenantId })
+          .where(
+            fileVersionId
+              ? { file_version_id: fileVersionId }
+              : { file_id: fileId },
+          )
           .forUpdate()
           .first();
         if (

@@ -5,9 +5,15 @@ import { WorkflowSyncService } from './workflow-sync.service';
 import { N8nWebhookController } from './n8n-webhook.controller';
 import { NotificationsModule } from 'src/notifications/notifications.module';
 import { IntegrationsModule } from 'src/integrations/integrations.module';
+import { DocumentsModule } from 'src/documents/documents.module';
 
 @Module({
-  imports: [DynamicDataModule, NotificationsModule, IntegrationsModule],
+  imports: [
+    DynamicDataModule,
+    NotificationsModule,
+    IntegrationsModule,
+    DocumentsModule,
+  ],
   controllers: [N8nWebhookController],
   providers: [N8nApiClient, WorkflowSyncService],
   exports: [N8nApiClient, WorkflowSyncService],

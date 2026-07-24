@@ -10,19 +10,32 @@ function makeService() {
       knex: jest.fn(),
     } as any,
     {
-      get: jest.fn((_key: string, fallback: string) => fallback),
+      get: jest.fn(
+        (_key: string, fallback: string) =>
+          fallback,
+      ),
     } as any,
     {} as any,
   );
 }
 
-function makeExecutableService(workflow: Record<string, any>) {
-  const first = jest.fn().mockResolvedValue(workflow);
-  const where = jest.fn().mockReturnValue({ first });
-  const knex = jest.fn().mockReturnValue({ where });
+function makeExecutableService(
+  workflow: Record<string, any>,
+) {
+  const first = jest
+    .fn()
+    .mockResolvedValue(workflow);
+  const where = jest
+    .fn()
+    .mockReturnValue({ first });
+  const knex = jest
+    .fn()
+    .mockReturnValue({ where });
   const n8nClient = {
     activateWorkflow: jest.fn(),
-    executeWebhook: jest.fn().mockResolvedValue({ ok: true }),
+    executeWebhook: jest
+      .fn()
+      .mockResolvedValue({ ok: true }),
   };
   const service = new WorkflowSyncService(
     n8nClient as any,
@@ -33,10 +46,15 @@ function makeExecutableService(workflow: Record<string, any>) {
       knex,
     } as any,
     {
-      get: jest.fn((_key: string, fallback: string) => fallback),
+      get: jest.fn(
+        (_key: string, fallback: string) =>
+          fallback,
+      ),
     } as any,
     {
-      signAsync: jest.fn().mockResolvedValue('workflow-token'),
+      signAsync: jest
+        .fn()
+        .mockResolvedValue('workflow-token'),
     } as any,
   );
 
@@ -46,47 +64,100 @@ function makeExecutableService(workflow: Record<string, any>) {
 describe('WorkflowSyncService validation nodes', () => {
   it('traduce nodul email prin endpointul intern fara credenciale SMTP', () => {
     const service = makeService();
-    const translated = (service as any).translateToN8n({
+    const translated = (
+      service as any
+    ).translateToN8n({
       name: 'Email contact',
       slug: 'email_contact',
       nodes: [
-        { id: 'start', type: 'start', position: { x: 0, y: 0 }, parameters: { entity: 'contacts' } },
+        {
+          id: 'start',
+          type: 'start',
+          position: { x: 0, y: 0 },
+          parameters: { entity: 'contacts' },
+        },
         {
           id: 'email',
           type: 'email',
           position: { x: 250, y: 0 },
           parameters: {
             integrationId: 'integration-id',
-            to: { sourceType: 'node_output', sourceNodeId: 'start', sourceFieldSlug: 'cf_email' },
-            subject: { sourceType: 'static', value: 'Bun venit' },
-            content: { sourceType: 'node_output', sourceNodeId: 'start', sourceFieldSlug: 'cf_mesaj' },
+            to: {
+              sourceType: 'node_output',
+              sourceNodeId: 'start',
+              sourceFieldSlug: 'cf_email',
+            },
+            subject: {
+              sourceType: 'static',
+              value: 'Bun venit',
+            },
+            content: {
+              sourceType: 'node_output',
+              sourceNodeId: 'start',
+              sourceFieldSlug: 'cf_mesaj',
+            },
           },
         },
       ],
-      connections: [{ source: 'start', target: 'email' }],
+      connections: [
+        { source: 'start', target: 'email' },
+      ],
     });
-    const email = translated.nodes.find((node: any) => node.id === 'email');
+    const email = translated.nodes.find(
+      (node: any) => node.id === 'email',
+    );
 
-    expect(email.type).toBe('n8n-nodes-base.httpRequest');
-    expect(email.parameters.url).toBe('http://localhost:4000/api/v1/webhooks/n8n/tenant/email');
-    expect(email.parameters.bodyParameters.parameters).toEqual(expect.arrayContaining([
-      { name: 'integrationId', value: 'integration-id' },
-      { name: 'to', value: "={{String($('start').first().json.body.record?.cf_email ?? '')}}" },
-      { name: 'subject', value: 'Bun venit' },
-      { name: 'content', value: "={{String($('start').first().json.body.record?.cf_mesaj ?? '')}}" },
-    ]));
-    expect(JSON.stringify(email)).not.toContain('password');
+    expect(email.type).toBe(
+      'n8n-nodes-base.httpRequest',
+    );
+    expect(email.parameters.url).toBe(
+      'http://localhost:4000/api/v1/webhooks/n8n/tenant/email',
+    );
+    expect(
+      email.parameters.bodyParameters.parameters,
+    ).toEqual(
+      expect.arrayContaining([
+        {
+          name: 'integrationId',
+          value: 'integration-id',
+        },
+        {
+          name: 'to',
+          value:
+            "={{String($('start').first().json.body.record?.cf_email ?? '')}}",
+        },
+        { name: 'subject', value: 'Bun venit' },
+        {
+          name: 'content',
+          value:
+            "={{String($('start').first().json.body.record?.cf_mesaj ?? '')}}",
+        },
+      ]),
+    );
+    expect(JSON.stringify(email)).not.toContain(
+      'password',
+    );
   });
 
   it('executa workflow-ul sincronizat fara sync sau activare inainte de rulare', async () => {
-    const { service, n8nClient } = makeExecutableService({
-      id_workflow: 'wf-id',
-      slug: 'actualizare-contacte',
-      n8n_workflow_id: 'n8n-id',
-      nodes: [{ id: 'start', type: 'start', parameters: { entity: 'contacts' } }],
-      connections: [],
-    });
-    const syncSpy = jest.spyOn(service, 'syncWorkflow');
+    const { service, n8nClient } =
+      makeExecutableService({
+        id_workflow: 'wf-id',
+        slug: 'actualizare-contacte',
+        n8n_workflow_id: 'n8n-id',
+        nodes: [
+          {
+            id: 'start',
+            type: 'start',
+            parameters: { entity: 'contacts' },
+          },
+        ],
+        connections: [],
+      });
+    const syncSpy = jest.spyOn(
+      service,
+      'syncWorkflow',
+    );
 
     await service.executeWorkflow('wf-id', {
       userId: 'user-id',
@@ -94,14 +165,24 @@ describe('WorkflowSyncService validation nodes', () => {
     });
 
     expect(syncSpy).not.toHaveBeenCalled();
-    expect(n8nClient.activateWorkflow).not.toHaveBeenCalled();
-    expect(n8nClient.executeWebhook).toHaveBeenCalledWith(
+    expect(
+      n8nClient.activateWorkflow,
+    ).not.toHaveBeenCalled();
+    expect(
+      n8nClient.executeWebhook,
+    ).toHaveBeenCalledWith(
       'crm-tenant-actualizare-contacte',
-      expect.objectContaining({ workflowToken: 'workflow-token' }),
+      expect.objectContaining({
+        workflowToken: 'workflow-token',
+      }),
       'n8n-id',
     );
-    expect((service as any).jwt.signAsync).toHaveBeenCalledWith(
-      expect.objectContaining({ purpose: 'workflow' }),
+    expect(
+      (service as any).jwt.signAsync,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        purpose: 'workflow',
+      }),
       { expiresIn: '31d' },
     );
   });
@@ -135,7 +216,8 @@ describe('WorkflowSyncService validation nodes', () => {
                 tokens: [
                   {
                     type: 'field',
-                    sourceNodeId: 'current-profile',
+                    sourceNodeId:
+                      'current-profile',
                     fieldSlug: 'id_profile',
                     dataType: 'uuid',
                   },
@@ -146,14 +228,27 @@ describe('WorkflowSyncService validation nodes', () => {
         },
       ],
       connections: [
-        { source: 'start', target: 'current-profile' },
-        { source: 'current-profile', target: 'set-profile' },
+        {
+          source: 'start',
+          target: 'current-profile',
+        },
+        {
+          source: 'current-profile',
+          target: 'set-profile',
+        },
       ],
     };
 
-    const translated = (service as any).translateToN8n(workflow);
-    const profileNode = translated.nodes.find((node: any) => node.id === 'current-profile');
-    const setNode = translated.nodes.find((node: any) => node.id === 'set-profile');
+    const translated = (
+      service as any
+    ).translateToN8n(workflow);
+    const profileNode = translated.nodes.find(
+      (node: any) =>
+        node.id === 'current-profile',
+    );
+    const setNode = translated.nodes.find(
+      (node: any) => node.id === 'set-profile',
+    );
 
     expect(profileNode).toMatchObject({
       type: 'n8n-nodes-base.httpRequest',
@@ -163,18 +258,25 @@ describe('WorkflowSyncService validation nodes', () => {
         authentication: 'none',
       },
     });
-    expect(profileNode.parameters.headerParameters.parameters).toEqual(
+    expect(
+      profileNode.parameters.headerParameters
+        .parameters,
+    ).toEqual(
       expect.arrayContaining([
         { name: 'x-tenant', value: 'tenant' },
         {
           name: 'x-workflow-token',
-          value: "={{ $('start').first().json.body.workflowToken }}",
+          value:
+            "={{ $('start').first().json.body.workflowToken }}",
         },
       ]),
     );
-    expect(setNode.parameters.values.string).toContainEqual({
+    expect(
+      setNode.parameters.values.string,
+    ).toContainEqual({
       name: 'initiator_profile_id',
-      value: "={{$('current-profile').first().json.data.id_profile}}",
+      value:
+        "={{$('current-profile').first().json.data.id_profile}}",
     });
   });
 
@@ -194,20 +296,29 @@ describe('WorkflowSyncService validation nodes', () => {
           id: 'stop',
           type: 'stop_error',
           position: { x: 250, y: 0 },
-          parameters: { message: 'Camp obligatoriu' },
+          parameters: {
+            message: 'Camp obligatoriu',
+          },
         },
       ],
-      connections: [{ source: 'start', target: 'stop' }],
+      connections: [
+        { source: 'start', target: 'stop' },
+      ],
     };
 
-    const translated = (service as any).translateToN8n(workflow);
-    const stopNode = translated.nodes.find((node: any) => node.id === 'stop');
+    const translated = (
+      service as any
+    ).translateToN8n(workflow);
+    const stopNode = translated.nodes.find(
+      (node: any) => node.id === 'stop',
+    );
 
     expect(stopNode).toMatchObject({
       type: 'n8n-nodes-base.stopAndError',
       parameters: {
         errorType: 'errorMessage',
-        errorMessage: '[MODUVIS_VALIDATION] Camp obligatoriu',
+        errorMessage:
+          '[MODUVIS_VALIDATION] Camp obligatoriu',
       },
     });
   });
@@ -240,7 +351,10 @@ describe('WorkflowSyncService validation nodes', () => {
                   dataType: 'numeric',
                 },
                 operator: 'larger',
-                rightOperand: { sourceType: 'static', value: '0' },
+                rightOperand: {
+                  sourceType: 'static',
+                  value: '0',
+                },
               },
             ],
           },
@@ -258,24 +372,40 @@ describe('WorkflowSyncService validation nodes', () => {
       ],
     };
 
-    const translated = (service as any).translateToN8n(workflow);
-    const validateNode = translated.nodes.find((node: any) => node.id === 'validate');
+    const translated = (
+      service as any
+    ).translateToN8n(workflow);
+    const validateNode = translated.nodes.find(
+      (node: any) => node.id === 'validate',
+    );
     const errorNode = translated.nodes.find(
-      (node: any) => node.id === 'validate__validation_error',
+      (node: any) =>
+        node.id === 'validate__validation_error',
     );
 
-    expect(validateNode.type).toBe('n8n-nodes-base.if');
+    expect(validateNode.type).toBe(
+      'n8n-nodes-base.if',
+    );
     expect(errorNode).toMatchObject({
       type: 'n8n-nodes-base.stopAndError',
       parameters: {
         errorType: 'errorMessage',
-        errorMessage: '[MODUVIS_VALIDATION] Buget invalid',
+        errorMessage:
+          '[MODUVIS_VALIDATION] Buget invalid',
       },
     });
-    expect(translated.connections.validate.main[0]).toEqual([
-      { node: 'validate__validation_error', type: 'main', index: 0 },
+    expect(
+      translated.connections.validate.main[0],
+    ).toEqual([
+      {
+        node: 'validate__validation_error',
+        type: 'main',
+        index: 0,
+      },
     ]);
-    expect(translated.connections.validate.main[1]).toEqual([
+    expect(
+      translated.connections.validate.main[1],
+    ).toEqual([
       { node: 'next', type: 'main', index: 0 },
     ]);
   });
@@ -296,32 +426,54 @@ describe('WorkflowSyncService validation nodes', () => {
           id: 'fetch_contacts',
           type: 'app_get_record',
           position: { x: 250, y: 0 },
-          parameters: { entity: 'contacts', limit: 5000, filters: [] },
+          parameters: {
+            entity: 'contacts',
+            limit: 5000,
+            filters: [],
+          },
         },
         {
           id: 'each_contact',
           type: 'for_each',
           position: { x: 500, y: 0 },
-          parameters: { sourceNodeId: 'fetch_contacts' },
+          parameters: {
+            sourceNodeId: 'fetch_contacts',
+          },
         },
       ],
       connections: [
-        { source: 'start', target: 'fetch_contacts' },
-        { source: 'fetch_contacts', target: 'each_contact' },
+        {
+          source: 'start',
+          target: 'fetch_contacts',
+        },
+        {
+          source: 'fetch_contacts',
+          target: 'each_contact',
+        },
       ],
     };
 
-    const translated = (service as any).translateToN8n(workflow);
-    const forEachNode = translated.nodes.find((node: any) => node.id === 'each_contact');
+    const translated = (
+      service as any
+    ).translateToN8n(workflow);
+    const forEachNode = translated.nodes.find(
+      (node: any) => node.id === 'each_contact',
+    );
 
     expect(forEachNode).toMatchObject({
       type: 'n8n-nodes-base.code',
       parameters: {
-        jsCode: expect.stringContaining('records.map((record, index)'),
+        jsCode: expect.stringContaining(
+          'records.map((record, index)',
+        ),
       },
     });
-    expect(forEachNode.parameters.jsCode).toContain('throw new Error');
-    expect(forEachNode.parameters.jsCode).toContain('_foreach_index');
+    expect(
+      forEachNode.parameters.jsCode,
+    ).toContain('throw new Error');
+    expect(
+      forEachNode.parameters.jsCode,
+    ).toContain('_foreach_index');
   });
 
   it('trimite limit=all pentru app_get_record fara limita configurata', () => {
@@ -340,16 +492,31 @@ describe('WorkflowSyncService validation nodes', () => {
           id: 'fetch_contacts',
           type: 'app_get_record',
           position: { x: 250, y: 0 },
-          parameters: { entity: 'contacts', filters: [] },
+          parameters: {
+            entity: 'contacts',
+            filters: [],
+          },
         },
       ],
-      connections: [{ source: 'start', target: 'fetch_contacts' }],
+      connections: [
+        {
+          source: 'start',
+          target: 'fetch_contacts',
+        },
+      ],
     };
 
-    const translated = (service as any).translateToN8n(workflow);
-    const fetchNode = translated.nodes.find((node: any) => node.id === 'fetch_contacts');
+    const translated = (
+      service as any
+    ).translateToN8n(workflow);
+    const fetchNode = translated.nodes.find(
+      (node: any) => node.id === 'fetch_contacts',
+    );
 
-    expect(fetchNode.parameters.queryParameters.parameters).toContainEqual({
+    expect(
+      fetchNode.parameters.queryParameters
+        .parameters,
+    ).toContainEqual({
       name: 'limit',
       value: 'all',
     });
@@ -371,7 +538,10 @@ describe('WorkflowSyncService validation nodes', () => {
           id: 'company',
           type: 'app_get_record',
           position: { x: 250, y: 0 },
-          parameters: { entity: 'crm_company', filters: [] },
+          parameters: {
+            entity: 'crm_company',
+            filters: [],
+          },
         },
         {
           id: 'set_search',
@@ -382,11 +552,28 @@ describe('WorkflowSyncService validation nodes', () => {
               {
                 key: 'search_name',
                 tokens: [
-                  { type: 'field', sourceNodeId: 'start', fieldSlug: 'cf_nume' },
-                  { type: 'operator', value: '+' },
-                  { type: 'literal', value: ' - ' },
-                  { type: 'operator', value: '+' },
-                  { type: 'field', sourceNodeId: 'company', fieldSlug: 'cf_denumire' },
+                  {
+                    type: 'field',
+                    sourceNodeId: 'start',
+                    fieldSlug: 'cf_nume',
+                  },
+                  {
+                    type: 'operator',
+                    value: '+',
+                  },
+                  {
+                    type: 'literal',
+                    value: ' - ',
+                  },
+                  {
+                    type: 'operator',
+                    value: '+',
+                  },
+                  {
+                    type: 'field',
+                    sourceNodeId: 'company',
+                    fieldSlug: 'cf_denumire',
+                  },
                 ],
               },
             ],
@@ -395,17 +582,25 @@ describe('WorkflowSyncService validation nodes', () => {
       ],
       connections: [
         { source: 'start', target: 'company' },
-        { source: 'company', target: 'set_search' },
+        {
+          source: 'company',
+          target: 'set_search',
+        },
       ],
     };
 
-    const translated = (service as any).translateToN8n(workflow);
-    const setNode = translated.nodes.find((node: any) => node.id === 'set_search');
+    const translated = (
+      service as any
+    ).translateToN8n(workflow);
+    const setNode = translated.nodes.find(
+      (node: any) => node.id === 'set_search',
+    );
 
-    expect(setNode.parameters.values.string).toContainEqual({
+    expect(
+      setNode.parameters.values.string,
+    ).toContainEqual({
       name: 'search_name',
-      value:
-        `={{$('start').first().json.body.record.cf_nume + " - " + $('company').first().json.data.cf_denumire}}`,
+      value: `={{$('start').first().json.body.record.cf_nume + " - " + $('company').first().json.data.cf_denumire}}`,
     });
   });
 
@@ -425,7 +620,11 @@ describe('WorkflowSyncService validation nodes', () => {
           id: 'sold',
           type: 'app_get_record',
           position: { x: 250, y: 0 },
-          parameters: { entity: 'sold', filters: [], limit: 1 },
+          parameters: {
+            entity: 'sold',
+            filters: [],
+            limit: 1,
+          },
         },
         {
           id: 'calc_sold',
@@ -436,9 +635,22 @@ describe('WorkflowSyncService validation nodes', () => {
               {
                 key: 'cf_sold',
                 tokens: [
-                  { type: 'field', sourceNodeId: 'sold', fieldSlug: 'cf_sold', dataType: 'numeric' },
-                  { type: 'operator', value: '+' },
-                  { type: 'field', sourceNodeId: 'start', fieldSlug: 'cf_suma', dataType: 'numeric' },
+                  {
+                    type: 'field',
+                    sourceNodeId: 'sold',
+                    fieldSlug: 'cf_sold',
+                    dataType: 'numeric',
+                  },
+                  {
+                    type: 'operator',
+                    value: '+',
+                  },
+                  {
+                    type: 'field',
+                    sourceNodeId: 'start',
+                    fieldSlug: 'cf_suma',
+                    dataType: 'numeric',
+                  },
                 ],
               },
             ],
@@ -451,13 +663,18 @@ describe('WorkflowSyncService validation nodes', () => {
       ],
     };
 
-    const translated = (service as any).translateToN8n(workflow);
-    const setNode = translated.nodes.find((node: any) => node.id === 'calc_sold');
+    const translated = (
+      service as any
+    ).translateToN8n(workflow);
+    const setNode = translated.nodes.find(
+      (node: any) => node.id === 'calc_sold',
+    );
 
-    expect(setNode.parameters.values.string).toContainEqual({
+    expect(
+      setNode.parameters.values.string,
+    ).toContainEqual({
       name: 'cf_sold',
-      value:
-        `={{Number($('sold').first().json.data.cf_sold ?? 0) + Number($('start').first().json.body.record.cf_suma ?? 0)}}`,
+      value: `={{Number($('sold').first().json.data.cf_sold ?? 0) + Number($('start').first().json.body.record.cf_suma ?? 0)}}`,
     });
   });
 
@@ -477,7 +694,11 @@ describe('WorkflowSyncService validation nodes', () => {
           id: 'sold',
           type: 'app_get_record',
           position: { x: 250, y: 0 },
-          parameters: { entity: 'sold', filters: [], limit: 1 },
+          parameters: {
+            entity: 'sold',
+            filters: [],
+            limit: 1,
+          },
         },
         {
           id: 'message',
@@ -488,13 +709,39 @@ describe('WorkflowSyncService validation nodes', () => {
               {
                 key: 'mesaj',
                 tokens: [
-                  { type: 'literal', value: 'Soldul este ' },
-                  { type: 'operator', value: '+' },
-                  { type: 'field', sourceNodeId: 'sold', fieldSlug: 'cf_sold', dataType: 'numeric' },
-                  { type: 'operator', value: '+' },
-                  { type: 'literal', value: ' lei. Cheltuieli totale pentru luna: ' },
-                  { type: 'operator', value: '+' },
-                  { type: 'field', sourceNodeId: 'start', fieldSlug: 'cf_luna', dataType: 'varchar' },
+                  {
+                    type: 'literal',
+                    value: 'Soldul este ',
+                  },
+                  {
+                    type: 'operator',
+                    value: '+',
+                  },
+                  {
+                    type: 'field',
+                    sourceNodeId: 'sold',
+                    fieldSlug: 'cf_sold',
+                    dataType: 'numeric',
+                  },
+                  {
+                    type: 'operator',
+                    value: '+',
+                  },
+                  {
+                    type: 'literal',
+                    value:
+                      ' lei. Cheltuieli totale pentru luna: ',
+                  },
+                  {
+                    type: 'operator',
+                    value: '+',
+                  },
+                  {
+                    type: 'field',
+                    sourceNodeId: 'start',
+                    fieldSlug: 'cf_luna',
+                    dataType: 'varchar',
+                  },
                 ],
               },
             ],
@@ -507,13 +754,18 @@ describe('WorkflowSyncService validation nodes', () => {
       ],
     };
 
-    const translated = (service as any).translateToN8n(workflow);
-    const setNode = translated.nodes.find((node: any) => node.id === 'message');
+    const translated = (
+      service as any
+    ).translateToN8n(workflow);
+    const setNode = translated.nodes.find(
+      (node: any) => node.id === 'message',
+    );
 
-    expect(setNode.parameters.values.string).toContainEqual({
+    expect(
+      setNode.parameters.values.string,
+    ).toContainEqual({
       name: 'mesaj',
-      value:
-        `={{"Soldul este " + Number($('sold').first().json.data.cf_sold ?? 0).toFixed(2) + " lei. Cheltuieli totale pentru luna: " + $('start').first().json.body.record.cf_luna}}`,
+      value: `={{"Soldul este " + Number($('sold').first().json.data.cf_sold ?? 0).toFixed(2) + " lei. Cheltuieli totale pentru luna: " + $('start').first().json.body.record.cf_luna}}`,
     });
   });
 
@@ -527,7 +779,9 @@ describe('WorkflowSyncService validation nodes', () => {
           id: 'start',
           type: 'start',
           position: { x: 0, y: 0 },
-          parameters: { entity: 'crm_activitate' },
+          parameters: {
+            entity: 'crm_activitate',
+          },
         },
         {
           id: 'contact',
@@ -576,10 +830,17 @@ describe('WorkflowSyncService validation nodes', () => {
       ],
     };
 
-    const translated = (service as any).translateToN8n(workflow);
-    const companyNode = translated.nodes.find((node: any) => node.id === 'company');
+    const translated = (
+      service as any
+    ).translateToN8n(workflow);
+    const companyNode = translated.nodes.find(
+      (node: any) => node.id === 'company',
+    );
 
-    expect(companyNode.parameters.queryParameters.parameters).toContainEqual({
+    expect(
+      companyNode.parameters.queryParameters
+        .parameters,
+    ).toContainEqual({
       name: 'filter[id][eq]',
       value: `={{$('contact').first().json.data?.cf_companie ?? "__MODUVIS_EMPTY_FILTER__"}}`,
     });
@@ -601,16 +862,32 @@ describe('WorkflowSyncService validation nodes', () => {
           id: 'fetch_judete',
           type: 'app_get_record',
           position: { x: 250, y: 0 },
-          parameters: { entity: 'judete', limit: 100, filters: [] },
+          parameters: {
+            entity: 'judete',
+            limit: 100,
+            filters: [],
+          },
         },
       ],
-      connections: [{ source: 'start', target: 'fetch_judete' }],
+      connections: [
+        {
+          source: 'start',
+          target: 'fetch_judete',
+        },
+      ],
     };
 
-    const translated = (service as any).translateToN8n(workflow);
-    const fetchNode = translated.nodes.find((node: any) => node.id === 'fetch_judete');
+    const translated = (
+      service as any
+    ).translateToN8n(workflow);
+    const fetchNode = translated.nodes.find(
+      (node: any) => node.id === 'fetch_judete',
+    );
 
-    expect(fetchNode.parameters.headerParameters.parameters).toContainEqual({
+    expect(
+      fetchNode.parameters.headerParameters
+        .parameters,
+    ).toContainEqual({
       name: 'x-tenant',
       value: 'tenant',
     });
@@ -632,13 +909,19 @@ describe('WorkflowSyncService validation nodes', () => {
           id: 'fetch_contacts',
           type: 'app_get_record',
           position: { x: 250, y: 0 },
-          parameters: { entity: 'contacts', limit: 5000, filters: [] },
+          parameters: {
+            entity: 'contacts',
+            limit: 5000,
+            filters: [],
+          },
         },
         {
           id: 'each_contact',
           type: 'for_each',
           position: { x: 500, y: 0 },
-          parameters: { sourceNodeId: 'fetch_contacts' },
+          parameters: {
+            sourceNodeId: 'fetch_contacts',
+          },
         },
         {
           id: 'validate_contact',
@@ -685,27 +968,57 @@ describe('WorkflowSyncService validation nodes', () => {
         },
       ],
       connections: [
-        { source: 'start', target: 'fetch_contacts' },
-        { source: 'fetch_contacts', target: 'each_contact' },
-        { source: 'each_contact', target: 'validate_contact' },
-        { source: 'validate_contact', target: 'update_contact' },
+        {
+          source: 'start',
+          target: 'fetch_contacts',
+        },
+        {
+          source: 'fetch_contacts',
+          target: 'each_contact',
+        },
+        {
+          source: 'each_contact',
+          target: 'validate_contact',
+        },
+        {
+          source: 'validate_contact',
+          target: 'update_contact',
+        },
       ],
     };
 
-    const translated = (service as any).translateToN8n(workflow);
-    const validateNode = translated.nodes.find((node: any) => node.id === 'validate_contact');
-    const updateNode = translated.nodes.find((node: any) => node.id === 'update_contact');
+    const translated = (
+      service as any
+    ).translateToN8n(workflow);
+    const validateNode = translated.nodes.find(
+      (node: any) =>
+        node.id === 'validate_contact',
+    );
+    const updateNode = translated.nodes.find(
+      (node: any) => node.id === 'update_contact',
+    );
 
-    expect(validateNode.parameters.conditions.string[0].value1).toBe(
+    expect(
+      validateNode.parameters.conditions.string[0]
+        .value1,
+    ).toBe(
       "={{$('each_contact').item.json.cf_email}}",
     );
-    expect(updateNode.parameters.queryParameters.parameters).toContainEqual({
+    expect(
+      updateNode.parameters.queryParameters
+        .parameters,
+    ).toContainEqual({
       name: 'id',
-      value: "={{$('each_contact').item.json.id}}",
+      value:
+        "={{$('each_contact').item.json.id}}",
     });
-    expect(updateNode.parameters.bodyParameters.parameters).toContainEqual({
+    expect(
+      updateNode.parameters.bodyParameters
+        .parameters,
+    ).toContainEqual({
       name: 'cf_status',
-      value: "={{$('each_contact').item.json.cf_status}}",
+      value:
+        "={{$('each_contact').item.json.cf_status}}",
     });
   });
 
@@ -732,40 +1045,71 @@ describe('WorkflowSyncService validation nodes', () => {
               sourceFieldSlug: 'id_profile',
             },
             subjectTokens: [
-              { type: 'literal', value: 'Contact ' },
-              { type: 'field', sourceNodeId: 'start', fieldSlug: 'cf_name' },
+              {
+                type: 'literal',
+                value: 'Contact ',
+              },
+              {
+                type: 'field',
+                sourceNodeId: 'start',
+                fieldSlug: 'cf_name',
+              },
             ],
-            contentTokens: [{ type: 'literal', value: 'A fost actualizat.' }],
+            contentTokens: [
+              {
+                type: 'literal',
+                value: 'A fost actualizat.',
+              },
+            ],
             targetSourceNodeId: 'start',
             targetEntitySlug: 'contacts',
           },
         },
       ],
-      connections: [{ source: 'start', target: 'notify' }],
+      connections: [
+        { source: 'start', target: 'notify' },
+      ],
     };
 
-    const translated = (service as any).translateToN8n(workflow);
-    const notification = translated.nodes.find((node: any) => node.id === 'notify');
+    const translated = (
+      service as any
+    ).translateToN8n(workflow);
+    const notification = translated.nodes.find(
+      (node: any) => node.id === 'notify',
+    );
 
-    expect(notification.type).toBe('n8n-nodes-base.httpRequest');
+    expect(notification.type).toBe(
+      'n8n-nodes-base.httpRequest',
+    );
     expect(notification.parameters.url).toBe(
       'http://localhost:4000/api/v1/webhooks/n8n/tenant/notifications',
     );
-    expect(notification.parameters.bodyParameters.parameters).toEqual(
+    expect(
+      notification.parameters.bodyParameters
+        .parameters,
+    ).toEqual(
       expect.arrayContaining([
         {
           name: 'recipientProfileId',
-          value: "={{$('start').first().json.body.record.id_profile}}",
+          value:
+            "={{$('start').first().json.body.record.id_profile}}",
         },
         {
           name: 'subject',
           value: `={{"Contact " + String($('start').first().json.body.record.cf_name ?? '')}}`,
         },
-        { name: 'content', value: `={{"A fost actualizat."}}` },
-        { name: 'targetEntitySlug', value: 'contacts' },
+        {
+          name: 'content',
+          value: `={{"A fost actualizat."}}`,
+        },
+        {
+          name: 'targetEntitySlug',
+          value: 'contacts',
+        },
         {
           name: 'targetRecordId',
-          value: "={{$('start').first().json.body.record.id}}",
+          value:
+            "={{$('start').first().json.body.record.id}}",
         },
         { name: 'sourceNodeId', value: 'notify' },
       ]),
@@ -778,16 +1122,42 @@ describe('WorkflowSyncService validation nodes', () => {
       name: 'Notificare prea tarzie',
       slug: 'notificare_tarzie',
       nodes: [
-        { id: 'start', type: 'start', position: { x: 0, y: 0 }, parameters: { entity: 'contacts' } },
-        { id: 'wait', type: 'delay', position: { x: 250, y: 0 }, parameters: { duration: 31, unit: 'days' } },
+        {
+          id: 'start',
+          type: 'start',
+          position: { x: 0, y: 0 },
+          parameters: { entity: 'contacts' },
+        },
+        {
+          id: 'wait',
+          type: 'delay',
+          position: { x: 250, y: 0 },
+          parameters: {
+            duration: 31,
+            unit: 'days',
+          },
+        },
         {
           id: 'notify',
           type: 'notification',
           position: { x: 500, y: 0 },
           parameters: {
-            recipient: { sourceType: 'static', profileId: 'profile-id' },
-            subjectTokens: [{ type: 'literal', value: 'Subiect' }],
-            contentTokens: [{ type: 'literal', value: 'Continut' }],
+            recipient: {
+              sourceType: 'static',
+              profileId: 'profile-id',
+            },
+            subjectTokens: [
+              {
+                type: 'literal',
+                value: 'Subiect',
+              },
+            ],
+            contentTokens: [
+              {
+                type: 'literal',
+                value: 'Continut',
+              },
+            ],
           },
         },
       ],
@@ -797,8 +1167,279 @@ describe('WorkflowSyncService validation nodes', () => {
       ],
     };
 
-    expect(() => (service as any).translateToN8n(workflow)).toThrow(
+    expect(() =>
+      (service as any).translateToN8n(workflow),
+    ).toThrow(
       'depaseste durata maxima cumulata de 30 de zile',
+    );
+  });
+
+  it('traduce lantul Word prin endpointul generic si pastreaza handle-ul upstream', () => {
+    const service = makeService();
+    const workflow = {
+      name: 'Contract Word',
+      slug: 'contract_word',
+      nodes: [
+        {
+          id: 'start',
+          type: 'start',
+          position: { x: 0, y: 0 },
+          parameters: { entity: 'contacts' },
+        },
+        {
+          id: 'open',
+          type: 'word_open',
+          position: { x: 250, y: 0 },
+          parameters: {
+            fileId: {
+              sourceType: 'node_output',
+              sourceNodeId: 'start',
+              sourceFieldSlug: 'cf_template',
+            },
+          },
+        },
+        {
+          id: 'replace',
+          type: 'word_replace_text',
+          position: { x: 500, y: 0 },
+          parameters: {
+            documentSourceNodeId: 'open',
+            search: {
+              sourceType: 'static',
+              value: '${nume}',
+            },
+            replace: {
+              sourceType: 'node_output',
+              sourceNodeId: 'start',
+              sourceFieldSlug: 'cf_name',
+            },
+          },
+        },
+        {
+          id: 'save',
+          type: 'word_save',
+          position: { x: 750, y: 0 },
+          parameters: {
+            documentSourceNodeId: 'replace',
+            fileName: {
+              sourceType: 'static',
+              value: 'contract.docx',
+            },
+          },
+        },
+      ],
+      connections: [
+        { source: 'start', target: 'open' },
+        { source: 'open', target: 'replace' },
+        { source: 'replace', target: 'save' },
+      ],
+    };
+
+    (service as any).validateDocumentNodes(
+      workflow,
+    );
+    const translated = (
+      service as any
+    ).translateToN8n(workflow);
+    const replace = translated.nodes.find(
+      (node: any) => node.id === 'replace',
+    );
+    const save = translated.nodes.find(
+      (node: any) => node.id === 'save',
+    );
+
+    expect(replace.type).toBe(
+      'n8n-nodes-base.httpRequest',
+    );
+    expect(replace.parameters.url).toBe(
+      'http://localhost:4000/api/v1/webhooks/n8n/tenant/documents/execute',
+    );
+    expect(replace.parameters.jsonBody).toContain(
+      'operation: "replaceText"',
+    );
+    expect(replace.parameters.jsonBody).toContain(
+      "$('open').first().json.data?.document",
+    );
+    expect(replace.parameters.jsonBody).toContain(
+      "$('start').first().json.body.record?.cf_name",
+    );
+    expect(save.parameters.jsonBody).toContain(
+      "$('replace').first().json.data?.document",
+    );
+    expect(save.parameters.jsonBody).toContain(
+      "String($execution.id) + ':save:'",
+    );
+  });
+
+  it('traduce actualizarea aceleiasi entitati ca PUT cand Record ID este selectat explicit din Start', () => {
+    const service = makeService();
+    const translated = (
+      service as any
+    ).translateToN8n({
+      name: 'Ataseaza documentul generat',
+      slug: 'ataseaza_documentul_generat',
+      nodes: [
+        {
+          id: 'start',
+          type: 'start',
+          position: { x: 0, y: 0 },
+          parameters: { entity: 'contacts' },
+        },
+        {
+          id: 'update',
+          type: 'app_update_record',
+          position: { x: 250, y: 0 },
+          parameters: {
+            entity: 'contacts',
+            recordIdSource: {
+              sourceType: 'node_output',
+              sourceNodeId: 'start',
+              sourceFieldSlug: 'id',
+              value: 'id',
+            },
+            fieldMappings: [
+              {
+                key: 'cf_word_completat',
+                sourceType: 'static',
+                value:
+                  'a2780d8a-a020-478a-a0df-41af451ff480',
+              },
+            ],
+          },
+        },
+      ],
+      connections: [
+        { source: 'start', target: 'update' },
+      ],
+    });
+    const update = translated.nodes.find(
+      (node: any) => node.id === 'update',
+    );
+
+    expect(update.type).toBe(
+      'n8n-nodes-base.httpRequest',
+    );
+    expect(update.parameters).toMatchObject({
+      method: 'PUT',
+      url: 'http://localhost:4000/api/v1/webhooks/n8n/tenant/data-resolve',
+      sendQuery: true,
+    });
+    expect(
+      update.parameters.queryParameters.parameters,
+    ).toEqual(
+      expect.arrayContaining([
+        {
+          name: 'entity',
+          value: 'contacts',
+        },
+        {
+          name: 'id',
+          value:
+            "={{$('start').first().json.body.record.id}}",
+        },
+      ]),
+    );
+  });
+
+  it('pastreaza modul Set pentru aceeasi entitate doar cand Record ID lipseste', () => {
+    const service = makeService();
+    const translated = (
+      service as any
+    ).translateToN8n({
+      name: 'Completeaza date inainte de creare',
+      slug: 'completeaza_inainte_de_creare',
+      nodes: [
+        {
+          id: 'start',
+          type: 'start',
+          position: { x: 0, y: 0 },
+          parameters: { entity: 'contacts' },
+        },
+        {
+          id: 'update',
+          type: 'app_update_record',
+          position: { x: 250, y: 0 },
+          parameters: {
+            entity: 'contacts',
+            recordIdSource: null,
+            fieldMappings: [
+              {
+                key: 'cf_status',
+                sourceType: 'static',
+                value: 'nou',
+              },
+            ],
+          },
+        },
+      ],
+      connections: [
+        { source: 'start', target: 'update' },
+      ],
+    });
+    const update = translated.nodes.find(
+      (node: any) => node.id === 'update',
+    );
+
+    expect(update.type).toBe(
+      'n8n-nodes-base.set',
+    );
+    expect(update.parameters).toMatchObject({
+      keepOnlySet: false,
+    });
+  });
+
+  it('respinge un handle Word care traverseaza un Delay egal cu TTL-ul', () => {
+    const service = makeService();
+    const workflow = {
+      nodes: [
+        {
+          id: 'start',
+          type: 'start',
+          parameters: { entity: 'contacts' },
+        },
+        {
+          id: 'open',
+          type: 'word_open',
+          parameters: {
+            fileId: {
+              sourceType: 'static',
+              value: 'file-id',
+            },
+          },
+        },
+        {
+          id: 'wait',
+          type: 'delay',
+          parameters: {
+            duration: 24,
+            unit: 'hours',
+          },
+        },
+        {
+          id: 'save',
+          type: 'word_save',
+          parameters: {
+            documentSourceNodeId: 'open',
+            fileName: {
+              sourceType: 'static',
+              value: 'contract.docx',
+            },
+          },
+        },
+      ],
+      connections: [
+        { source: 'start', target: 'open' },
+        { source: 'open', target: 'wait' },
+        { source: 'wait', target: 'save' },
+      ],
+    };
+
+    expect(() =>
+      (service as any).validateDocumentNodes(
+        workflow,
+      ),
+    ).toThrow(
+      'traverseaza un Delay mai lung decat TTL-ul sesiunii',
     );
   });
 });

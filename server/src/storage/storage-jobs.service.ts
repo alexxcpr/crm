@@ -45,6 +45,7 @@ export class StorageJobsService {
       await this.recoverCompletedFiles();
       await this.markAbandonedFiles();
       await this.retryDeletions();
+      await this.cleanupDocumentSessions();
     });
   }
 
@@ -52,14 +53,16 @@ export class StorageJobsService {
     for (const tenant of await this.tenants()) {
       try {
         const db = this.connection(tenant);
-        const files = await db('stored_file')
+        const versions = await db(
+          'stored_file_version',
+        )
           .whereIn('status', [
             'pending',
             'scanning',
           ])
-          .select('id_file')
+          .select('*')
           .limit(100);
-        if (!files.length) continue;
+        if (!versions.length) continue;
 
         const reservations = await this.metaDb
           .knex('tenant_storage_reservation')
@@ -68,10 +71,19 @@ export class StorageJobsService {
             status: 'completed',
           })
           .whereIn(
-            'file_id',
-            files.map((file) => file.id_file),
+            'file_version_id',
+            versions.map(
+              (version) =>
+                version.id_file_version,
+            ),
           );
         for (const reservation of reservations) {
+          const version = versions.find(
+            (candidate) =>
+              candidate.id_file_version ===
+              reservation.file_version_id,
+          );
+          if (!version) continue;
           const object =
             await this.provider.headObject(
               this.bucket,
@@ -87,15 +99,52 @@ export class StorageJobsService {
             );
             continue;
           }
-          await db('stored_file')
-            .where({
-              id_file: reservation.file_id,
-            })
-            .update({
-              status: 'active',
-              etag: object.etag,
-              date_updated: db.fn.now(),
-            });
+          await db.transaction(async (trx) => {
+            await trx('stored_file_version')
+              .where({
+                id_file_version:
+                  version.id_file_version,
+              })
+              .update({
+                status: 'active',
+                etag: object.etag,
+              });
+            await trx('stored_file')
+              .where({
+                id_file: reservation.file_id,
+              })
+              .andWhere((builder) =>
+                builder
+                  .whereIn('status', [
+                    'pending',
+                    'scanning',
+                  ])
+                  .orWhere(
+                    'current_version_number',
+                    '<',
+                    version.version_number,
+                  ),
+              )
+              .update({
+                reservation_id:
+                  version.reservation_id,
+                storage_provider:
+                  version.storage_provider,
+                bucket: version.bucket,
+                object_key: version.object_key,
+                original_name: version.file_name,
+                mime_type: version.mime_type,
+                size_bytes: version.size_bytes,
+                checksum: version.checksum,
+                etag: object.etag,
+                current_version_id:
+                  version.id_file_version,
+                current_version_number:
+                  version.version_number,
+                status: 'active',
+                date_updated: trx.fn.now(),
+              });
+          });
           await this.provider
             .deleteObject(
               this.bucket,
@@ -257,10 +306,15 @@ export class StorageJobsService {
           row.file_id,
           'expired',
           'UPLOAD_EXPIRED',
+          row.file_version_id,
         );
         const tenantDb = this.connection(row);
         await tenantDb('stored_file')
-          .where({ id_file: row.file_id })
+          .where({
+            id_file: row.file_id,
+            current_version_id:
+              row.file_version_id,
+          })
           .whereIn('status', [
             'pending',
             'scanning',
@@ -269,6 +323,15 @@ export class StorageJobsService {
             status: 'failed',
             date_updated: tenantDb.fn.now(),
           });
+        await tenantDb('stored_file_version')
+          .where({
+            id_file_version: row.file_version_id,
+          })
+          .whereIn('status', [
+            'pending',
+            'scanning',
+          ])
+          .update({ status: 'failed' });
       } catch (error) {
         this.logger.error(
           `Cleanup upload expirat esuat pentru ${row.file_id}`,
@@ -325,21 +388,67 @@ export class StorageJobsService {
 
       for (const file of files) {
         try {
-          await this.provider.deleteObject(
-            file.bucket,
-            file.object_key,
-          );
-          if (
-            await this.provider.headObject(
-              file.bucket,
-              file.object_key,
-            )
+          const versions = await db(
+            'stored_file_version',
           )
-            continue;
-          await this.quota.deleteCompletedForTenant(
-            tenant.id,
-            file.id_file,
-          );
+            .where({ id_file: file.id_file })
+            .whereNot({ status: 'deleted' });
+          let allDeleted = true;
+          for (const version of versions) {
+            await this.provider.deleteObject(
+              version.bucket,
+              version.object_key,
+            );
+            if (
+              await this.provider.headObject(
+                version.bucket,
+                version.object_key,
+              )
+            ) {
+              allDeleted = false;
+              break;
+            }
+            const reservation = await this.metaDb
+              .knex('tenant_storage_reservation')
+              .where({
+                tenant_id: tenant.id,
+                file_version_id:
+                  version.id_file_version,
+              })
+              .first();
+            if (
+              reservation?.status === 'completed'
+            ) {
+              await this.quota.deleteCompletedForTenant(
+                tenant.id,
+                file.id_file,
+                version.id_file_version,
+              );
+            } else if (
+              reservation &&
+              ['pending', 'finalizing'].includes(
+                reservation.status,
+              )
+            ) {
+              await this.quota.releaseReserved(
+                tenant.id,
+                file.id_file,
+                'failed',
+                'FILE_DELETED',
+                version.id_file_version,
+              );
+            }
+            await db('stored_file_version')
+              .where({
+                id_file_version:
+                  version.id_file_version,
+              })
+              .update({
+                status: 'deleted',
+                date_deleted: db.fn.now(),
+              });
+          }
+          if (!allDeleted) continue;
           await db('stored_file')
             .where({ id_file: file.id_file })
             .update({
@@ -355,6 +464,125 @@ export class StorageJobsService {
         }
       }
     }
+  }
+
+  private async cleanupDocumentSessions(): Promise<void> {
+    for (const tenant of await this.tenants()) {
+      try {
+        const db = this.connection(tenant);
+        const sessions = await db(
+          'workflow_document_session',
+        )
+          .where({ status: 'active' })
+          .where('expires_at', '<=', db.fn.now())
+          .limit(100);
+        for (const session of sessions) {
+          const prefix = String(
+            session.current_object_key,
+          ).replace(/\/r\d+\.[^/]+$/, '/');
+          let continuationToken:
+            | string
+            | undefined;
+          do {
+            const page =
+              await this.provider.listObjectsPage(
+                {
+                  bucket: this.bucket,
+                  prefix,
+                  continuationToken,
+                  maxKeys: 100,
+                },
+              );
+            await Promise.all(
+              page.objects.map((object) =>
+                this.provider.deleteObject(
+                  this.bucket,
+                  object.objectKey,
+                ),
+              ),
+            );
+            continuationToken =
+              page.nextContinuationToken;
+          } while (continuationToken);
+          await db('workflow_document_session')
+            .where({
+              id_session: session.id_session,
+            })
+            .update({
+              status: 'expired',
+              date_updated: db.fn.now(),
+            });
+        }
+        await db('workflow_document_session')
+          .where({ status: 'expired' })
+          .where(
+            'date_updated',
+            '<=',
+            new Date(
+              Date.now() -
+                this.numberConfig(
+                  'WORKFLOW_DOCUMENT_TTL_SECONDS',
+                  86_400,
+                ) *
+                  1_000,
+            ),
+          )
+          .delete();
+        await this.cleanupOrphanDocumentObjects(
+          db,
+          tenant,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Cleanup sesiuni document esuat pentru ${tenant.slug}.`,
+          error as Error,
+        );
+      }
+    }
+  }
+
+  private async cleanupOrphanDocumentObjects(
+    db: any,
+    tenant: JobTenant,
+  ): Promise<void> {
+    const activeSessionIds = new Set<string>(
+      (
+        await db('workflow_document_session')
+          .where({ status: 'active' })
+          .pluck('id_session')
+      ).map(String),
+    );
+    const cutoff =
+      Date.now() -
+      this.numberConfig(
+        'WORKFLOW_DOCUMENT_TTL_SECONDS',
+        86_400,
+      ) *
+        1_000;
+    const prefix = `_workflow/${tenant.slug}/`;
+    let continuationToken: string | undefined;
+    do {
+      const page = await this.provider.listObjectsPage({
+        bucket: this.bucket,
+        prefix,
+        continuationToken,
+        maxKeys: 500,
+      });
+      for (const object of page.objects) {
+        const parts = object.objectKey.split('/');
+        const sessionId = parts.at(-2) ?? '';
+        if (
+          !activeSessionIds.has(sessionId) &&
+          (object.lastModified?.getTime() ?? 0) <= cutoff
+        ) {
+          await this.provider.deleteObject(
+            this.bucket,
+            object.objectKey,
+          );
+        }
+      }
+      continuationToken = page.nextContinuationToken;
+    } while (continuationToken);
   }
 
   private async tenants(): Promise<JobTenant[]> {

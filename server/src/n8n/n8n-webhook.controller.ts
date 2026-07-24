@@ -27,8 +27,11 @@ import { CreateWorkflowNotificationDto } from 'src/notifications/dto';
 import { NotificationsService } from 'src/notifications/notifications.service';
 import { SmtpMailService } from 'src/integrations/smtp-mail.service';
 import { WorkflowEmailDto } from 'src/integrations/dto/integration.dto';
+import { DocumentRuntimeService } from 'src/documents/document-runtime.service';
+import type { DocumentExecuteRequest } from 'src/documents/document.types';
 
-const EMPTY_WORKFLOW_FILTER_VALUE = '__MODUVIS_EMPTY_FILTER__';
+const EMPTY_WORKFLOW_FILTER_VALUE =
+  '__MODUVIS_EMPTY_FILTER__';
 
 interface WebhookPayload {
   executionId: string;
@@ -43,7 +46,9 @@ interface WebhookPayload {
 
 @Controller('v1/webhooks/n8n')
 export class N8nWebhookController {
-  private readonly logger = new Logger(N8nWebhookController.name);
+  private readonly logger = new Logger(
+    N8nWebhookController.name,
+  );
   private readonly webhookSecret: string;
 
   constructor(
@@ -56,8 +61,12 @@ export class N8nWebhookController {
     private readonly jwt: JwtService,
     private readonly notifications: NotificationsService,
     private readonly smtp: SmtpMailService,
+    private readonly documents: DocumentRuntimeService,
   ) {
-    this.webhookSecret = config.get<string>('N8N_WEBHOOK_SECRET', '');
+    this.webhookSecret = config.get<string>(
+      'N8N_WEBHOOK_SECRET',
+      '',
+    );
   }
 
   // ─── Existing webhook routes ───
@@ -67,7 +76,8 @@ export class N8nWebhookController {
   async handleWebhook(
     @Param('tenantSlug') tenantSlug: string,
     @Body() payload: WebhookPayload,
-    @Headers('x-webhook-signature') signature?: string,
+    @Headers('x-webhook-signature')
+    signature?: string,
   ) {
     if (this.webhookSecret) {
       this.verifySignature(payload, signature);
@@ -77,31 +87,40 @@ export class N8nWebhookController {
       `Webhook received: tenant=${tenantSlug} execution=${payload.executionId} status=${payload.status}`,
     );
 
-    await this.eventEmitter.emitAsync('n8n.webhook.received', {
-      tenantSlug,
-      ...payload,
-    });
+    await this.eventEmitter.emitAsync(
+      'n8n.webhook.received',
+      {
+        tenantSlug,
+        ...payload,
+      },
+    );
 
     if (payload.status === 'error') {
       this.logger.warn(
         `Workflow execution failed: ${payload.executionId} — ${payload.error}`,
       );
 
-      await this.eventEmitter.emitAsync('n8n.execution.failed', {
-        tenantSlug,
-        executionId: payload.executionId,
-        workflowId: payload.workflowId,
-        error: payload.error,
-      });
+      await this.eventEmitter.emitAsync(
+        'n8n.execution.failed',
+        {
+          tenantSlug,
+          executionId: payload.executionId,
+          workflowId: payload.workflowId,
+          error: payload.error,
+        },
+      );
     }
 
     if (payload.status === 'success') {
-      await this.eventEmitter.emitAsync('n8n.execution.completed', {
-        tenantSlug,
-        executionId: payload.executionId,
-        workflowId: payload.workflowId,
-        data: payload.data,
-      });
+      await this.eventEmitter.emitAsync(
+        'n8n.execution.completed',
+        {
+          tenantSlug,
+          executionId: payload.executionId,
+          workflowId: payload.workflowId,
+          data: payload.data,
+        },
+      );
     }
 
     return { received: true };
@@ -118,20 +137,29 @@ export class N8nWebhookController {
       fields: Record<string, any>;
       dbName: string;
     },
-    @Headers('x-webhook-signature') signature?: string,
+    @Headers('x-webhook-signature')
+    signature?: string,
   ) {
     if (this.webhookSecret) {
       this.verifySignature(body, signature);
     }
 
-    const knex = this.connectionManager.getConnection(body.dbName);
+    const knex =
+      this.connectionManager.getConnection(
+        body.dbName,
+      );
 
-    const entity = await knex('entity').where('slug', body.entity).first();
+    const entity = await knex('entity')
+      .where('slug', body.entity)
+      .first();
     if (!entity) {
       this.logger.warn(
         `Webhook record-update: entity "${body.entity}" not found in tenant "${tenantSlug}"`,
       );
-      return { updated: false, reason: 'entity_not_found' };
+      return {
+        updated: false,
+        reason: 'entity_not_found',
+      };
     }
 
     await knex(entity.table_name)
@@ -154,19 +182,25 @@ export class N8nWebhookController {
   async getCurrentProfile(
     @Param('tenantSlug') tenantSlug: string,
     @Headers('x-webhook-secret') secret?: string,
-    @Headers('x-workflow-token') workflowToken?: string,
+    @Headers('x-workflow-token')
+    workflowToken?: string,
   ) {
     this.verifyDataAccess(secret);
 
-    return this.handleDataOperation(tenantSlug, workflowToken, async (actor) => ({
-      data: {
-        id_profile: actor.profile.id_profile,
-        id_user: actor.profile.id_user,
-        username: actor.profile.username,
-        email: actor.profile.email,
-        display_name: actor.profile.display_name,
-      },
-    }));
+    return this.handleDataOperation(
+      tenantSlug,
+      workflowToken,
+      async (actor) => ({
+        data: {
+          id_profile: actor.profile.id_profile,
+          id_user: actor.profile.id_user,
+          username: actor.profile.username,
+          email: actor.profile.email,
+          display_name:
+            actor.profile.display_name,
+        },
+      }),
+    );
   }
 
   @Get(':tenantSlug/data/:entitySlug/:id')
@@ -175,12 +209,20 @@ export class N8nWebhookController {
     @Param('entitySlug') entitySlug: string,
     @Param('id') id: string,
     @Headers('x-webhook-secret') secret?: string,
-    @Headers('x-workflow-token') workflowToken?: string,
+    @Headers('x-workflow-token')
+    workflowToken?: string,
   ) {
     this.verifyDataAccess(secret);
 
-    const result = await this.handleDataOperation(tenantSlug, workflowToken, (actor) =>
-      this.dataService.findOne(entitySlug, id, actor),
+    const result = await this.handleDataOperation(
+      tenantSlug,
+      workflowToken,
+      (actor) =>
+        this.dataService.findOne(
+          entitySlug,
+          id,
+          actor,
+        ),
     );
 
     this.logger.log(
@@ -197,12 +239,20 @@ export class N8nWebhookController {
     @Param('entitySlug') entitySlug: string,
     @Body() body: Record<string, any>,
     @Headers('x-webhook-secret') secret?: string,
-    @Headers('x-workflow-token') workflowToken?: string,
+    @Headers('x-workflow-token')
+    workflowToken?: string,
   ) {
     this.verifyDataAccess(secret);
 
-    const result = await this.handleDataOperation(tenantSlug, workflowToken, (actor) =>
-      this.dataService.create(entitySlug, body, actor),
+    const result = await this.handleDataOperation(
+      tenantSlug,
+      workflowToken,
+      (actor) =>
+        this.dataService.create(
+          entitySlug,
+          body,
+          actor,
+        ),
     );
 
     this.logger.log(
@@ -220,12 +270,21 @@ export class N8nWebhookController {
     @Param('id') id: string,
     @Body() body: Record<string, any>,
     @Headers('x-webhook-secret') secret?: string,
-    @Headers('x-workflow-token') workflowToken?: string,
+    @Headers('x-workflow-token')
+    workflowToken?: string,
   ) {
     this.verifyDataAccess(secret);
 
-    const result = await this.handleDataOperation(tenantSlug, workflowToken, (actor) =>
-      this.dataService.update(entitySlug, id, body, actor),
+    const result = await this.handleDataOperation(
+      tenantSlug,
+      workflowToken,
+      (actor) =>
+        this.dataService.update(
+          entitySlug,
+          id,
+          body,
+          actor,
+        ),
     );
 
     this.logger.log(
@@ -242,42 +301,76 @@ export class N8nWebhookController {
     @Param('tenantSlug') tenantSlug: string,
     @Query() query: Record<string, any>,
     @Headers('x-webhook-secret') secret?: string,
-    @Headers('x-workflow-token') workflowToken?: string,
+    @Headers('x-workflow-token')
+    workflowToken?: string,
   ) {
     this.verifyDataAccess(secret);
 
-    const result = await this.handleDataOperation(tenantSlug, workflowToken, async (actor) => {
-      if (!query.entity) throw new BadRequestException('Query param "entity" is required');
-      if (this.hasEmptyWorkflowFilter(query.filter)) {
-        if (query.limit === '1' || query.limit === 1) {
-          return { data: null };
+    const result = await this.handleDataOperation(
+      tenantSlug,
+      workflowToken,
+      async (actor) => {
+        if (!query.entity)
+          throw new BadRequestException(
+            'Query param "entity" is required',
+          );
+        if (
+          this.hasEmptyWorkflowFilter(
+            query.filter,
+          )
+        ) {
+          if (
+            query.limit === '1' ||
+            query.limit === 1
+          ) {
+            return { data: null };
+          }
+
+          return {
+            data: [],
+            meta: {
+              total: 0,
+              page:
+                Number.parseInt(
+                  String(query.page ?? '1'),
+                  10,
+                ) || 1,
+              limit:
+                query.limit === 'all'
+                  ? 0
+                  : Number.parseInt(
+                      String(query.limit ?? '25'),
+                      10,
+                    ) || 25,
+              totalPages: 0,
+            },
+          };
         }
 
-        return {
-          data: [],
-          meta: {
-            total: 0,
-            page: Number.parseInt(String(query.page ?? '1'), 10) || 1,
-            limit: query.limit === 'all' ? 0 : Number.parseInt(String(query.limit ?? '25'), 10) || 25,
-            totalPages: 0,
-          },
-        };
-      }
-
-      const list = await this.dataService.findAll(query.entity, query, actor, {
-        tableOnly: false,
-      });
-      // When limit=1, unwrap the array so downstream $json.data.field works the same
-      // as the old data-resolve endpoint did for single-record fetches.
-      if (query.limit === '1' || query.limit === 1) {
-        const first = list.data?.[0] ?? null;
-        return { data: first };
-      }
-      return list;
-    });
+        const list =
+          await this.dataService.findAll(
+            query.entity,
+            query,
+            actor,
+            {
+              tableOnly: false,
+            },
+          );
+        // When limit=1, unwrap the array so downstream $json.data.field works the same
+        // as the old data-resolve endpoint did for single-record fetches.
+        if (
+          query.limit === '1' ||
+          query.limit === 1
+        ) {
+          const first = list.data?.[0] ?? null;
+          return { data: first };
+        }
+        return list;
+      },
+    );
 
     this.logger.log(
-      `Webhook data LIST: ${tenantSlug}/${query.entity} filters=${JSON.stringify(query.filter ?? {})} limit=${query.limit ?? 'none'} returned=${Array.isArray((result as any)?.data) ? (result as any).data.length : ((result as any)?.data ? 1 : 0)} total=${(result as any)?.meta?.total ?? 'n/a'}`,
+      `Webhook data LIST: ${tenantSlug}/${query.entity} filters=${JSON.stringify(query.filter ?? {})} limit=${query.limit ?? 'none'} returned=${Array.isArray((result as any)?.data) ? (result as any).data.length : (result as any)?.data ? 1 : 0} total=${(result as any)?.meta?.total ?? 'n/a'}`,
     );
 
     return result;
@@ -285,10 +378,15 @@ export class N8nWebhookController {
 
   // ─── Data CRUD routes (query params — used by n8n when entity/id are dynamic expressions) ───
 
-  private hasEmptyWorkflowFilter(filter: unknown): boolean {
-    if (!filter || typeof filter !== 'object') return false;
+  private hasEmptyWorkflowFilter(
+    filter: unknown,
+  ): boolean {
+    if (!filter || typeof filter !== 'object')
+      return false;
 
-    return Object.values(filter).some((value) => this.containsEmptyFilterValue(value));
+    return Object.values(filter).some((value) =>
+      this.containsEmptyFilterValue(value),
+    );
   }
 
   @Post(':tenantSlug/notifications')
@@ -297,11 +395,18 @@ export class N8nWebhookController {
     @Param('tenantSlug') tenantSlug: string,
     @Body() body: CreateWorkflowNotificationDto,
     @Headers('x-webhook-secret') secret?: string,
-    @Headers('x-workflow-token') workflowToken?: string,
+    @Headers('x-workflow-token')
+    workflowToken?: string,
   ) {
     this.verifyDataAccess(secret);
-    return this.handleDataOperation(tenantSlug, workflowToken, (actor) =>
-      this.notifications.createFromWorkflow(body, actor),
+    return this.handleDataOperation(
+      tenantSlug,
+      workflowToken,
+      (actor) =>
+        this.notifications.createFromWorkflow(
+          body,
+          actor,
+        ),
     );
   }
 
@@ -311,25 +416,75 @@ export class N8nWebhookController {
     @Param('tenantSlug') tenantSlug: string,
     @Body() body: WorkflowEmailDto,
     @Headers('x-webhook-secret') secret?: string,
-    @Headers('x-workflow-token') workflowToken?: string,
+    @Headers('x-workflow-token')
+    workflowToken?: string,
   ) {
     this.verifyDataAccess(secret);
-    return this.handleDataOperation(tenantSlug, workflowToken, () =>
-      this.smtp.sendWorkflowEmail(body.integrationId, body.to, body.subject, body.content),
+    return this.handleDataOperation(
+      tenantSlug,
+      workflowToken,
+      () =>
+        this.smtp.sendWorkflowEmail(
+          body.integrationId,
+          body.to,
+          body.subject,
+          body.content,
+        ),
     );
   }
 
-  private containsEmptyFilterValue(value: unknown): boolean {
-    if (value === null || value === undefined || value === '' || value === EMPTY_WORKFLOW_FILTER_VALUE) return true;
+  @Post(':tenantSlug/documents/execute')
+  @HttpCode(HttpStatus.OK)
+  async executeDocument(
+    @Param('tenantSlug') tenantSlug: string,
+    @Body() body: DocumentExecuteRequest,
+    @Headers('x-webhook-secret') secret?: string,
+    @Headers('x-workflow-token')
+    workflowToken?: string,
+    @Headers('x-tenant') tenantHeader?: string,
+  ) {
+    this.verifyDataAccess(secret);
+    if (
+      !tenantHeader ||
+      tenantHeader !== tenantSlug
+    ) {
+      throw new UnauthorizedException(
+        'Tenant header invalid',
+      );
+    }
+    return this.handleDataOperation(
+      tenantSlug,
+      workflowToken,
+      (actor) =>
+        this.documents.execute(body, actor),
+    );
+  }
+
+  private containsEmptyFilterValue(
+    value: unknown,
+  ): boolean {
+    if (
+      value === null ||
+      value === undefined ||
+      value === '' ||
+      value === EMPTY_WORKFLOW_FILTER_VALUE
+    )
+      return true;
     if (Array.isArray(value)) {
-      return value.some((item) => this.containsEmptyFilterValue(item));
+      return value.some((item) =>
+        this.containsEmptyFilterValue(item),
+      );
     }
     if (typeof value !== 'object') return false;
 
-    const entries = Object.entries(value as Record<string, unknown>);
+    const entries = Object.entries(
+      value as Record<string, unknown>,
+    );
     if (entries.length === 0) return true;
 
-    return entries.some(([, item]) => this.containsEmptyFilterValue(item));
+    return entries.some(([, item]) =>
+      this.containsEmptyFilterValue(item),
+    );
   }
 
   @Get(':tenantSlug/data-resolve')
@@ -340,33 +495,61 @@ export class N8nWebhookController {
     @Query('filterField') filterField?: string,
     @Query('filterValue') filterValue?: string,
     @Headers('x-webhook-secret') secret?: string,
-    @Headers('x-workflow-token') workflowToken?: string,
+    @Headers('x-workflow-token')
+    workflowToken?: string,
   ) {
     this.verifyDataAccess(secret);
 
-    const result = await this.handleDataOperation(tenantSlug, workflowToken, async (actor) => {
-      if (!entitySlug) throw new BadRequestException('Query param "entity" is required');
+    const result = await this.handleDataOperation(
+      tenantSlug,
+      workflowToken,
+      async (actor) => {
+        if (!entitySlug)
+          throw new BadRequestException(
+            'Query param "entity" is required',
+          );
 
-      if (filterField && filterValue !== undefined && filterValue !== null && filterValue !== '') {
-        const query: Record<string, any> = {
-          limit: 1,
-          filter: {
-            [filterField]: { eq: filterValue },
-          },
-        };
-        const list = await this.dataService.findAll(entitySlug, query, actor, {
-          tableOnly: false,
-        });
-        const first = list.data?.[0] ?? null;
-        if (!first) {
-          throw new NotFoundException(`Nicio inregistrare gasita in "${entitySlug}" cu ${filterField} = "${filterValue}".`);
+        if (
+          filterField &&
+          filterValue !== undefined &&
+          filterValue !== null &&
+          filterValue !== ''
+        ) {
+          const query: Record<string, any> = {
+            limit: 1,
+            filter: {
+              [filterField]: { eq: filterValue },
+            },
+          };
+          const list =
+            await this.dataService.findAll(
+              entitySlug,
+              query,
+              actor,
+              {
+                tableOnly: false,
+              },
+            );
+          const first = list.data?.[0] ?? null;
+          if (!first) {
+            throw new NotFoundException(
+              `Nicio inregistrare gasita in "${entitySlug}" cu ${filterField} = "${filterValue}".`,
+            );
+          }
+          return { data: first };
         }
-        return { data: first };
-      }
 
-      if (!id) throw new BadRequestException('Query param "id" or filter params are required');
-      return this.dataService.findOne(entitySlug, id, actor);
-    });
+        if (!id)
+          throw new BadRequestException(
+            'Query param "id" or filter params are required',
+          );
+        return this.dataService.findOne(
+          entitySlug,
+          id,
+          actor,
+        );
+      },
+    );
 
     this.logger.log(
       `Webhook data GET (resolve): ${tenantSlug}/${entitySlug}/${id ?? `${filterField}=${filterValue}`}`,
@@ -382,14 +565,26 @@ export class N8nWebhookController {
     @Query('entity') entitySlug: string,
     @Body() body: Record<string, any>,
     @Headers('x-webhook-secret') secret?: string,
-    @Headers('x-workflow-token') workflowToken?: string,
+    @Headers('x-workflow-token')
+    workflowToken?: string,
   ) {
     this.verifyDataAccess(secret);
 
-    const result = await this.handleDataOperation(tenantSlug, workflowToken, (actor) => {
-      if (!entitySlug) throw new BadRequestException('Query param "entity" is required');
-      return this.dataService.create(entitySlug, body, actor);
-    });
+    const result = await this.handleDataOperation(
+      tenantSlug,
+      workflowToken,
+      (actor) => {
+        if (!entitySlug)
+          throw new BadRequestException(
+            'Query param "entity" is required',
+          );
+        return this.dataService.create(
+          entitySlug,
+          body,
+          actor,
+        );
+      },
+    );
 
     this.logger.log(
       `Webhook data POST (resolve): ${tenantSlug}/${entitySlug}`,
@@ -406,15 +601,31 @@ export class N8nWebhookController {
     @Query('id') id: string,
     @Body() body: Record<string, any>,
     @Headers('x-webhook-secret') secret?: string,
-    @Headers('x-workflow-token') workflowToken?: string,
+    @Headers('x-workflow-token')
+    workflowToken?: string,
   ) {
     this.verifyDataAccess(secret);
 
-    const result = await this.handleDataOperation(tenantSlug, workflowToken, (actor) => {
-      if (!entitySlug) throw new BadRequestException('Query param "entity" is required');
-      if (!id) throw new BadRequestException('Query param "id" is required');
-      return this.dataService.update(entitySlug, id, body, actor);
-    });
+    const result = await this.handleDataOperation(
+      tenantSlug,
+      workflowToken,
+      (actor) => {
+        if (!entitySlug)
+          throw new BadRequestException(
+            'Query param "entity" is required',
+          );
+        if (!id)
+          throw new BadRequestException(
+            'Query param "id" is required',
+          );
+        return this.dataService.update(
+          entitySlug,
+          id,
+          body,
+          actor,
+        );
+      },
+    );
 
     this.logger.log(
       `Webhook data PUT (resolve): ${tenantSlug}/${entitySlug}/${id} fields=${Object.keys(body ?? {}).join(',') || 'none'}`,
@@ -425,24 +636,39 @@ export class N8nWebhookController {
 
   // ─── Auth helpers ───
 
-  private verifyDataAccess(secret?: string): void {
+  private verifyDataAccess(
+    secret?: string,
+  ): void {
     if (!this.webhookSecret) return;
 
     if (!secret) {
-      throw new UnauthorizedException('Missing webhook secret header');
+      throw new UnauthorizedException(
+        'Missing webhook secret header',
+      );
     }
 
     if (
-      secret.length !== this.webhookSecret.length ||
-      !crypto.timingSafeEqual(Buffer.from(secret), Buffer.from(this.webhookSecret))
+      secret.length !==
+        this.webhookSecret.length ||
+      !crypto.timingSafeEqual(
+        Buffer.from(secret),
+        Buffer.from(this.webhookSecret),
+      )
     ) {
-      throw new UnauthorizedException('Invalid webhook secret');
+      throw new UnauthorizedException(
+        'Invalid webhook secret',
+      );
     }
   }
 
-  private verifySignature(payload: any, signature?: string): void {
+  private verifySignature(
+    payload: any,
+    signature?: string,
+  ): void {
     if (!signature) {
-      throw new UnauthorizedException('Missing webhook signature');
+      throw new UnauthorizedException(
+        'Missing webhook signature',
+      );
     }
 
     const expected = crypto
@@ -450,53 +676,119 @@ export class N8nWebhookController {
       .update(JSON.stringify(payload))
       .digest('hex');
 
-    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
-      throw new UnauthorizedException('Invalid webhook signature');
+    if (
+      !crypto.timingSafeEqual(
+        Buffer.from(signature),
+        Buffer.from(expected),
+      )
+    ) {
+      throw new UnauthorizedException(
+        'Invalid webhook signature',
+      );
     }
   }
 
   private async handleDataOperation<T>(
     tenantSlug: string,
     workflowToken: string | undefined,
-    callback: (actor: AuthenticatedUser) => Promise<T>,
+    callback: (
+      actor: AuthenticatedUser,
+    ) => Promise<T>,
   ): Promise<T> {
-    if (!workflowToken) throw new UnauthorizedException('Missing workflow token');
-    return await this.runInTenantContext(tenantSlug, async () => {
-      let payload: any;
-      try {
-        payload = await this.jwt.verifyAsync(workflowToken);
-      } catch {
-        throw new UnauthorizedException('Workflow token invalid sau expirat');
-      }
-      if (payload.purpose !== 'workflow' || payload.tenant !== tenantSlug) throw new UnauthorizedException('Workflow token invalid');
-      const knex = this.tenantContext.knex;
-      const user = await knex('user').where({ id: payload.sub, is_active: true }).first();
-      const profile = await knex('profile').where({ id_profile: payload.profileId, id_user: payload.sub, is_active: true }).first();
-      if (!user || !profile) throw new UnauthorizedException('Profilul workflow nu mai este activ');
-      const roles = await knex('profile_role').join('role', 'profile_role.id_role', 'role.id_role')
-        .where('profile_role.id_profile', profile.id_profile).select('role.slug');
-      const { hash: _, ...safeUser } = user;
-      return callback({ ...safeUser, profile, profileId: profile.id_profile, roles: roles.map((row) => row.slug), tenant: tenantSlug, dbName: this.tenantContext.dbName });
-    });
+    if (!workflowToken)
+      throw new UnauthorizedException(
+        'Missing workflow token',
+      );
+    return await this.runInTenantContext(
+      tenantSlug,
+      async () => {
+        let payload: any;
+        try {
+          payload = await this.jwt.verifyAsync(
+            workflowToken,
+          );
+        } catch {
+          throw new UnauthorizedException(
+            'Workflow token invalid sau expirat',
+          );
+        }
+        if (
+          payload.purpose !== 'workflow' ||
+          payload.tenant !== tenantSlug
+        )
+          throw new UnauthorizedException(
+            'Workflow token invalid',
+          );
+        const knex = this.tenantContext.knex;
+        const user = await knex('user')
+          .where({
+            id: payload.sub,
+            is_active: true,
+          })
+          .first();
+        const profile = await knex('profile')
+          .where({
+            id_profile: payload.profileId,
+            id_user: payload.sub,
+            is_active: true,
+          })
+          .first();
+        if (!user || !profile)
+          throw new UnauthorizedException(
+            'Profilul workflow nu mai este activ',
+          );
+        const roles = await knex('profile_role')
+          .join(
+            'role',
+            'profile_role.id_role',
+            'role.id_role',
+          )
+          .where(
+            'profile_role.id_profile',
+            profile.id_profile,
+          )
+          .select('role.slug');
+        const { hash: _, ...safeUser } = user;
+        return callback({
+          ...safeUser,
+          profile,
+          profileId: profile.id_profile,
+          roles: roles.map((row) => row.slug),
+          tenant: tenantSlug,
+          dbName: this.tenantContext.dbName,
+        });
+      },
+    );
   }
 
   private async runInTenantContext<T>(
     tenantSlug: string,
     callback: () => Promise<T>,
   ): Promise<T> {
-    const tenantInfo = await this.billingClient.getCompanyBySlug(tenantSlug);
+    const tenantInfo =
+      await this.billingClient.getCompanyBySlug(
+        tenantSlug,
+      );
     if (!tenantInfo || !tenantInfo.isActive) {
-      throw new NotFoundException(`Tenant "${tenantSlug}" not found or inactive`);
+      throw new NotFoundException(
+        `Tenant "${tenantSlug}" not found or inactive`,
+      );
     }
 
-    const knex = this.connectionManager.getConnection({
-      dbName: tenantInfo.dbName,
-      dbUser: tenantInfo.dbUser ?? undefined,
-      dbPassword: tenantInfo.dbPassword ?? undefined,
-    });
+    const knex =
+      this.connectionManager.getConnection({
+        dbName: tenantInfo.dbName,
+        dbUser: tenantInfo.dbUser ?? undefined,
+        dbPassword:
+          tenantInfo.dbPassword ?? undefined,
+      });
 
     return this.tenantContext.run(
-      { knex, slug: tenantSlug, dbName: tenantInfo.dbName },
+      {
+        knex,
+        slug: tenantSlug,
+        dbName: tenantInfo.dbName,
+      },
       callback,
     );
   }
