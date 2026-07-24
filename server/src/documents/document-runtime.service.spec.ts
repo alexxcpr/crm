@@ -7,6 +7,7 @@ import type {
   DocumentExecuteRequest,
   DocumentHandle,
 } from './document.types';
+import { PdfDocumentAdapter } from './pdf-document.adapter';
 import { WordDocumentAdapter } from './word-document.adapter';
 
 function makeService() {
@@ -19,7 +20,8 @@ function makeService() {
       ),
     } as any,
     {} as any,
-    new WordDocumentAdapter(),
+    new WordDocumentAdapter({} as any),
+    new PdfDocumentAdapter(),
     {} as any,
   );
 }
@@ -146,6 +148,26 @@ describe('DocumentRuntimeService session isolation', () => {
     expect(first).toBe(second);
     expect(first).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-a[0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+  });
+
+  it('forces the file extension to match the document package', () => {
+    const service = makeService();
+    const normalize = (
+      service as any
+    ).normalizeFileNameForPackage.bind(service);
+
+    expect(
+      normalize('contract.docx', 'pdf'),
+    ).toBe('contract.pdf');
+    expect(normalize('contract.PDF', 'pdf')).toBe(
+      'contract.pdf',
+    );
+    expect(
+      normalize('folder/template.pdf', 'pdf'),
+    ).toBe('template.pdf');
+    expect(normalize('result.pdf', 'word')).toBe(
+      'result.docx',
     );
   });
 });

@@ -89,16 +89,98 @@ interface WorkflowValueSource {
   sourceFieldSlug?: string;
 }
 
+type DocumentPackage =
+  | 'word'
+  | 'pdf'
+  | 'excel'
+  | 'image';
+
+interface DocumentNodeSpec {
+  package: DocumentPackage;
+  operation: string;
+  inputPackage?: DocumentPackage;
+  outputPackage: DocumentPackage;
+  fileIdArgument?: boolean;
+  fileNameArgument?: 'required' | 'optional';
+}
+
 const MAX_NOTIFICATION_DELAY_MS =
   30 * 24 * 60 * 60 * 1000;
-const WORD_NODE_TYPES = new Set([
-  'word_open',
-  'word_replace_text',
-  'word_create_table_rows',
-  'word_insert_table_rows',
-  'word_save',
-  'word_update',
-]);
+const DOCUMENT_NODE_SPECS: Record<
+  string,
+  DocumentNodeSpec
+> = {
+  word_open: {
+    package: 'word',
+    operation: 'open',
+    outputPackage: 'word',
+    fileIdArgument: true,
+  },
+  word_replace_text: {
+    package: 'word',
+    operation: 'replaceText',
+    inputPackage: 'word',
+    outputPackage: 'word',
+  },
+  word_create_table_rows: {
+    package: 'word',
+    operation: 'createTableRows',
+    inputPackage: 'word',
+    outputPackage: 'word',
+  },
+  word_insert_table_rows: {
+    package: 'word',
+    operation: 'insertTableRows',
+    inputPackage: 'word',
+    outputPackage: 'word',
+  },
+  word_convert_to_pdf: {
+    package: 'word',
+    operation: 'convertToPdf',
+    inputPackage: 'word',
+    outputPackage: 'pdf',
+    fileNameArgument: 'optional',
+  },
+  word_save: {
+    package: 'word',
+    operation: 'save',
+    inputPackage: 'word',
+    outputPackage: 'word',
+    fileNameArgument: 'required',
+  },
+  word_update: {
+    package: 'word',
+    operation: 'update',
+    inputPackage: 'word',
+    outputPackage: 'word',
+    fileIdArgument: true,
+    fileNameArgument: 'optional',
+  },
+  pdf_open: {
+    package: 'pdf',
+    operation: 'open',
+    outputPackage: 'pdf',
+    fileIdArgument: true,
+  },
+  pdf_save: {
+    package: 'pdf',
+    operation: 'save',
+    inputPackage: 'pdf',
+    outputPackage: 'pdf',
+    fileNameArgument: 'optional',
+  },
+  pdf_update: {
+    package: 'pdf',
+    operation: 'update',
+    inputPackage: 'pdf',
+    outputPackage: 'pdf',
+    fileIdArgument: true,
+    fileNameArgument: 'optional',
+  },
+};
+const DOCUMENT_NODE_TYPES = new Set(
+  Object.keys(DOCUMENT_NODE_SPECS),
+);
 
 @Injectable()
 export class WorkflowSyncService {
@@ -508,7 +590,7 @@ export class WorkflowSyncService {
     if (source.sourceType === 'node_output') {
       return Boolean(
         source.sourceNodeId &&
-          source.sourceFieldSlug,
+        source.sourceFieldSlug,
       );
     }
 
@@ -603,6 +685,32 @@ export class WorkflowSyncService {
       return `String(${this.nodeOutputJsonPath(source.sourceNodeId, allNodes, itemNodeIds)}?.${source.sourceFieldSlug} ?? '')`;
     }
     return JSON.stringify(source?.value ?? '');
+  }
+
+  private workflowFileNameExpression(
+    source:
+      | WorkflowValueSource
+      | string
+      | number
+      | undefined,
+    allNodes: NodeDefinition[],
+    itemNodeIds: Set<string>,
+  ): string {
+    if (
+      typeof source === 'object' &&
+      source?.sourceType === 'node_output' &&
+      source.sourceNodeId &&
+      ['document', 'document_handle'].includes(
+        source.sourceFieldSlug ?? '',
+      )
+    ) {
+      return `String(${this.nodeOutputJsonPath(source.sourceNodeId, allNodes, itemNodeIds)}?.${source.sourceFieldSlug}?.fileName ?? '')`;
+    }
+    return this.workflowValueExpression(
+      source,
+      allNodes,
+      itemNodeIds,
+    );
   }
 
   private async validateEmailIntegrations(workflow: {
@@ -796,10 +904,11 @@ export class WorkflowSyncService {
         return;
       }
       if (value.sourceType === 'static') {
-        if (
-          !allowEmpty &&
-          !String(value.value ?? '').trim()
-        ) {
+        const staticValue = String(
+          value.value ?? '',
+        ).trim();
+        if (optional && !staticValue) return;
+        if (!allowEmpty && !staticValue) {
           throw new BadRequestException(
             `Campul ${label} este gol in nodul "${node.name ?? node.id}".`,
           );
@@ -840,10 +949,11 @@ export class WorkflowSyncService {
     };
 
     for (const node of nodes.filter((candidate) =>
-      WORD_NODE_TYPES.has(candidate.type),
+      DOCUMENT_NODE_TYPES.has(candidate.type),
     )) {
       const params = node.parameters ?? {};
-      if (node.type === 'word_open') {
+      const spec = DOCUMENT_NODE_SPECS[node.type];
+      if (!spec.inputPackage) {
         validateValue(
           params.fileId,
           'Fisier',
@@ -857,10 +967,11 @@ export class WorkflowSyncService {
         if (
           !sourceId ||
           !source ||
-          !WORD_NODE_TYPES.has(source.type)
+          DOCUMENT_NODE_SPECS[source.type]
+            ?.outputPackage !== spec.inputPackage
         ) {
           throw new BadRequestException(
-            `Alege un document Word anterior in nodul "${node.name ?? node.id}".`,
+            `Alege un document ${spec.inputPackage.toUpperCase()} anterior in nodul "${node.name ?? node.id}".`,
           );
         }
         if (
@@ -943,18 +1054,23 @@ export class WorkflowSyncService {
           }
         }
       }
-      if (node.type === 'word_save')
+      if (spec.fileNameArgument === 'required')
         validateValue(
           params.fileName,
           'Nume fisier',
           node,
         );
-      if (node.type === 'word_update') {
+      if (
+        spec.fileIdArgument &&
+        spec.inputPackage
+      ) {
         validateValue(
           params.fileId,
           'Fisier',
           node,
         );
+      }
+      if (spec.fileNameArgument === 'optional') {
         validateValue(
           params.fileName,
           'Nume fisier',
@@ -1100,7 +1216,7 @@ export class WorkflowSyncService {
       'app_update_record',
       'system_get_current_profile',
       'email',
-      ...WORD_NODE_TYPES,
+      ...DOCUMENT_NODE_TYPES,
     ]);
     return httpTypes.has(node.type);
   }
@@ -1536,6 +1652,11 @@ export class WorkflowSyncService {
         'n8n-nodes-base.httpRequest',
       word_save: 'n8n-nodes-base.httpRequest',
       word_update: 'n8n-nodes-base.httpRequest',
+      word_convert_to_pdf:
+        'n8n-nodes-base.httpRequest',
+      pdf_open: 'n8n-nodes-base.httpRequest',
+      pdf_save: 'n8n-nodes-base.httpRequest',
+      pdf_update: 'n8n-nodes-base.httpRequest',
     };
 
     // Same-entity updates without an explicit Record ID are DTO merge nodes
@@ -1577,7 +1698,7 @@ export class WorkflowSyncService {
       parameters: this.translateParameters(
         node.type,
         node.type === 'notification' ||
-          WORD_NODE_TYPES.has(node.type)
+          DOCUMENT_NODE_TYPES.has(node.type)
           ? {
               ...(node.parameters ?? {}),
               sourceNodeId: node.id,
@@ -1626,107 +1747,92 @@ export class WorkflowSyncService {
       },
     };
 
-    switch (nodeType) {
-      case 'word_open':
-      case 'word_replace_text':
-      case 'word_create_table_rows':
-      case 'word_insert_table_rows':
-      case 'word_save':
-      case 'word_update': {
-        const operationByType: Record<
-          string,
-          string
-        > = {
-          word_open: 'open',
-          word_replace_text: 'replaceText',
-          word_create_table_rows:
-            'createTableRows',
-          word_insert_table_rows:
-            'insertTableRows',
-          word_save: 'save',
-          word_update: 'update',
-        };
-        const operation =
-          operationByType[nodeType];
-        const nodeId = String(
-          params.sourceNodeId ?? 'word-node',
-        );
-        const documentSourceNodeId = String(
-          params.documentSourceNodeId ?? '',
-        );
-        const bodyEntries = [
-          `package: 'word'`,
-          `operation: ${JSON.stringify(operation)}`,
-          `executionId: String($execution.id)`,
-          `idempotencyKey: String($execution.id) + ':${nodeId}:' + String($runIndex ?? 0) + ':' + String($itemIndex ?? 0)`,
-        ];
-        if (documentSourceNodeId) {
-          bodyEntries.push(
-            `document: ${this.nodeOutputJsonPath(documentSourceNodeId, allNodes, itemNodeIds)}?.document`,
-          );
-        }
-
-        const args: string[] = [];
-        if (nodeType === 'word_open') {
-          args.push(
-            `id_file: ${this.workflowValueExpression(params.fileId, allNodes, itemNodeIds)}`,
-          );
-        }
-        if (
-          [
-            'word_replace_text',
-            'word_create_table_rows',
-            'word_insert_table_rows',
-          ].includes(nodeType)
-        ) {
-          args.push(
-            `search: ${this.workflowValueExpression(params.search, allNodes, itemNodeIds)}`,
-          );
-        }
-        if (nodeType === 'word_replace_text') {
-          args.push(
-            `replace: ${this.workflowValueExpression(params.replace, allNodes, itemNodeIds)}`,
-          );
-        }
-        if (
-          [
-            'word_create_table_rows',
-            'word_insert_table_rows',
-          ].includes(nodeType)
-        ) {
-          args.push(
-            `nrOfNewRows: Number(${this.workflowValueExpression(params.nrOfNewRows, allNodes, itemNodeIds)})`,
-          );
-        }
-        if (
-          nodeType === 'word_save' ||
-          nodeType === 'word_update'
-        ) {
-          args.push(
-            `fileName: ${this.workflowValueExpression(params.fileName, allNodes, itemNodeIds)}`,
-          );
-        }
-        if (nodeType === 'word_update') {
-          args.push(
-            `id_file: ${this.workflowValueExpression(params.fileId, allNodes, itemNodeIds)}`,
-          );
-        }
+    const documentSpec =
+      DOCUMENT_NODE_SPECS[nodeType];
+    if (documentSpec) {
+      const nodeId = String(
+        params.sourceNodeId ?? 'document-node',
+      );
+      const documentSourceNodeId = String(
+        params.documentSourceNodeId ?? '',
+      );
+      const bodyEntries = [
+        `package: ${JSON.stringify(documentSpec.package)}`,
+        `operation: ${JSON.stringify(documentSpec.operation)}`,
+        `executionId: String($execution.id)`,
+        `idempotencyKey: String($execution.id) + ':${nodeId}:' + String($runIndex ?? 0) + ':' + String($itemIndex ?? 0)`,
+      ];
+      if (documentSourceNodeId) {
         bodyEntries.push(
-          `args: { ${args.join(', ')} }`,
+          `document: ${this.nodeOutputJsonPath(documentSourceNodeId, allNodes, itemNodeIds)}?.document`,
         );
-
-        return {
-          method: 'POST',
-          url: `${this.webhookBaseUrl}/v1/webhooks/n8n/${tenantSlug}/documents/execute`,
-          authentication: 'none',
-          sendBody: true,
-          specifyBody: 'json',
-          jsonBody: `={{ ({ ${bodyEntries.join(', ')} }) }}`,
-          ...webhookHeaders,
-          options: {},
-        };
       }
 
+      const args: string[] = [];
+      if (
+        documentSpec.fileIdArgument &&
+        !documentSpec.inputPackage
+      ) {
+        args.push(
+          `id_file: ${this.workflowValueExpression(params.fileId, allNodes, itemNodeIds)}`,
+        );
+      }
+      if (
+        [
+          'word_replace_text',
+          'word_create_table_rows',
+          'word_insert_table_rows',
+        ].includes(nodeType)
+      ) {
+        args.push(
+          `search: ${this.workflowValueExpression(params.search, allNodes, itemNodeIds)}`,
+        );
+      }
+      if (nodeType === 'word_replace_text') {
+        args.push(
+          `replace: ${this.workflowValueExpression(params.replace, allNodes, itemNodeIds)}`,
+        );
+      }
+      if (
+        [
+          'word_create_table_rows',
+          'word_insert_table_rows',
+        ].includes(nodeType)
+      ) {
+        args.push(
+          `nrOfNewRows: Number(${this.workflowValueExpression(params.nrOfNewRows, allNodes, itemNodeIds)})`,
+        );
+      }
+      if (documentSpec.fileNameArgument) {
+        args.push(
+          `fileName: ${this.workflowFileNameExpression(params.fileName, allNodes, itemNodeIds)}`,
+        );
+      }
+      if (
+        documentSpec.fileIdArgument &&
+        documentSpec.inputPackage
+      ) {
+        args.push(
+          `id_file: ${this.workflowValueExpression(params.fileId, allNodes, itemNodeIds)}`,
+        );
+      }
+      bodyEntries.push(
+        `args: { ${args.join(', ')} }`,
+      );
+
+      return {
+        method: 'POST',
+        url: `${this.webhookBaseUrl}/v1/webhooks/n8n/${tenantSlug}/documents/execute`,
+        authentication: 'none',
+        sendBody: true,
+        specifyBody: 'json',
+        jsonBody: `={{ ({ ${bodyEntries.join(', ')} }) }}`,
+        ...webhookHeaders,
+        options: {},
+      };
+    }
+
+    switch (nodeType) {
       case 'system_get_current_profile':
         return {
           method: 'GET',

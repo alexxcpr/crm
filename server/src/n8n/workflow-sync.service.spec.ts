@@ -1271,6 +1271,220 @@ describe('WorkflowSyncService validation nodes', () => {
     );
   });
 
+  it('traduce conversia Word in handle PDF si salvarea PDF downstream', () => {
+    const service = makeService();
+    const workflow = {
+      name: 'Contract PDF',
+      slug: 'contract_pdf',
+      nodes: [
+        {
+          id: 'start',
+          type: 'start',
+          position: { x: 0, y: 0 },
+          parameters: { entity: 'contacts' },
+        },
+        {
+          id: 'open-word',
+          type: 'word_open',
+          position: { x: 250, y: 0 },
+          parameters: {
+            fileId: {
+              sourceType: 'node_output',
+              sourceNodeId: 'start',
+              sourceFieldSlug: 'cf_template',
+            },
+          },
+        },
+        {
+          id: 'convert-pdf',
+          type: 'word_convert_to_pdf',
+          position: { x: 500, y: 0 },
+          parameters: {
+            documentSourceNodeId: 'open-word',
+            fileName: {
+              sourceType: 'node_output',
+              sourceNodeId: 'open-word',
+              sourceFieldSlug: 'document_handle',
+            },
+          },
+        },
+        {
+          id: 'save-pdf',
+          type: 'pdf_save',
+          position: { x: 750, y: 0 },
+          parameters: {
+            documentSourceNodeId: 'convert-pdf',
+            fileName: {
+              sourceType: 'node_output',
+              sourceNodeId: 'convert-pdf',
+              sourceFieldSlug: 'document_handle',
+            },
+          },
+        },
+      ],
+      connections: [
+        { source: 'start', target: 'open-word' },
+        {
+          source: 'open-word',
+          target: 'convert-pdf',
+        },
+        {
+          source: 'convert-pdf',
+          target: 'save-pdf',
+        },
+      ],
+    };
+
+    expect(() =>
+      (service as any).validateDocumentNodes(
+        workflow,
+      ),
+    ).not.toThrow();
+    const translated = (
+      service as any
+    ).translateToN8n(workflow);
+    const convert = translated.nodes.find(
+      (node: any) => node.id === 'convert-pdf',
+    );
+    const save = translated.nodes.find(
+      (node: any) => node.id === 'save-pdf',
+    );
+
+    expect(convert.parameters.jsonBody).toContain(
+      'package: "word"',
+    );
+    expect(convert.parameters.jsonBody).toContain(
+      'operation: "convertToPdf"',
+    );
+    expect(convert.parameters.jsonBody).toContain(
+      "$('open-word').first().json.data?.document",
+    );
+    expect(convert.parameters.jsonBody).toContain(
+      "$('open-word').first().json.data?.document_handle?.fileName",
+    );
+    expect(save.parameters.jsonBody).toContain(
+      'package: "pdf"',
+    );
+    expect(save.parameters.jsonBody).toContain(
+      'operation: "save"',
+    );
+    expect(save.parameters.jsonBody).toContain(
+      "$('convert-pdf').first().json.data?.document",
+    );
+    expect(save.parameters.jsonBody).toContain(
+      "$('convert-pdf').first().json.data?.document_handle?.fileName",
+    );
+  });
+
+  it('valideaza package-ul upstream si traduce PDF Open-Update', () => {
+    const service = makeService();
+    const workflow = {
+      name: 'Actualizare PDF',
+      slug: 'actualizare_pdf',
+      nodes: [
+        {
+          id: 'start',
+          type: 'start',
+          position: { x: 0, y: 0 },
+          parameters: { entity: 'contacts' },
+        },
+        {
+          id: 'open-pdf',
+          type: 'pdf_open',
+          position: { x: 250, y: 0 },
+          parameters: {
+            fileId: {
+              sourceType: 'node_output',
+              sourceNodeId: 'start',
+              sourceFieldSlug: 'cf_pdf',
+            },
+          },
+        },
+        {
+          id: 'update-pdf',
+          type: 'pdf_update',
+          position: { x: 500, y: 0 },
+          parameters: {
+            documentSourceNodeId: 'open-pdf',
+            fileId: {
+              sourceType: 'node_output',
+              sourceNodeId: 'start',
+              sourceFieldSlug: 'cf_pdf',
+            },
+            fileName: {
+              sourceType: 'static',
+              value: '',
+            },
+          },
+        },
+      ],
+      connections: [
+        { source: 'start', target: 'open-pdf' },
+        {
+          source: 'open-pdf',
+          target: 'update-pdf',
+        },
+      ],
+    };
+
+    expect(() =>
+      (service as any).validateDocumentNodes(
+        workflow,
+      ),
+    ).not.toThrow();
+    const translated = (
+      service as any
+    ).translateToN8n(workflow);
+    const update = translated.nodes.find(
+      (node: any) => node.id === 'update-pdf',
+    );
+    expect(update.parameters.jsonBody).toContain(
+      'package: "pdf"',
+    );
+    expect(update.parameters.jsonBody).toContain(
+      'operation: "update"',
+    );
+    expect(update.parameters.jsonBody).toContain(
+      'id_file:',
+    );
+
+    const invalid = {
+      ...workflow,
+      nodes: workflow.nodes
+        .map((node) =>
+          node.id === 'update-pdf'
+            ? {
+                ...node,
+                parameters: {
+                  ...node.parameters,
+                  documentSourceNodeId: 'word',
+                },
+              }
+            : node,
+        )
+        .concat({
+          id: 'word',
+          type: 'word_open',
+          position: { x: 250, y: 200 },
+          parameters: {
+            fileId: {
+              sourceType: 'static',
+              value: 'word-id',
+            },
+          },
+        }),
+      connections: workflow.connections.concat({
+        source: 'word',
+        target: 'update-pdf',
+      }),
+    };
+    expect(() =>
+      (service as any).validateDocumentNodes(
+        invalid,
+      ),
+    ).toThrow('Alege un document PDF anterior');
+  });
+
   it('traduce actualizarea aceleiasi entitati ca PUT cand Record ID este selectat explicit din Start', () => {
     const service = makeService();
     const translated = (
@@ -1325,7 +1539,8 @@ describe('WorkflowSyncService validation nodes', () => {
       sendQuery: true,
     });
     expect(
-      update.parameters.queryParameters.parameters,
+      update.parameters.queryParameters
+        .parameters,
     ).toEqual(
       expect.arrayContaining([
         {

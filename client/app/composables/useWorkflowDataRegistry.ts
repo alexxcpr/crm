@@ -1,5 +1,6 @@
 import type { Node, Edge } from "@vue-flow/core";
 import type { Field, EntitySchema } from "~/types/schema";
+import type { DocumentPackage } from "./useNodeTypes";
 
 interface BaseDataSource {
   nodeId: string;
@@ -13,7 +14,7 @@ export type DataSource =
   | (BaseDataSource & { kind: "entity" })
   | (BaseDataSource & {
       kind: "document";
-      documentPackage: "word" | "pdf" | "excel" | "image";
+      documentPackage: DocumentPackage;
     })
   | (BaseDataSource & { kind: "file" });
 
@@ -34,7 +35,7 @@ const documentHandleFields = [
   },
 ] as Field[];
 
-const wordResultFields: Record<string, Field[]> = {
+const documentResultFields: Record<string, Field[]> = {
   word_replace_text: [
     {
       column_name: "replacement_count",
@@ -122,6 +123,80 @@ const wordResultFields: Record<string, Field[]> = {
       ui_type: "text",
     } as Field,
   ],
+  pdf_save: [
+    {
+      column_name: "id_file",
+      name: "ID fisier PDF salvat",
+      slug: "_pdf_saved_file_id",
+      data_type: "uuid",
+      ui_type: "file",
+    } as Field,
+    {
+      column_name: "version",
+      name: "Versiune fisier",
+      slug: "_pdf_saved_file_version",
+      data_type: "integer",
+      ui_type: "number",
+    } as Field,
+    {
+      column_name: "file_name",
+      name: "Nume fisier",
+      slug: "_pdf_saved_file_name",
+      data_type: "varchar",
+      ui_type: "text",
+    } as Field,
+    {
+      column_name: "mime_type",
+      name: "Tip MIME",
+      slug: "_pdf_saved_mime_type",
+      data_type: "varchar",
+      ui_type: "text",
+    } as Field,
+    {
+      column_name: "size_bytes",
+      name: "Dimensiune fisier",
+      slug: "_pdf_saved_size_bytes",
+      data_type: "integer",
+      ui_type: "number",
+    } as Field,
+  ],
+  pdf_update: [
+    {
+      column_name: "id_file",
+      name: "ID fisier PDF actualizat",
+      slug: "_pdf_updated_file_id",
+      data_type: "uuid",
+      ui_type: "file",
+    } as Field,
+    {
+      column_name: "version",
+      name: "Versiune fisier",
+      slug: "_pdf_updated_file_version",
+      data_type: "integer",
+      ui_type: "number",
+    } as Field,
+    {
+      column_name: "file_name",
+      name: "Nume fisier",
+      slug: "_pdf_updated_file_name",
+      data_type: "varchar",
+      ui_type: "text",
+    } as Field,
+    {
+      column_name: "mime_type",
+      name: "Tip MIME",
+      slug: "_pdf_updated_mime_type",
+      data_type: "varchar",
+      ui_type: "text",
+    } as Field,
+    {
+      column_name: "size_bytes",
+      name: "Dimensiune fisier",
+      slug: "_pdf_updated_size_bytes",
+      data_type: "integer",
+      ui_type: "number",
+    } as Field,
+  ],
 };
 
 const currentProfileFields = [
@@ -186,6 +261,7 @@ export function useWorkflowDataRegistry(
   edges: Ref<Edge[]>,
 ) {
   const { apiFetch } = useApi();
+  const { getNodeType } = useNodeTypes();
 
   const dataSources = ref<DataSource[]>([]);
   const loading = ref(false);
@@ -333,16 +409,20 @@ export function useWorkflowDataRegistry(
           });
           processed.add(node.id);
           changed = true;
-        } else if (nodeType.startsWith("word_")) {
+        } else if (getNodeType(nodeType)?.category === "files") {
+          const definition = getNodeType(nodeType);
+          const outputPackage =
+            definition?.outputDocumentPackage ?? definition?.package;
+          if (!outputPackage) continue;
           sources.push({
             kind: "document",
-            documentPackage: "word",
+            documentPackage: outputPackage,
             nodeId: node.id,
-            label: data.label || "Word",
-            entitySlug: "__document_word",
+            label: data.label || outputPackage.toUpperCase(),
+            entitySlug: `__document_${outputPackage}`,
             fields: [
               ...documentHandleFields,
-              ...(wordResultFields[nodeType] ?? []),
+              ...(documentResultFields[nodeType] ?? []),
             ],
             cardinality: "single",
           });

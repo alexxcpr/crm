@@ -72,7 +72,9 @@ const dataSourceOptions = computed(() =>
 );
 
 const documentSourceOptions = computed(() => {
-  const documentPackage = nodeTypeDef.value?.package;
+  const documentPackage =
+    nodeTypeDef.value?.inputDocumentPackage ??
+    nodeTypeDef.value?.package;
   return (props.dataSources || [])
     .filter(
       (ds) =>

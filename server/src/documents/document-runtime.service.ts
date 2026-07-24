@@ -21,6 +21,7 @@ import type {
   DocumentHandle,
   DocumentPackageAdapter,
 } from './document.types';
+import { PdfDocumentAdapter } from './pdf-document.adapter';
 import { WordDocumentAdapter } from './word-document.adapter';
 
 const DEFAULT_DOCUMENT_TTL_SECONDS = 86_400;
@@ -39,11 +40,16 @@ export class DocumentRuntimeService {
     private readonly config: ConfigService,
     private readonly files: FileStorageService,
     word: WordDocumentAdapter,
+    pdf: PdfDocumentAdapter,
     @Inject(STORAGE_PROVIDER)
     private readonly provider: StorageProvider,
   ) {
-    this.adapters = new Map([
+    this.adapters = new Map<
+      string,
+      DocumentPackageAdapter
+    >([
       [word.package, word],
+      [pdf.package, pdf],
     ]);
   }
 
@@ -336,14 +342,24 @@ export class DocumentRuntimeService {
           data: DocumentExecuteData;
         };
         if (request.operation === 'save') {
+          const requestedFileName =
+            typeof request.args?.fileName ===
+              'string' &&
+            request.args.fileName.trim()
+              ? request.args.fileName
+              : session.file_name;
           const file =
             await this.files.createGeneratedFile(
               {
                 buffer: currentBuffer,
-                fileName: this.requiredString(
-                  request.args?.fileName,
-                  'fileName',
-                ),
+                fileName:
+                  this.normalizeFileNameForPackage(
+                    this.requiredString(
+                      requestedFileName,
+                      'fileName',
+                    ),
+                    request.package,
+                  ),
                 mimeType: session.mime_type,
                 idempotencyKey:
                   this.storageIdempotency(
@@ -369,17 +385,23 @@ export class DocumentRuntimeService {
               session.source_file_id,
             'id_file',
           );
+          const requestedFileName =
+            typeof request.args?.fileName ===
+              'string' &&
+            request.args.fileName.trim()
+              ? request.args.fileName
+              : undefined;
           const file =
             await this.files.updateGeneratedFile(
               fileId,
               {
                 buffer: currentBuffer,
-                fileName:
-                  typeof request.args
-                    ?.fileName === 'string' &&
-                  request.args.fileName.length
-                    ? request.args.fileName
-                    : undefined,
+                fileName: requestedFileName
+                  ? this.normalizeFileNameForPackage(
+                      requestedFileName,
+                      request.package,
+                    )
+                  : undefined,
                 mimeType: session.mime_type,
                 idempotencyKey:
                   this.storageIdempotency(
@@ -405,6 +427,11 @@ export class DocumentRuntimeService {
                 ? additionalBuffers
                 : undefined,
               args: request.args ?? {},
+              source: {
+                package: request.package,
+                mimeType: session.mime_type,
+                fileName: session.file_name,
+              },
             },
           );
           if (result.kind === 'value') {
@@ -445,6 +472,28 @@ export class DocumentRuntimeService {
             this.validateSize(result.buffer);
             const outputPackage =
               result.package ?? request.package;
+            const outputAdapter =
+              this.adapters.get(outputPackage);
+            if (!outputAdapter) {
+              throw new BadRequestException(
+                `Pachetul rezultat "${outputPackage}" nu este disponibil.`,
+              );
+            }
+            if (
+              !outputAdapter.mimeTypes.includes(
+                result.mimeType,
+              )
+            ) {
+              throw new BadRequestException(
+                'Tipul MIME al documentului rezultat nu corespunde pachetului.',
+              );
+            }
+            outputAdapter.validate(result.buffer);
+            const outputFileName =
+              this.normalizeFileNameForPackage(
+                result.fileName,
+                outputPackage,
+              );
             const newSessionId = randomUUID();
             const newKey = this.objectKey(
               request.executionId,
@@ -470,7 +519,7 @@ export class DocumentRuntimeService {
               current_revision: 0,
               current_object_key: newKey,
               mime_type: result.mimeType,
-              file_name: result.fileName,
+              file_name: outputFileName,
               id_owner_profile: actor.profileId,
               status: 'active',
               expires_at: expiresAt,
@@ -480,7 +529,7 @@ export class DocumentRuntimeService {
               package: outputPackage,
               revision: 0,
               mimeType: result.mimeType,
-              fileName: result.fileName,
+              fileName: outputFileName,
               expiresAt: expiresAt.toISOString(),
             };
             response = {
@@ -851,6 +900,34 @@ export class DocumentRuntimeService {
         image: 'bin',
       }[documentPackage] ?? 'bin'
     );
+  }
+
+  private normalizeFileNameForPackage(
+    fileName: string,
+    documentPackage: string,
+  ): string {
+    const extension = this.extensionFor(
+      documentPackage,
+    );
+    const leaf =
+      fileName
+        .trim()
+        .replace(/\\/g, '/')
+        .split('/')
+        .pop()
+        ?.trim() || `document.${extension}`;
+    const expectedSuffix = `.${extension}`;
+    if (
+      leaf.toLowerCase().endsWith(expectedSuffix)
+    ) {
+      return `${leaf.slice(0, -expectedSuffix.length)}${expectedSuffix}`;
+    }
+    const lastDot = leaf.lastIndexOf('.');
+    const stem =
+      lastDot > 0
+        ? leaf.slice(0, lastDot).trim()
+        : leaf;
+    return `${stem || 'document'}${expectedSuffix}`;
   }
 
   private numberConfig(

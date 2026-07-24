@@ -290,12 +290,16 @@ export interface NodeTypeDefinition {
   label: string;
   icon: string;
   category: "trigger" | "system" | "action" | "logic" | "integration" | "files";
-  package?: "word" | "pdf" | "excel" | "image";
+  package?: DocumentPackage;
+  inputDocumentPackage?: DocumentPackage;
+  outputDocumentPackage?: DocumentPackage;
   color: string;
   description: string;
   defaults: Record<string, any>;
   configFields: NodeConfigField[];
 }
+
+export type DocumentPackage = "word" | "pdf" | "excel" | "image";
 
 export interface NodeConfigField {
   key: string;
@@ -325,7 +329,7 @@ export interface NodeConfigField {
   placeholder?: string;
   options?: { label: string; value: string }[];
   required?: boolean;
-  inputKind?: "email" | "text" | "textarea";
+  inputKind?: "email" | "text" | "textarea" | "file-name";
 }
 
 export function useNodeTypes() {
@@ -692,6 +696,36 @@ export function useNodeTypes() {
       ],
     },
     {
+      type: "word_convert_to_pdf",
+      label: "Convert to PDF",
+      icon: "i-lucide-file-output",
+      category: "files",
+      package: "word",
+      inputDocumentPackage: "word",
+      outputDocumentPackage: "pdf",
+      color: "#2563eb",
+      description:
+        "Converteste documentul Word curent intr-un document PDF temporar.",
+      defaults: {
+        documentSourceNodeId: "",
+        fileName: { sourceType: "static", value: "" } as WorkflowValueSource,
+      },
+      configFields: [
+        {
+          key: "documentSourceNodeId",
+          label: "Document Word",
+          type: "document-source-select",
+          required: true,
+        },
+        {
+          key: "fileName",
+          label: "Nume PDF (optional)",
+          type: "workflow-value-source",
+          inputKind: "file-name",
+        },
+      ],
+    },
+    {
       type: "word_save",
       label: "Save",
       icon: "i-lucide-save",
@@ -719,6 +753,7 @@ export function useNodeTypes() {
           label: "Nume fisier",
           type: "workflow-value-source",
           required: true,
+          inputKind: "file-name",
         },
       ],
     },
@@ -752,6 +787,96 @@ export function useNodeTypes() {
           key: "fileName",
           label: "Nume nou (optional)",
           type: "workflow-value-source",
+          inputKind: "file-name",
+        },
+      ],
+    },
+    {
+      type: "pdf_open",
+      label: "Open",
+      icon: "i-lucide-file-input",
+      category: "files",
+      package: "pdf",
+      outputDocumentPackage: "pdf",
+      color: "#dc2626",
+      description:
+        "Deschide versiunea curenta a unui fisier PDF intr-o sesiune privata de workflow.",
+      defaults: {
+        fileId: { sourceType: "static", value: "" } as WorkflowValueSource,
+      },
+      configFields: [
+        {
+          key: "fileId",
+          label: "Fisier PDF (id_file)",
+          type: "workflow-value-source",
+          required: true,
+        },
+      ],
+    },
+    {
+      type: "pdf_save",
+      label: "Save",
+      icon: "i-lucide-save",
+      category: "files",
+      package: "pdf",
+      inputDocumentPackage: "pdf",
+      outputDocumentPackage: "pdf",
+      color: "#dc2626",
+      description:
+        "Salveaza documentul PDF ca fisier logic nou si returneaza id_file.",
+      defaults: {
+        documentSourceNodeId: "",
+        fileName: { sourceType: "static", value: "" } as WorkflowValueSource,
+      },
+      configFields: [
+        {
+          key: "documentSourceNodeId",
+          label: "Document PDF",
+          type: "document-source-select",
+          required: true,
+        },
+        {
+          key: "fileName",
+          label: "Nume fisier (optional)",
+          type: "workflow-value-source",
+          inputKind: "file-name",
+        },
+      ],
+    },
+    {
+      type: "pdf_update",
+      label: "Update",
+      icon: "i-lucide-file-up",
+      category: "files",
+      package: "pdf",
+      inputDocumentPackage: "pdf",
+      outputDocumentPackage: "pdf",
+      color: "#dc2626",
+      description:
+        "Creeaza o versiune PDF noua si pastreaza acelasi id_file.",
+      defaults: {
+        documentSourceNodeId: "",
+        fileId: { sourceType: "static", value: "" } as WorkflowValueSource,
+        fileName: { sourceType: "static", value: "" } as WorkflowValueSource,
+      },
+      configFields: [
+        {
+          key: "documentSourceNodeId",
+          label: "Document PDF",
+          type: "document-source-select",
+          required: true,
+        },
+        {
+          key: "fileId",
+          label: "Fisier PDF de actualizat (id_file)",
+          type: "workflow-value-source",
+          required: true,
+        },
+        {
+          key: "fileName",
+          label: "Nume nou (optional)",
+          type: "workflow-value-source",
+          inputKind: "file-name",
         },
       ],
     },

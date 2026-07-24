@@ -69,16 +69,23 @@ export type DocumentAdapterResult =
       result?: Record<string, unknown>;
     };
 
+export interface DocumentAdapterInput {
+  document?: Buffer;
+  documents?: Buffer[];
+  args: Record<string, unknown>;
+  source?: {
+    package: DocumentPackage;
+    mimeType: string;
+    fileName: string;
+  };
+}
+
 export interface DocumentPackageAdapter {
   readonly package: DocumentPackage;
   readonly mimeTypes: readonly string[];
   validate(buffer: Buffer): void;
   execute(
     operation: string,
-    input: {
-      document?: Buffer;
-      documents?: Buffer[];
-      args: Record<string, unknown>;
-    },
+    input: DocumentAdapterInput,
   ): Promise<DocumentAdapterResult>;
 }

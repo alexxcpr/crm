@@ -8,9 +8,12 @@ import {
 } from '@xmldom/xmldom';
 import PizZip from 'pizzip';
 import type {
+  DocumentAdapterInput,
   DocumentAdapterResult,
   DocumentPackageAdapter,
 } from './document.types';
+import { OfficeConversionService } from './office-conversion.service';
+import { PDF_MIME } from './pdf-document.adapter';
 
 const WORD_MIME =
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -29,6 +32,10 @@ export class WordDocumentAdapter implements DocumentPackageAdapter {
   readonly package = 'word' as const;
   readonly mimeTypes = [WORD_MIME] as const;
 
+  constructor(
+    private readonly conversion: OfficeConversionService,
+  ) {}
+
   validate(buffer: Buffer): void {
     const zip = this.openZip(buffer);
     if (
@@ -43,11 +50,7 @@ export class WordDocumentAdapter implements DocumentPackageAdapter {
 
   async execute(
     operation: string,
-    input: {
-      document?: Buffer;
-      documents?: Buffer[];
-      args: Record<string, unknown>;
-    },
+    input: DocumentAdapterInput,
   ): Promise<DocumentAdapterResult> {
     if (!input.document) {
       throw new BadRequestException(
@@ -56,6 +59,24 @@ export class WordDocumentAdapter implements DocumentPackageAdapter {
     }
     const { args } = input;
     const buffer = input.document;
+    if (operation === 'convertToPdf') {
+      const converted =
+        await this.conversion.convertDocxToPdf(
+          buffer,
+          input.source?.fileName ??
+            'document.docx',
+          typeof args.fileName === 'string'
+            ? args.fileName
+            : undefined,
+        );
+      return {
+        kind: 'new-document',
+        buffer: converted.buffer,
+        package: 'pdf',
+        mimeType: PDF_MIME,
+        fileName: converted.fileName,
+      };
+    }
     const zip = this.openZip(buffer);
     switch (operation) {
       case 'replaceText':

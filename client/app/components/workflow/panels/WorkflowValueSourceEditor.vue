@@ -6,7 +6,7 @@ import type { Field } from '~/types/schema'
 const props = defineProps<{
   modelValue: WorkflowValueSource | null
   dataSources: DataSource[]
-  inputKind?: 'email' | 'text' | 'textarea'
+  inputKind?: 'email' | 'text' | 'textarea' | 'file-name'
   fetchSourceFields?: (nodeId: string) => Promise<Field[]>
 }>()
 
@@ -27,7 +27,10 @@ const nodeOptions = computed(() => props.dataSources.map(source => ({
   value: source.nodeId
 })))
 const fieldOptions = computed(() => fields.value
-  .filter(field => props.inputKind !== 'email' || ['varchar', 'text'].includes(field.data_type))
+  .filter(field =>
+    !['email', 'file-name'].includes(props.inputKind ?? '')
+    || ['varchar', 'text'].includes(field.data_type)
+  )
   .map(field => ({ label: `${field.name} (${field.column_name})`, value: field.column_name })))
 
 watch(() => props.modelValue, async (value) => {
@@ -107,7 +110,13 @@ function changeField(field: string) {
       :model-value="staticValue"
       :type="inputKind === 'email' ? 'email' : 'text'"
       class="w-full"
-      :placeholder="inputKind === 'email' ? 'email@exemplu.ro' : 'Scrie valoarea...'"
+      :placeholder="
+        inputKind === 'email'
+          ? 'email@exemplu.ro'
+          : inputKind === 'file-name'
+            ? 'Exemplu: document.pdf'
+            : 'Scrie valoarea...'
+      "
       @update:model-value="value => { staticValue = value; emitUpdate() }"
     />
     <template v-else>

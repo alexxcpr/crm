@@ -57,7 +57,59 @@ function partText(
 }
 
 describe('WordDocumentAdapter', () => {
-  const adapter = new WordDocumentAdapter();
+  const conversion = {
+    convertDocxToPdf: jest.fn(),
+  };
+  const adapter = new WordDocumentAdapter(
+    conversion as any,
+  );
+
+  beforeEach(() => {
+    conversion.convertDocxToPdf.mockReset();
+  });
+
+  it('converts the current DOCX into a new PDF document handle payload', async () => {
+    const pdf = Buffer.from(
+      '%PDF-1.4\nconverted\n%%EOF',
+    );
+    conversion.convertDocxToPdf.mockResolvedValue(
+      {
+        buffer: pdf,
+        fileName: 'contract.pdf',
+      },
+    );
+
+    const result = await adapter.execute(
+      'convertToPdf',
+      {
+        document: makeDocx(
+          '<w:p><w:r><w:t>Contract</w:t></w:r></w:p>',
+        ),
+        args: { fileName: 'contract.pdf' },
+        source: {
+          package: 'word',
+          mimeType:
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          fileName: 'template.docx',
+        },
+      },
+    );
+
+    expect(
+      conversion.convertDocxToPdf,
+    ).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      'template.docx',
+      'contract.pdf',
+    );
+    expect(result).toEqual({
+      kind: 'new-document',
+      buffer: pdf,
+      package: 'pdf',
+      mimeType: 'application/pdf',
+      fileName: 'contract.pdf',
+    });
+  });
 
   it('replaces literal text split across runs in all supported text parts', async () => {
     const paragraph = `<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Buna ${'${nu'}</w:t></w:r><w:r><w:t>me}</w:t></w:r></w:p>`;
