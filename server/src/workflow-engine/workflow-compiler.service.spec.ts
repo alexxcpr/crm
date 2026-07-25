@@ -136,6 +136,95 @@ describe('WorkflowCompilerService', () => {
     );
   });
 
+  it('permite filtre pe coloana sistem id fara metadata field', async () => {
+    const where = jest.fn().mockResolvedValue([]);
+    const select = jest.fn(() => ({ where }));
+    const service = new WorkflowCompilerService(
+      {
+        knex: jest.fn(() => ({ select })),
+      } as any,
+      {} as any,
+      {} as any,
+    );
+    const node = {
+      id: 'read-sold',
+      type: 'app_get_record',
+      parameters: {
+        entity: 'sold',
+        filters: [
+          {
+            field: 'id',
+            operator: 'eq',
+            valueSource: {
+              sourceType: 'static',
+              value: 'record-1',
+            },
+          },
+        ],
+      },
+    };
+    const fieldIds = new Set<string>();
+    const errors: any[] = [];
+
+    await (
+      service as any
+    ).resolveFieldDependencies(
+      node,
+      new Map([['sold', 'entity-sold']]),
+      fieldIds,
+      errors,
+    );
+
+    expect(errors).toEqual([]);
+    expect(fieldIds).toEqual(new Set());
+    expect(
+      node.parameters.filters[0],
+    ).toMatchObject({
+      field: 'id',
+      fieldSnapshot: 'id',
+      dataType: 'uuid',
+    });
+  });
+
+  it('nu permite scrierea coloanei sistem id', async () => {
+    const where = jest.fn().mockResolvedValue([]);
+    const select = jest.fn(() => ({ where }));
+    const service = new WorkflowCompilerService(
+      {
+        knex: jest.fn(() => ({ select })),
+      } as any,
+      {} as any,
+      {} as any,
+    );
+    const errors: any[] = [];
+
+    await (
+      service as any
+    ).resolveFieldDependencies(
+      {
+        id: 'update-sold',
+        type: 'app_update_record',
+        parameters: {
+          entity: 'sold',
+          fieldMappings: [
+            {
+              key: 'id',
+              sourceType: 'static',
+              value: 'record-2',
+            },
+          ],
+        },
+      },
+      new Map([['sold', 'entity-sold']]),
+      new Set<string>(),
+      errors,
+    );
+
+    expect(
+      errors.map((error) => error.code),
+    ).toContain('field_not_found');
+  });
+
   it('respinge Delay si Cod Custom', async () => {
     const service = compiler();
     const result = await service.compile(

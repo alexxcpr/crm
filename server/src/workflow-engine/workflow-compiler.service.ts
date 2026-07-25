@@ -1197,31 +1197,67 @@ export class WorkflowCompilerService {
         field.id_field,
       );
     }
-    const referenced = new Set<string>();
+    const referenced = new Map<
+      string,
+      { write: boolean; filter: boolean }
+    >();
+    const markReference = (
+      key: string,
+      kind: 'write' | 'filter',
+    ) => {
+      const usage = referenced.get(key) ?? {
+        write: false,
+        filter: false,
+      };
+      usage[kind] = true;
+      referenced.set(key, usage);
+    };
     for (const mapping of node.parameters
       ?.fieldMappings ?? []) {
       if (mapping?.key)
-        referenced.add(String(mapping.key));
+        markReference(
+          String(mapping.key),
+          'write',
+        );
     }
     for (const key of Object.keys(
       node.parameters?.fields ?? {},
     )) {
-      referenced.add(key);
+      markReference(key, 'write');
     }
     for (const filter of node.parameters
       ?.filters ?? []) {
       if (filter?.field)
-        referenced.add(String(filter.field));
+        markReference(
+          String(filter.field),
+          'filter',
+        );
     }
-    for (const key of referenced) {
+    for (const [key, usage] of referenced) {
       const id = fieldByKey.get(key);
-      if (!id) {
+      const systemField =
+        SYSTEM_SOURCE_FIELDS.get(key);
+      const validSystemFilter =
+        usage.filter &&
+        !usage.write &&
+        Boolean(systemField);
+      if (!id && !validSystemFilter) {
         errors.push({
           code: 'field_not_found',
           message: `Campul "${key}" nu exista in entitatea "${targetSlug}".`,
           nodeId: node.id,
         });
+      } else if (!id && systemField) {
+        for (const filter of node.parameters
+          ?.filters ?? []) {
+          if (filter?.field === key) {
+            filter.fieldSnapshot = key;
+            filter.dataType =
+              systemField.dataType;
+          }
+        }
       } else {
+        if (!id) continue;
         fieldIds.add(id);
         node.parameters ??= {};
         node.parameters.fieldRefs ??= {};
