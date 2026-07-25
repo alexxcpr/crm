@@ -1,4 +1,5 @@
 import { EntityEvent } from './entity-event.enum';
+import type { AuthenticatedUser } from 'src/security/security.types';
 
 export interface EntityEventPayload {
   /** Tipul evenimentului */
@@ -36,6 +37,9 @@ export interface EntityEventPayload {
 
   /** Profilul activ care a initiat operatia */
   profileId: string | null;
+
+  /** Actorul complet, pastrat pentru RBAC in workflow-urile imbricate */
+  actor: AuthenticatedUser;
 
   /** Timestamp-ul evenimentului */
   timestamp: Date;

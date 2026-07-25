@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Roles } from 'src/guards/roles.decorator';
 import { RolesGuard } from 'src/guards/roles.guard';
@@ -10,6 +21,7 @@ import {
 } from './dto/integration.dto';
 import { IntegrationsService } from './integrations.service';
 import { SmtpMailService } from './smtp-mail.service';
+import type { AuthenticatedUser } from 'src/security/security.types';
 
 @Controller('v1/admin/integrations')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -26,22 +38,38 @@ export class AdminIntegrationsController {
   }
 
   @Post('smtp')
-  createSmtp(@Body() dto: CreateSmtpIntegrationDto) {
+  createSmtp(
+    @Body() dto: CreateSmtpIntegrationDto,
+  ) {
     return this.integrations.createSmtp(dto);
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateSmtpIntegrationDto) {
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateSmtpIntegrationDto,
+  ) {
     return this.integrations.update(id, dto);
   }
 
   @Post(':id/test')
-  test(@Param('id') id: string, @Body() dto: TestSmtpIntegrationDto) {
+  test(
+    @Param('id') id: string,
+    @Body() dto: TestSmtpIntegrationDto,
+  ) {
     return this.smtp.sendTest(id, dto.to);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @Body() dto?: DeleteIntegrationDto) {
-    return this.integrations.remove(id, dto?.replacementIntegrationId);
+  remove(
+    @Param('id') id: string,
+    @Body() dto: DeleteIntegrationDto | undefined,
+    @Req() req: { user: AuthenticatedUser },
+  ) {
+    return this.integrations.remove(
+      id,
+      dto?.replacementIntegrationId,
+      req.user.profileId,
+    );
   }
 }

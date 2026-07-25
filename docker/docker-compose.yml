@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: traefik:v3.7.5
+    image: traefik:latest
     container_name: moduvis-traefik
     restart: unless-stopped
     command:
@@ -8,6 +8,7 @@ services:
     environment:
       CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN:-}
       ACME_EMAIL: ${ACME_EMAIL:-}
+      DOCKER_API_VERSION: "1.44"
     ports:
       - "80:80"
       - "443:443"
@@ -48,10 +49,11 @@ services:
       - traefik.http.routers.moduvis-frontend.priority=10
       - traefik.http.routers.moduvis-frontend.tls=${TRAEFIK_TLS:-false}
       - traefik.http.routers.moduvis-frontend.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-}
-      - traefik.http.routers.moduvis-frontend.tls.domains[0].main=${DOMAIN_BASE}
-      - traefik.http.routers.moduvis-frontend.tls.domains[0].sans=*.${DOMAIN_BASE}
+      - traefik.http.routers.moduvis-frontend.middlewares=${TRAEFIK_HTTPS_REDIRECT:-} 
       - traefik.http.services.moduvis-frontend.loadbalancer.server.port=3000
       - traefik.http.services.moduvis-frontend.loadbalancer.healthcheck.path=/
+      - traefik.http.routers.moduvis-frontend.tls.domains[0].main=stanciulescu.xyz
+      - traefik.http.routers.moduvis-frontend.tls.domains[0].sans=*.stanciulescu.xyz
     networks:
       - web
 
@@ -78,9 +80,6 @@ services:
       PROVISIONING_APP_INTERNAL_URL: ${PROVISIONING_APP_INTERNAL_URL:-http://provisioning:3000}
       DEFAULT_TENANT_SLUG: ${DEFAULT_TENANT_SLUG:-dev}
       DEFAULT_TENANT_DB: ${DEFAULT_TENANT_DB:-devdb}
-      N8N_API_URL: http://n8n:5678
-      N8N_API_KEY: ${N8N_API_KEY}
-      N8N_WEBHOOK_SECRET: ${N8N_WEBHOOK_SECRET}
       INTEGRATIONS_ENCRYPTION_KEY: ${INTEGRATIONS_ENCRYPTION_KEY}
       STORAGE_ENABLED: ${STORAGE_ENABLED:-false}
       STORAGE_S3_ENDPOINT: ${STORAGE_S3_ENDPOINT:-}
@@ -116,10 +115,11 @@ services:
       - traefik.http.routers.moduvis-backend.priority=100
       - traefik.http.routers.moduvis-backend.tls=${TRAEFIK_TLS:-false}
       - traefik.http.routers.moduvis-backend.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-}
-      - traefik.http.routers.moduvis-backend.tls.domains[0].main=${DOMAIN_BASE}
-      - traefik.http.routers.moduvis-backend.tls.domains[0].sans=*.${DOMAIN_BASE}
+      - traefik.http.routers.moduvis-backend.middlewares=${TRAEFIK_HTTPS_REDIRECT:-}		 
       - traefik.http.services.moduvis-backend.loadbalancer.server.port=4000
       - traefik.http.services.moduvis-backend.loadbalancer.healthcheck.path=/api/health
+      - traefik.http.routers.moduvis-backend.tls.domains[0].main=stanciulescu.xyz
+      - traefik.http.routers.moduvis-backend.tls.domains[0].sans=*.stanciulescu.xyz
     networks:
       - web
       - internal
@@ -133,7 +133,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DEFAULT_TENANT_DB:-devdb}
     ports:
-      - "7432:5432"
+      - "127.0.0.1:7432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-meta-db.sql:/docker-entrypoint-initdb.d/init-meta-db.sql:ro
@@ -146,37 +146,6 @@ services:
       - web
       - internal
 
-  n8n:
-    image: n8nio/n8n:latest
-    container_name: n8n-engine
-    restart: unless-stopped
-    environment:
-      N8N_BASIC_AUTH_ACTIVE: "true"
-      N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER:-admin}
-      N8N_BASIC_AUTH_PASSWORD: ${N8N_BASIC_AUTH_PASSWORD}
-      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
-      N8N_HOST: n8n
-      N8N_PROTOCOL: http
-      WEBHOOK_URL: http://n8n:5678/
-      N8N_RUNNERS_ENABLED: "true"
-      EXECUTIONS_MODE: regular
-      DB_TYPE: postgresdb
-      DB_POSTGRESDB_HOST: postgres
-      DB_POSTGRESDB_PORT: 5432
-      DB_POSTGRESDB_DATABASE: ${N8N_DB:-n8n_db}
-      DB_POSTGRESDB_USER: ${DB_USER}
-      DB_POSTGRESDB_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "5678:5678"
-    volumes:
-      - n8n_data:/home/node/.n8n
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - web
-      - internal
-
   provisioning:
     build:
       context: ../../Moduvis-Provisioning
@@ -184,7 +153,7 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      NUXT_PUBLIC_SITE_URL: https://moduvis.${DOMAIN_BASE}
+      NUXT_PUBLIC_SITE_URL: http://moduvis.${DOMAIN_BASE}
       NUXT_PUBLIC_APP_DOMAIN_BASE: ${DOMAIN_BASE}
       NUXT_STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       NUXT_STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
@@ -209,8 +178,7 @@ services:
       - traefik.http.routers.moduvis-provisioning.priority=300
       - traefik.http.routers.moduvis-provisioning.tls=${TRAEFIK_TLS:-false}
       - traefik.http.routers.moduvis-provisioning.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-}
-      - traefik.http.routers.moduvis-provisioning.tls.domains[0].main=${DOMAIN_BASE}
-      - traefik.http.routers.moduvis-provisioning.tls.domains[0].sans=*.${DOMAIN_BASE}
+      - traefik.http.routers.moduvis-provisioning.middlewares=${TRAEFIK_HTTPS_REDIRECT:-} 
       - traefik.http.services.moduvis-provisioning.loadbalancer.server.port=3000
       - traefik.http.services.moduvis-provisioning.loadbalancer.healthcheck.path=/
     networks:
@@ -226,5 +194,4 @@ networks:
 
 volumes:
   postgres_data:
-  n8n_data:
   traefik_letsencrypt:

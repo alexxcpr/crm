@@ -1,12 +1,18 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { EntityEvent } from './entity-event.enum';
 import { EntityEventPayload } from './entity-event.payload';
+import type { AuthenticatedUser } from 'src/security/security.types';
 
 @Injectable()
 export class EntityEventsService {
-  private readonly logger = new Logger(EntityEventsService.name);
+  private readonly logger = new Logger(
+    EntityEventsService.name,
+  );
 
   constructor(
     private readonly eventEmitter: EventEmitter2,
@@ -29,6 +35,7 @@ export class EntityEventsService {
       previousData?: Record<string, any>;
       userId: string | null;
       profileId: string | null;
+      actor: AuthenticatedUser;
     },
   ): Promise<void> {
     const payload: EntityEventPayload = {
@@ -43,6 +50,7 @@ export class EntityEventsService {
       previousData: context.previousData,
       userId: context.userId,
       profileId: context.profileId,
+      actor: context.actor,
       timestamp: new Date(),
     };
 
@@ -51,9 +59,15 @@ export class EntityEventsService {
     );
 
     // Emite evenimentul generic (ex: "entity.before_insert")
-    await this.eventEmitter.emitAsync(event, payload);
+    await this.eventEmitter.emitAsync(
+      event,
+      payload,
+    );
 
     // Emite și evenimentul specific per entitate (ex: "entity.before_insert.contacts")
-    await this.eventEmitter.emitAsync(`${event}.${context.entitySlug}`, payload);
+    await this.eventEmitter.emitAsync(
+      `${event}.${context.entitySlug}`,
+      payload,
+    );
   }
 }

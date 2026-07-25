@@ -1,10 +1,18 @@
-import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as argon from 'argon2';
 import knex, { Knex } from 'knex';
 import { MetaDbService } from './meta-db.service';
 import { migrationDirectory } from './migration-directory';
-import { BASE_INCLUDED_PROFILE_SEATS, BASE_INCLUDED_STORAGE_GB } from 'src/billing/billing.constants';
+import {
+  BASE_INCLUDED_PROFILE_SEATS,
+  BASE_INCLUDED_STORAGE_GB,
+} from 'src/billing/billing.constants';
 
 export interface ProvisionTenantInput {
   slug?: string;
@@ -65,7 +73,11 @@ export interface TenantAvailabilityResult {
 }
 
 export interface TenantProvisioningStatusResult {
-  status: 'not_found' | 'provisioning' | 'provisioned' | 'failed';
+  status:
+    | 'not_found'
+    | 'provisioning'
+    | 'provisioned'
+    | 'failed';
   tenantSlug?: string;
   appUrl?: string;
 }
@@ -80,147 +92,245 @@ export interface SetAdminCredentialsInput {
 
 @Injectable()
 export class TenantProvisioningService {
-  private static readonly RESERVED_SLUGS = new Set([
-    'www',
-    'api',
-    'admin',
-    'billing',
-    'stripe',
-    'n8n',
-    'app',
-    'moduvis',
-    'dev',
-    'provisioning',
-  ]);
+  private static readonly RESERVED_SLUGS =
+    new Set([
+      'www',
+      'api',
+      'admin',
+      'billing',
+      'stripe',
+      'app',
+      'moduvis',
+      'dev',
+      'provisioning',
+    ]);
 
-  private readonly logger = new Logger(TenantProvisioningService.name);
+  private readonly logger = new Logger(
+    TenantProvisioningService.name,
+  );
 
   constructor(
     private readonly config: ConfigService,
     private readonly metaDb: MetaDbService,
   ) {}
 
-  async provision(input: ProvisionTenantInput): Promise<{ slug: string; dbName: string }> {
-    const slug = this.normalizeSlug(input.tenantSlug || input.slug);
+  async provision(
+    input: ProvisionTenantInput,
+  ): Promise<{ slug: string; dbName: string }> {
+    const slug = this.normalizeSlug(
+      input.tenantSlug || input.slug,
+    );
     if (this.isReservedSlug(slug)) {
-      throw new BadRequestException('Tenant slug is reserved');
+      throw new BadRequestException(
+        'Tenant slug is reserved',
+      );
     }
     const dbName = slug;
-    const registry = this.buildTenantRegistryInput(input, slug, dbName);
-    const existing = await this.findTenantRegistry(slug);
+    const registry =
+      this.buildTenantRegistryInput(
+        input,
+        slug,
+        dbName,
+      );
+    const existing =
+      await this.findTenantRegistry(slug);
 
     if (existing) {
-      this.assertCanUseExistingTenant(existing, registry);
+      this.assertCanUseExistingTenant(
+        existing,
+        registry,
+      );
       if (this.isProvisioned(existing)) {
-        this.logger.log(`Tenant "${slug}" is already provisioned, returning existing registry`);
+        this.logger.log(
+          `Tenant "${slug}" is already provisioned, returning existing registry`,
+        );
         return { slug, dbName: existing.db_name };
       }
     }
 
-    await this.reserveTenantRegistry(registry, existing);
+    await this.reserveTenantRegistry(
+      registry,
+      existing,
+    );
 
     try {
       await this.ensureDatabase(dbName);
       await this.runTenantMigrations(dbName);
-      await this.seedAdminUser(dbName, input.adminEmail, input.adminPassword, input.adminName);
+      await this.seedAdminUser(
+        dbName,
+        input.adminEmail,
+        input.adminPassword,
+        input.adminName,
+      );
       await this.markTenantProvisioned(registry);
     } catch (error) {
-      await this.markTenantProvisioningFailed(registry, error);
+      await this.markTenantProvisioningFailed(
+        registry,
+        error,
+      );
       throw error;
     }
 
-    this.logger.log(`Provisioned tenant "${slug}" with database "${dbName}"`);
+    this.logger.log(
+      `Provisioned tenant "${slug}" with database "${dbName}"`,
+    );
     return { slug, dbName };
   }
 
-  async checkAvailability(slugInput?: string): Promise<TenantAvailabilityResult> {
+  async checkAvailability(
+    slugInput?: string,
+  ): Promise<TenantAvailabilityResult> {
     const slug = this.parseSlug(slugInput);
-    if (!slug) return { available: false, reason: 'invalid_slug' };
-    if (this.isReservedSlug(slug)) return { available: false, reason: 'reserved_slug' };
+    if (!slug)
+      return {
+        available: false,
+        reason: 'invalid_slug',
+      };
+    if (this.isReservedSlug(slug))
+      return {
+        available: false,
+        reason: 'reserved_slug',
+      };
 
-    const existing = await this.findTenantRegistry(slug);
-    if (existing) return { available: false, reason: 'tenant_exists' };
+    const existing =
+      await this.findTenantRegistry(slug);
+    if (existing)
+      return {
+        available: false,
+        reason: 'tenant_exists',
+      };
 
-    const dbExists = await this.databaseExists(slug);
-    if (dbExists) return { available: false, reason: 'database_exists' };
+    const dbExists =
+      await this.databaseExists(slug);
+    if (dbExists)
+      return {
+        available: false,
+        reason: 'database_exists',
+      };
 
     return { available: true };
   }
 
-  async getProvisioningStatus(slugInput: string): Promise<TenantProvisioningStatusResult> {
+  async getProvisioningStatus(
+    slugInput: string,
+  ): Promise<TenantProvisioningStatusResult> {
     const slug = this.parseSlug(slugInput);
     if (!slug) return { status: 'not_found' };
 
-    const existing = await this.findTenantRegistry(slug);
+    const existing =
+      await this.findTenantRegistry(slug);
     if (!existing) return { status: 'not_found' };
 
-    const status = this.clientSafeProvisioningStatus(existing);
+    const status =
+      this.clientSafeProvisioningStatus(existing);
     return {
       status,
       tenantSlug: existing.slug,
-      ...(status === 'provisioned' ? { appUrl: this.appUrl(existing.slug) } : {}),
+      ...(status === 'provisioned'
+        ? { appUrl: this.appUrl(existing.slug) }
+        : {}),
     };
   }
 
-  async setAdminCredentials(input: SetAdminCredentialsInput): Promise<{ slug: string }> {
+  async setAdminCredentials(
+    input: SetAdminCredentialsInput,
+  ): Promise<{ slug: string }> {
     const slug = this.parseSlug(input.slug);
-    if (!slug) throw this.invalidAdminCredentialsRequest();
-
-    const existing = await this.findTenantRegistry(slug);
-    if (!existing || this.clientSafeProvisioningStatus(existing) !== 'provisioned') {
+    if (!slug)
       throw this.invalidAdminCredentialsRequest();
-    }
 
-    const checkoutSessionId = this.optionalString(input.stripeCheckoutSessionId);
-    const adminEmail = this.optionalString(input.adminEmail)?.toLowerCase();
-    const adminUsername = this.normalizeAdminUsername(input.adminUsername);
+    const existing =
+      await this.findTenantRegistry(slug);
     if (
-      !checkoutSessionId ||
-      !adminEmail ||
-      !adminUsername ||
-      existing.stripe_checkout_session_id !== checkoutSessionId ||
-      existing.admin_email?.toLowerCase() !== adminEmail
+      !existing ||
+      this.clientSafeProvisioningStatus(
+        existing,
+      ) !== 'provisioned'
     ) {
       throw this.invalidAdminCredentialsRequest();
     }
 
-    const tenantDb = this.createTenantConnection(existing.db_name);
+    const checkoutSessionId = this.optionalString(
+      input.stripeCheckoutSessionId,
+    );
+    const adminEmail = this.optionalString(
+      input.adminEmail,
+    )?.toLowerCase();
+    const adminUsername =
+      this.normalizeAdminUsername(
+        input.adminUsername,
+      );
+    if (
+      !checkoutSessionId ||
+      !adminEmail ||
+      !adminUsername ||
+      existing.stripe_checkout_session_id !==
+        checkoutSessionId ||
+      existing.admin_email?.toLowerCase() !==
+        adminEmail
+    ) {
+      throw this.invalidAdminCredentialsRequest();
+    }
+
+    const tenantDb = this.createTenantConnection(
+      existing.db_name,
+    );
     try {
       await tenantDb.transaction(async (trx) => {
         const profile = await trx('profile')
-          .whereRaw('LOWER(email) = ?', [adminEmail])
+          .whereRaw('LOWER(email) = ?', [
+            adminEmail,
+          ])
           .where({ is_active: true })
           .first();
-        if (!profile) throw this.invalidAdminCredentialsRequest();
+        if (!profile)
+          throw this.invalidAdminCredentialsRequest();
 
         const user = await trx('user')
-          .where({ id: profile.id_user, is_active: true })
+          .where({
+            id: profile.id_user,
+            is_active: true,
+          })
           .first();
-        if (!user || user.must_change_password === false) {
+        if (
+          !user ||
+          user.must_change_password === false
+        ) {
           throw this.invalidAdminCredentialsRequest();
         }
 
         const duplicateUser = await trx('user')
-          .whereRaw('LOWER(login_username) = ?', [adminUsername])
+          .whereRaw('LOWER(login_username) = ?', [
+            adminUsername,
+          ])
           .whereNot('id', user.id)
           .first();
-        const duplicateProfile = await trx('profile')
-          .whereRaw('LOWER(username) = ?', [adminUsername])
+        const duplicateProfile = await trx(
+          'profile',
+        )
+          .whereRaw('LOWER(username) = ?', [
+            adminUsername,
+          ])
           .whereNot('id_user', user.id)
           .first();
         if (duplicateUser || duplicateProfile) {
-          throw new ConflictException('Utilizatorul administrator ales exista deja.');
+          throw new ConflictException(
+            'Utilizatorul administrator ales exista deja.',
+          );
         }
 
         const updated = await trx('user')
           .where({ id: user.id, is_active: true })
           .update({
             login_username: adminUsername,
-            hash: await argon.hash(input.password),
+            hash: await argon.hash(
+              input.password,
+            ),
             must_change_password: false,
             date_updated: new Date(),
           });
-        if (!updated) throw this.invalidAdminCredentialsRequest();
+        if (!updated)
+          throw this.invalidAdminCredentialsRequest();
 
         await trx('profile')
           .where({ id_user: user.id })
@@ -242,55 +352,109 @@ export class TenantProvisioningService {
     currentPeriodEnd?: string | null;
   }): Promise<{ slug: string }> {
     const slug = this.parseSlug(input.slug);
-    if (!slug) throw new BadRequestException('Tenant slug invalid');
+    if (!slug)
+      throw new BadRequestException(
+        'Tenant slug invalid',
+      );
 
-    const billingStatus = input.billingStatus || this.billingStatusFromSubscription(input.subscriptionStatus);
-    await this.metaDb.knex.transaction(async (trx) => {
-      const [tenant] = await trx('tenants')
-        .where({ slug })
-        .update({
-          subscription_status: input.subscriptionStatus,
-          billing_status: billingStatus,
-          current_period_end: input.currentPeriodEnd ? new Date(input.currentPeriodEnd) : null,
-          updated_at: trx.fn.now(),
-        })
-        .returning(['id']);
+    const billingStatus =
+      input.billingStatus ||
+      this.billingStatusFromSubscription(
+        input.subscriptionStatus,
+      );
+    await this.metaDb.knex.transaction(
+      async (trx) => {
+        const [tenant] = await trx('tenants')
+          .where({ slug })
+          .update({
+            subscription_status:
+              input.subscriptionStatus,
+            billing_status: billingStatus,
+            current_period_end:
+              input.currentPeriodEnd
+                ? new Date(input.currentPeriodEnd)
+                : null,
+            updated_at: trx.fn.now(),
+          })
+          .returning(['id']);
 
-      if (!tenant) throw new BadRequestException('Tenantul nu exista.');
-      await this.applyDueScheduledBillingChanges(trx, tenant.id);
-    });
+        if (!tenant)
+          throw new BadRequestException(
+            'Tenantul nu exista.',
+          );
+        await this.applyDueScheduledBillingChanges(
+          trx,
+          tenant.id,
+        );
+      },
+    );
 
     return { slug };
   }
 
-  private async applyDueScheduledBillingChanges(trx: Knex.Transaction, tenantId: string): Promise<void> {
-    const changes = await trx('tenant_scheduled_billing_changes')
-      .where({ tenant_id: tenantId, status: 'scheduled' })
+  private async applyDueScheduledBillingChanges(
+    trx: Knex.Transaction,
+    tenantId: string,
+  ): Promise<void> {
+    const changes = await trx(
+      'tenant_scheduled_billing_changes',
+    )
+      .where({
+        tenant_id: tenantId,
+        status: 'scheduled',
+      })
       .where('effective_at', '<=', trx.fn.now());
 
     for (const change of changes) {
-      const payload = typeof change.payload === 'string' ? JSON.parse(change.payload) : change.payload;
-      const patch: Record<string, unknown> = { updated_at: trx.fn.now() };
+      const payload =
+        typeof change.payload === 'string'
+          ? JSON.parse(change.payload)
+          : change.payload;
+      const patch: Record<string, unknown> = {
+        updated_at: trx.fn.now(),
+      };
 
-      if (change.change_type === 'profile_seats' && Number.isInteger(payload.profileSeats)) {
-        patch.profile_seats = payload.profileSeats;
+      if (
+        change.change_type === 'profile_seats' &&
+        Number.isInteger(payload.profileSeats)
+      ) {
+        patch.profile_seats =
+          payload.profileSeats;
         patch.max_users = payload.profileSeats;
       }
 
-      if (change.change_type === 'extra_storage_units' && Number.isInteger(payload.extraStorageUnits)) {
-        patch.extra_storage_units = payload.extraStorageUnits;
+      if (
+        change.change_type ===
+          'extra_storage_units' &&
+        Number.isInteger(
+          payload.extraStorageUnits,
+        )
+      ) {
+        patch.extra_storage_units =
+          payload.extraStorageUnits;
       }
 
       if (Object.keys(patch).length > 1) {
-        await trx('tenants').where({ id: tenantId }).update(patch);
+        await trx('tenants')
+          .where({ id: tenantId })
+          .update(patch);
       }
-      await trx('tenant_scheduled_billing_changes')
+      await trx(
+        'tenant_scheduled_billing_changes',
+      )
         .where({ id: change.id })
-        .update({ status: 'applied', updated_at: trx.fn.now() });
+        .update({
+          status: 'applied',
+          updated_at: trx.fn.now(),
+        });
     }
 
     await trx('tenant_feature_entitlements')
-      .where({ tenant_id: tenantId, cancel_at_period_end: true, status: 'active' })
+      .where({
+        tenant_id: tenantId,
+        cancel_at_period_end: true,
+        status: 'active',
+      })
       .whereNotNull('active_until')
       .where('active_until', '<=', trx.fn.now())
       .update({
@@ -300,93 +464,181 @@ export class TenantProvisioningService {
       });
   }
 
-  private billingStatusFromSubscription(status: string): string {
+  private billingStatusFromSubscription(
+    status: string,
+  ): string {
     const normalized = status.toLowerCase();
-    if (normalized === 'active' || normalized === 'trialing') return 'active';
-    if (normalized === 'past_due' || normalized === 'unpaid' || normalized === 'incomplete_expired') return 'blocked';
-    if (normalized === 'canceled') return 'canceled';
+    if (
+      normalized === 'active' ||
+      normalized === 'trialing'
+    )
+      return 'active';
+    if (
+      normalized === 'past_due' ||
+      normalized === 'unpaid' ||
+      normalized === 'incomplete_expired'
+    )
+      return 'blocked';
+    if (normalized === 'canceled')
+      return 'canceled';
     return normalized;
   }
 
   private normalizeSlug(slug?: string): string {
     const normalized = this.parseSlug(slug);
     if (!normalized) {
-      throw new BadRequestException('Tenant slug must be 3-64 chars, lowercase letters/numbers/dashes, and cannot start or end with dash');
+      throw new BadRequestException(
+        'Tenant slug must be 3-64 chars, lowercase letters/numbers/dashes, and cannot start or end with dash',
+      );
     }
     return normalized;
   }
 
-  private parseSlug(slug?: string): string | null {
-    const normalized = slug?.trim().toLowerCase() || '';
-    if (!/^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/.test(normalized)) {
+  private parseSlug(
+    slug?: string,
+  ): string | null {
+    const normalized =
+      slug?.trim().toLowerCase() || '';
+    if (
+      !/^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/.test(
+        normalized,
+      )
+    ) {
       return null;
     }
     return normalized;
   }
 
   private isReservedSlug(slug: string): boolean {
-    return TenantProvisioningService.RESERVED_SLUGS.has(slug);
+    return TenantProvisioningService.RESERVED_SLUGS.has(
+      slug,
+    );
   }
 
-  private buildTenantRegistryInput(input: ProvisionTenantInput, slug: string, dbName: string): TenantRegistryInput {
+  private buildTenantRegistryInput(
+    input: ProvisionTenantInput,
+    slug: string,
+    dbName: string,
+  ): TenantRegistryInput {
     return {
       slug,
       dbName,
-      companyName: this.optionalString(input.companyName),
-      adminName: this.optionalString(input.adminName),
-      adminEmail: this.optionalString(input.adminEmail)?.toLowerCase() || null,
-      plan: this.optionalString(input.plan) || 'starter',
-      profileSeats: this.normalizeProfileSeats(input.profileSeats ?? input.maxUsers),
-      maxUsers: this.normalizeProfileSeats(input.profileSeats ?? input.maxUsers),
-      includedStorageGb: this.normalizeStorageGb(input.includedStorageGb),
-      extraStorageUnits: this.normalizeExtraStorageUnits(input.extraStorageUnits),
+      companyName: this.optionalString(
+        input.companyName,
+      ),
+      adminName: this.optionalString(
+        input.adminName,
+      ),
+      adminEmail:
+        this.optionalString(
+          input.adminEmail,
+        )?.toLowerCase() || null,
+      plan:
+        this.optionalString(input.plan) ||
+        'starter',
+      profileSeats: this.normalizeProfileSeats(
+        input.profileSeats ?? input.maxUsers,
+      ),
+      maxUsers: this.normalizeProfileSeats(
+        input.profileSeats ?? input.maxUsers,
+      ),
+      includedStorageGb: this.normalizeStorageGb(
+        input.includedStorageGb,
+      ),
+      extraStorageUnits:
+        this.normalizeExtraStorageUnits(
+          input.extraStorageUnits,
+        ),
       features: input.features || {},
-      stripeCustomerId: this.optionalString(input.stripeCustomerId),
-      stripeSubscriptionId: this.optionalString(input.stripeSubscriptionId),
-      stripeCheckoutSessionId: this.optionalString(input.stripeCheckoutSessionId),
-      subscriptionStatus: this.optionalString(input.subscriptionStatus) || 'active',
+      stripeCustomerId: this.optionalString(
+        input.stripeCustomerId,
+      ),
+      stripeSubscriptionId: this.optionalString(
+        input.stripeSubscriptionId,
+      ),
+      stripeCheckoutSessionId:
+        this.optionalString(
+          input.stripeCheckoutSessionId,
+        ),
+      subscriptionStatus:
+        this.optionalString(
+          input.subscriptionStatus,
+        ) || 'active',
     };
   }
 
-  private normalizeProfileSeats(profileSeats?: number): number {
-    if (profileSeats === undefined || profileSeats === null) return BASE_INCLUDED_PROFILE_SEATS;
-    if (!Number.isInteger(profileSeats) || profileSeats < BASE_INCLUDED_PROFILE_SEATS) {
-      throw new BadRequestException(`profileSeats must be at least ${BASE_INCLUDED_PROFILE_SEATS}`);
+  private normalizeProfileSeats(
+    profileSeats?: number,
+  ): number {
+    if (
+      profileSeats === undefined ||
+      profileSeats === null
+    )
+      return BASE_INCLUDED_PROFILE_SEATS;
+    if (
+      !Number.isInteger(profileSeats) ||
+      profileSeats < BASE_INCLUDED_PROFILE_SEATS
+    ) {
+      throw new BadRequestException(
+        `profileSeats must be at least ${BASE_INCLUDED_PROFILE_SEATS}`,
+      );
     }
     return profileSeats;
   }
 
-  private normalizeStorageGb(value?: number): number {
-    if (value === undefined || value === null) return BASE_INCLUDED_STORAGE_GB;
+  private normalizeStorageGb(
+    value?: number,
+  ): number {
+    if (value === undefined || value === null)
+      return BASE_INCLUDED_STORAGE_GB;
     if (!Number.isInteger(value) || value < 0) {
-      throw new BadRequestException('includedStorageGb must be a positive integer');
+      throw new BadRequestException(
+        'includedStorageGb must be a positive integer',
+      );
     }
     return value;
   }
 
-  private normalizeExtraStorageUnits(value?: number): number {
-    if (value === undefined || value === null) return 0;
+  private normalizeExtraStorageUnits(
+    value?: number,
+  ): number {
+    if (value === undefined || value === null)
+      return 0;
     if (!Number.isInteger(value) || value < 0) {
-      throw new BadRequestException('extraStorageUnits must be a positive integer');
+      throw new BadRequestException(
+        'extraStorageUnits must be a positive integer',
+      );
     }
     return value;
   }
 
-  private optionalString(value?: string): string | null {
+  private optionalString(
+    value?: string,
+  ): string | null {
     const normalized = value?.trim();
     return normalized ? normalized : null;
   }
 
-  private normalizeAdminUsername(value?: string): string | null {
-    const normalized = value?.trim().toLowerCase() || '';
-    if (!/^[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]$/.test(normalized)) {
+  private normalizeAdminUsername(
+    value?: string,
+  ): string | null {
+    const normalized =
+      value?.trim().toLowerCase() || '';
+    if (
+      !/^[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]$/.test(
+        normalized,
+      )
+    ) {
       return null;
     }
     return normalized;
   }
 
-  private async findTenantRegistry(slug: string): Promise<TenantRegistryRow | undefined> {
-    return this.metaDb.knex('tenants')
+  private async findTenantRegistry(
+    slug: string,
+  ): Promise<TenantRegistryRow | undefined> {
+    return this.metaDb
+      .knex('tenants')
       .select(
         'slug',
         'db_name',
@@ -400,134 +652,222 @@ export class TenantProvisioningService {
       .first();
   }
 
-  private assertCanUseExistingTenant(existing: TenantRegistryRow, input: TenantRegistryInput): void {
-    const existingSubscriptionId = existing.stripe_subscription_id;
-    const existingCheckoutSessionId = existing.stripe_checkout_session_id;
-    const existingHasStripe = Boolean(existingSubscriptionId || existingCheckoutSessionId);
-    const incomingHasStripe = Boolean(input.stripeSubscriptionId || input.stripeCheckoutSessionId);
+  private assertCanUseExistingTenant(
+    existing: TenantRegistryRow,
+    input: TenantRegistryInput,
+  ): void {
+    const existingSubscriptionId =
+      existing.stripe_subscription_id;
+    const existingCheckoutSessionId =
+      existing.stripe_checkout_session_id;
+    const existingHasStripe = Boolean(
+      existingSubscriptionId ||
+      existingCheckoutSessionId,
+    );
+    const incomingHasStripe = Boolean(
+      input.stripeSubscriptionId ||
+      input.stripeCheckoutSessionId,
+    );
 
-    if (!existingHasStripe && !incomingHasStripe) return;
+    if (!existingHasStripe && !incomingHasStripe)
+      return;
 
     const sameSubscription = Boolean(
       existingSubscriptionId &&
       input.stripeSubscriptionId &&
-      existingSubscriptionId === input.stripeSubscriptionId,
+      existingSubscriptionId ===
+        input.stripeSubscriptionId,
     );
     const sameCheckout = Boolean(
       existingCheckoutSessionId &&
       input.stripeCheckoutSessionId &&
-      existingCheckoutSessionId === input.stripeCheckoutSessionId,
+      existingCheckoutSessionId ===
+        input.stripeCheckoutSessionId,
     );
 
     if (sameSubscription || sameCheckout) return;
 
-    throw new ConflictException('Tenant slug already exists for another subscription');
+    throw new ConflictException(
+      'Tenant slug already exists for another subscription',
+    );
   }
 
-  private isProvisioned(existing: TenantRegistryRow): boolean {
-    return existing.provisioning_status === 'provisioned'
-      || (existing.is_active && !existing.provisioning_status);
+  private isProvisioned(
+    existing: TenantRegistryRow,
+  ): boolean {
+    return (
+      existing.provisioning_status ===
+        'provisioned' ||
+      (existing.is_active &&
+        !existing.provisioning_status)
+    );
   }
 
   private clientSafeProvisioningStatus(
     existing: TenantRegistryRow,
   ): TenantProvisioningStatusResult['status'] {
-    if (existing.provisioning_status === 'failed') return 'failed';
-    if (this.isProvisioned(existing)) return 'provisioned';
+    if (existing.provisioning_status === 'failed')
+      return 'failed';
+    if (this.isProvisioned(existing))
+      return 'provisioned';
     return 'provisioning';
   }
 
   private appUrl(slug: string): string {
     const domainBase = (
-      this.config.get<string>('DOMAIN_BASE', 'stanciulescu.xyz') || 'stanciulescu.xyz'
+      this.config.get<string>(
+        'DOMAIN_BASE',
+        'stanciulescu.xyz',
+      ) || 'stanciulescu.xyz'
     ).replace(/^\.+|\.+$/g, '');
     return `https://${slug}.${domainBase}`;
   }
 
-  private async ensureDatabase(dbName: string): Promise<void> {
-    const admin = this.createAdminConnection(this.config.get<string>('META_DB', 'meta'));
+  private async ensureDatabase(
+    dbName: string,
+  ): Promise<void> {
+    const admin = this.createAdminConnection(
+      this.config.get<string>('META_DB', 'meta'),
+    );
     try {
-      const existing = await admin('pg_database').where({ datname: dbName }).first();
+      const existing = await admin('pg_database')
+        .where({ datname: dbName })
+        .first();
       if (existing) {
-        this.logger.warn(`Database "${dbName}" already exists, skipping create`);
+        this.logger.warn(
+          `Database "${dbName}" already exists, skipping create`,
+        );
         return;
       }
 
-      await admin.raw('CREATE DATABASE ??', [dbName]);
+      await admin.raw('CREATE DATABASE ??', [
+        dbName,
+      ]);
     } finally {
       await admin.destroy();
     }
   }
 
-  private async databaseExists(dbName: string): Promise<boolean> {
-    const admin = this.createAdminConnection(this.config.get<string>('META_DB', 'meta'));
+  private async databaseExists(
+    dbName: string,
+  ): Promise<boolean> {
+    const admin = this.createAdminConnection(
+      this.config.get<string>('META_DB', 'meta'),
+    );
     try {
-      const existing = await admin('pg_database').where({ datname: dbName }).first();
+      const existing = await admin('pg_database')
+        .where({ datname: dbName })
+        .first();
       return Boolean(existing);
     } finally {
       await admin.destroy();
     }
   }
 
-  private async runTenantMigrations(dbName: string): Promise<void> {
-    const tenantDb = this.createTenantConnection(dbName);
+  private async runTenantMigrations(
+    dbName: string,
+  ): Promise<void> {
+    const tenantDb =
+      this.createTenantConnection(dbName);
     try {
-      await tenantDb.migrate.latest(migrationDirectory('tenant'));
+      await tenantDb.migrate.latest(
+        migrationDirectory('tenant'),
+      );
     } finally {
       await tenantDb.destroy();
     }
   }
 
-  private async seedAdminUser(dbName: string, email?: string, password?: string, adminName?: string): Promise<void> {
+  private async seedAdminUser(
+    dbName: string,
+    email?: string,
+    password?: string,
+    adminName?: string,
+  ): Promise<void> {
     if (!email) return;
 
-    const tenantDb = this.createTenantConnection(dbName);
+    const tenantDb =
+      this.createTenantConnection(dbName);
     try {
-      const hash = await argon.hash(password || this.randomPassword());
-      const user = await tenantDb('user').where({ login_username: 'admin' }).first();
+      const hash = await argon.hash(
+        password || this.randomPassword(),
+      );
+      const user = await tenantDb('user')
+        .where({ login_username: 'admin' })
+        .first();
       if (!user) return;
-      const loginUsername = this.loginUsernameFromEmail(email);
+      const loginUsername =
+        this.loginUsernameFromEmail(email);
       await tenantDb.transaction(async (trx) => {
-        await trx('user').where('id', user.id).update({ login_username: loginUsername, hash, must_change_password: true });
-        await trx('profile').where('id_user', user.id).update({
-          username: loginUsername,
-          email: email.toLowerCase(),
-          display_name: this.optionalString(adminName) || 'Admin',
-        });
+        await trx('user')
+          .where('id', user.id)
+          .update({
+            login_username: loginUsername,
+            hash,
+            must_change_password: true,
+          });
+        await trx('profile')
+          .where('id_user', user.id)
+          .update({
+            username: loginUsername,
+            email: email.toLowerCase(),
+            display_name:
+              this.optionalString(adminName) ||
+              'Admin',
+          });
       });
     } finally {
       await tenantDb.destroy();
     }
   }
 
-  private loginUsernameFromEmail(email: string): string {
-    const raw = (email.split('@')[0] || 'admin').toLowerCase();
-    return raw.replace(/[^a-z0-9._-]/g, '_').slice(0, 100) || 'admin';
+  private loginUsernameFromEmail(
+    email: string,
+  ): string {
+    const raw = (
+      email.split('@')[0] || 'admin'
+    ).toLowerCase();
+    return (
+      raw
+        .replace(/[^a-z0-9._-]/g, '_')
+        .slice(0, 100) || 'admin'
+    );
   }
 
-  private async reserveTenantRegistry(input: TenantRegistryInput, existing?: TenantRegistryRow): Promise<void> {
+  private async reserveTenantRegistry(
+    input: TenantRegistryInput,
+    existing?: TenantRegistryRow,
+  ): Promise<void> {
     const data = {
       plan: input.plan,
       is_active: false,
       max_users: input.maxUsers,
       profile_seats: input.profileSeats,
-      included_storage_gb: input.includedStorageGb,
-      extra_storage_units: input.extraStorageUnits,
+      included_storage_gb:
+        input.includedStorageGb,
+      extra_storage_units:
+        input.extraStorageUnits,
       billing_status: 'active',
       company_name: input.companyName,
       admin_name: input.adminName,
       admin_email: input.adminEmail,
       stripe_customer_id: input.stripeCustomerId,
-      stripe_subscription_id: input.stripeSubscriptionId,
-      stripe_checkout_session_id: input.stripeCheckoutSessionId,
-      subscription_status: input.subscriptionStatus,
+      stripe_subscription_id:
+        input.stripeSubscriptionId,
+      stripe_checkout_session_id:
+        input.stripeCheckoutSessionId,
+      subscription_status:
+        input.subscriptionStatus,
       provisioning_status: 'provisioning',
       provisioning_error: null,
       updated_at: this.metaDb.knex.fn.now(),
     };
 
     if (existing) {
-      await this.metaDb.knex('tenants').where({ slug: input.slug }).update(data);
+      await this.metaDb
+        .knex('tenants')
+        .where({ slug: input.slug })
+        .update(data);
       return;
     }
 
@@ -538,8 +878,11 @@ export class TenantProvisioningService {
     });
   }
 
-  private async markTenantProvisioned(input: TenantRegistryInput): Promise<void> {
-    await this.metaDb.knex('tenants')
+  private async markTenantProvisioned(
+    input: TenantRegistryInput,
+  ): Promise<void> {
+    await this.metaDb
+      .knex('tenants')
       .where({ slug: input.slug })
       .update({
         db_name: input.dbName,
@@ -547,16 +890,25 @@ export class TenantProvisioningService {
         is_active: true,
         max_users: input.maxUsers,
         profile_seats: input.profileSeats,
-        included_storage_gb: input.includedStorageGb,
-        extra_storage_units: input.extraStorageUnits,
-        billing_status: input.subscriptionStatus === 'past_due' ? 'blocked' : 'active',
+        included_storage_gb:
+          input.includedStorageGb,
+        extra_storage_units:
+          input.extraStorageUnits,
+        billing_status:
+          input.subscriptionStatus === 'past_due'
+            ? 'blocked'
+            : 'active',
         company_name: input.companyName,
         admin_name: input.adminName,
         admin_email: input.adminEmail,
-        stripe_customer_id: input.stripeCustomerId,
-        stripe_subscription_id: input.stripeSubscriptionId,
-        stripe_checkout_session_id: input.stripeCheckoutSessionId,
-        subscription_status: input.subscriptionStatus,
+        stripe_customer_id:
+          input.stripeCustomerId,
+        stripe_subscription_id:
+          input.stripeSubscriptionId,
+        stripe_checkout_session_id:
+          input.stripeCheckoutSessionId,
+        subscription_status:
+          input.subscriptionStatus,
         provisioning_status: 'provisioned',
         provisioning_error: null,
         updated_at: this.metaDb.knex.fn.now(),
@@ -565,12 +917,19 @@ export class TenantProvisioningService {
     await this.syncProvisionedEntitlements(input);
   }
 
-  private async syncProvisionedEntitlements(input: TenantRegistryInput): Promise<void> {
-    const tenant = await this.metaDb.knex('tenants').select('id').where({ slug: input.slug }).first();
+  private async syncProvisionedEntitlements(
+    input: TenantRegistryInput,
+  ): Promise<void> {
+    const tenant = await this.metaDb
+      .knex('tenants')
+      .select('id')
+      .where({ slug: input.slug })
+      .first();
     if (!tenant) return;
 
     if (input.features.reportsDashboards) {
-      await this.metaDb.knex('tenant_feature_entitlements')
+      await this.metaDb
+        .knex('tenant_feature_entitlements')
         .insert({
           tenant_id: tenant.id,
           feature_key: 'reports_dashboards',
@@ -589,49 +948,87 @@ export class TenantProvisioningService {
     }
   }
 
-  private async markTenantProvisioningFailed(input: TenantRegistryInput, error: unknown): Promise<void> {
-    await this.metaDb.knex('tenants')
+  private async markTenantProvisioningFailed(
+    input: TenantRegistryInput,
+    error: unknown,
+  ): Promise<void> {
+    await this.metaDb
+      .knex('tenants')
       .where({ slug: input.slug })
       .update({
         is_active: false,
         provisioning_status: 'failed',
-        provisioning_error: this.errorMessage(error).slice(0, 2000),
+        provisioning_error: this.errorMessage(
+          error,
+        ).slice(0, 2000),
         updated_at: this.metaDb.knex.fn.now(),
       });
   }
 
   private errorMessage(error: unknown): string {
-    if (error instanceof Error) return error.message;
+    if (error instanceof Error)
+      return error.message;
     if (typeof error === 'string') return error;
     return 'Unknown provisioning error';
   }
 
   private invalidAdminCredentialsRequest(): BadRequestException {
-    return new BadRequestException('Datele contului administrator nu sunt valide.');
+    return new BadRequestException(
+      'Datele contului administrator nu sunt valide.',
+    );
   }
 
-  private createAdminConnection(database: string): Knex {
+  private createAdminConnection(
+    database: string,
+  ): Knex {
     return knex({
       client: 'pg',
       connection: {
-        host: this.config.get<string>('DB_HOST', 'localhost'),
-        port: Number(this.config.get<number>('DB_PORT', 5432)),
-        user: this.config.get<string>('DB_ADMIN_USER') || this.config.get<string>('DB_USER'),
-        password: this.config.get<string>('DB_ADMIN_PASSWORD') || this.config.get<string>('DB_PASSWORD'),
+        host: this.config.get<string>(
+          'DB_HOST',
+          'localhost',
+        ),
+        port: Number(
+          this.config.get<number>(
+            'DB_PORT',
+            5432,
+          ),
+        ),
+        user:
+          this.config.get<string>(
+            'DB_ADMIN_USER',
+          ) || this.config.get<string>('DB_USER'),
+        password:
+          this.config.get<string>(
+            'DB_ADMIN_PASSWORD',
+          ) ||
+          this.config.get<string>('DB_PASSWORD'),
         database,
       },
       pool: { min: 0, max: 1 },
     });
   }
 
-  private createTenantConnection(database: string): Knex {
+  private createTenantConnection(
+    database: string,
+  ): Knex {
     return knex({
       client: 'pg',
       connection: {
-        host: this.config.get<string>('DB_HOST', 'localhost'),
-        port: Number(this.config.get<number>('DB_PORT', 5432)),
+        host: this.config.get<string>(
+          'DB_HOST',
+          'localhost',
+        ),
+        port: Number(
+          this.config.get<number>(
+            'DB_PORT',
+            5432,
+          ),
+        ),
         user: this.config.get<string>('DB_USER'),
-        password: this.config.get<string>('DB_PASSWORD'),
+        password: this.config.get<string>(
+          'DB_PASSWORD',
+        ),
         database,
       },
       pool: { min: 0, max: 1 },
@@ -639,6 +1036,9 @@ export class TenantProvisioningService {
   }
 
   private randomPassword(): string {
-    return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+    return (
+      Math.random().toString(36).slice(2) +
+      Math.random().toString(36).slice(2)
+    );
   }
 }

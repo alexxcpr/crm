@@ -1,12 +1,16 @@
-interface WorkflowDefinition {
+export interface WorkflowDefinition {
   id_workflow: string
   name: string
   slug: string
   nodes: any[]
   connections: any[]
-  n8n_workflow_id: string | null
   status: 'draft' | 'active' | 'paused'
   version: number
+  revision?: number
+  irVersion?: number | null
+  isValid?: boolean
+  published?: boolean
+  validationErrors?: Array<{ code: string, message: string, nodeId?: string }>
   rank: number
   date_created: string
   date_updated: string
@@ -161,22 +165,6 @@ export function useAdminWorkflows() {
     }
   }
 
-  async function syncWorkflow(id: string): Promise<WorkflowDefinition | null> {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiFetch<ApiResponse<WorkflowDefinition>>(`/v1/admin/workflows/${id}/sync`, {
-        method: 'POST'
-      })
-      return response.data
-    } catch (err: any) {
-      error.value = err?.data?.message || err.message || 'Eroare la sincronizarea workflow-ului'
-      return null
-    } finally {
-      loading.value = false
-    }
-  }
-
   return {
     workflows,
     loading,
@@ -188,7 +176,6 @@ export function useAdminWorkflows() {
     deleteWorkflow,
     deleteWorkflows,
     activateWorkflow,
-    deactivateWorkflow,
-    syncWorkflow
+    deactivateWorkflow
   }
 }

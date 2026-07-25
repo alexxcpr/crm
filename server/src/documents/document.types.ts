@@ -21,6 +21,8 @@ export interface DocumentExecuteRequest {
   document?: DocumentHandle;
   documents?: DocumentHandle[];
   args?: Record<string, unknown>;
+  signal?: AbortSignal;
+  deadlineAt?: number;
 }
 
 export interface DocumentExecuteData {
@@ -78,6 +80,8 @@ export interface DocumentAdapterInput {
     mimeType: string;
     fileName: string;
   };
+  signal?: AbortSignal;
+  deadlineAt?: number;
 }
 
 export interface DocumentPackageAdapter {

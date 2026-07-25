@@ -27,6 +27,8 @@ interface PendingPermit {
   resolve: (permit: ConversionPermit) => void;
   reject: (error: Error) => void;
   timer: NodeJS.Timeout;
+  signal?: AbortSignal;
+  abort?: () => void;
 }
 
 export interface OfficeConversionResult {
@@ -50,12 +52,23 @@ export class OfficeConversionService {
     document: Buffer,
     sourceFileName: string,
     requestedFileName?: string,
+    signal?: AbortSignal,
+    deadlineAt?: number,
   ): Promise<OfficeConversionResult> {
     const startedAt = Date.now();
-    const permit = await this.acquirePermit();
+    const permit = await this.acquirePermit(
+      signal,
+      deadlineAt,
+    );
     const elapsedInQueue = Date.now() - startedAt;
-    const remainingTimeout =
-      this.timeoutMs - elapsedInQueue;
+    const workflowRemaining =
+      deadlineAt === undefined
+        ? Number.POSITIVE_INFINITY
+        : deadlineAt - Date.now();
+    const remainingTimeout = Math.min(
+      this.timeoutMs - elapsedInQueue,
+      workflowRemaining,
+    );
 
     try {
       if (remainingTimeout <= 0) {
@@ -69,6 +82,7 @@ export class OfficeConversionService {
           sourceFileName,
           requestedFileName,
           remainingTimeout,
+          signal,
         );
       this.logger.log(
         `Conversie Word-PDF finalizata in ${Date.now() - startedAt} ms (${result.buffer.length} bytes).`,
@@ -112,6 +126,7 @@ export class OfficeConversionService {
     sourceFileName: string,
     requestedFileName: string | undefined,
     timeout: number,
+    signal?: AbortSignal,
   ): Promise<OfficeConversionResult> {
     const workspace = await mkdtemp(
       join(tmpdir(), 'moduvis-office-'),
@@ -155,6 +170,7 @@ export class OfficeConversionService {
         ],
         workspace,
         timeout,
+        signal,
       );
       const output = await readFile(
         join(outputDirectory, 'source.pdf'),
@@ -184,6 +200,7 @@ export class OfficeConversionService {
     args: string[],
     cwd: string,
     timeout: number,
+    signal?: AbortSignal,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       execFile(
@@ -192,6 +209,7 @@ export class OfficeConversionService {
         {
           cwd,
           timeout,
+          signal,
           maxBuffer: 1_000_000,
           windowsHide: true,
         },
@@ -214,7 +232,8 @@ export class OfficeConversionService {
           }
           if (
             processError.killed ||
-            processError.code === 'ETIMEDOUT'
+            processError.code === 'ETIMEDOUT' ||
+            processError.code === 'ABORT_ERR'
           ) {
             reject(
               new GatewayTimeoutException(
@@ -233,7 +252,19 @@ export class OfficeConversionService {
     });
   }
 
-  private acquirePermit(): Promise<ConversionPermit> {
+  private acquirePermit(
+    signal?: AbortSignal,
+    deadlineAt?: number,
+  ): Promise<ConversionPermit> {
+    if (
+      signal?.aborted ||
+      (deadlineAt !== undefined &&
+        Date.now() >= deadlineAt)
+    ) {
+      throw new GatewayTimeoutException(
+        'Conversia Word in PDF a depasit timpul maxim permis.',
+      );
+    }
     if (
       this.activeConversions < this.maxConcurrency
     ) {
@@ -250,6 +281,15 @@ export class OfficeConversionService {
     }
 
     return new Promise((resolve, reject) => {
+      const queueTimeout = Math.max(
+        1,
+        Math.min(
+          this.timeoutMs,
+          deadlineAt === undefined
+            ? Number.POSITIVE_INFINITY
+            : deadlineAt - Date.now(),
+        ),
+      );
       const entry: PendingPermit = {
         resolve,
         reject,
@@ -258,13 +298,36 @@ export class OfficeConversionService {
             this.pending.indexOf(entry);
           if (index >= 0)
             this.pending.splice(index, 1);
+          entry.signal?.removeEventListener(
+            'abort',
+            entry.abort!,
+          );
           reject(
             new GatewayTimeoutException(
               'Conversia Word in PDF a depasit timpul maxim permis.',
             ),
           );
-        }, this.timeoutMs),
+        }, queueTimeout),
+        signal,
       };
+      entry.abort = () => {
+        const index = this.pending.indexOf(entry);
+        if (index >= 0)
+          this.pending.splice(index, 1);
+        clearTimeout(entry.timer);
+        reject(
+          new GatewayTimeoutException(
+            'Conversia Word in PDF a depasit timpul maxim permis.',
+          ),
+        );
+      };
+      signal?.addEventListener(
+        'abort',
+        entry.abort,
+        {
+          once: true,
+        },
+      );
       this.pending.push(entry);
     });
   }
@@ -278,6 +341,10 @@ export class OfficeConversionService {
         const next = this.pending.shift();
         if (next) {
           clearTimeout(next.timer);
+          next.signal?.removeEventListener(
+            'abort',
+            next.abort!,
+          );
           next.resolve(this.permit());
           return;
         }

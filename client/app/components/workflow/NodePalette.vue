@@ -1,5 +1,6 @@
 <script setup lang="ts">
-const { categories, getNodesByCategory } = useNodeTypes();
+const { categories, getNodesByCategory, fetchNodeTypes } = useNodeTypes();
+await fetchNodeTypes();
 
 const emit = defineEmits<{
   dragStart: [type: string, event: DragEvent];

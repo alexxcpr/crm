@@ -101,6 +101,8 @@ describe('WordDocumentAdapter', () => {
       expect.any(Buffer),
       'template.docx',
       'contract.pdf',
+      undefined,
+      undefined,
     );
     expect(result).toEqual({
       kind: 'new-document',

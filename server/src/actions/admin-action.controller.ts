@@ -14,17 +14,24 @@ import { Roles } from 'src/guards/roles.decorator';
 import { RolesGuard } from 'src/guards/roles.guard';
 import { returnValidResponse } from 'src/utils/crud.utils';
 import { ActionService } from './action.service';
-import { CreateActionDto, UpdateActionDto } from './dto';
+import {
+  CreateActionDto,
+  UpdateActionDto,
+} from './dto';
 import { ReorderDto } from 'src/admin/dto/reorder.dto';
 
 @Controller('v1/admin/actions')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Roles('admin')
 export class AdminActionController {
-  constructor(private readonly actionService: ActionService) {}
+  constructor(
+    private readonly actionService: ActionService,
+  ) {}
 
   @Get()
-  async findAll(@Query('entityId') entityId?: string) {
+  async findAll(
+    @Query('entityId') entityId?: string,
+  ) {
     return this.actionService.findAll(entityId);
   }
 
@@ -35,19 +42,31 @@ export class AdminActionController {
 
   @Post()
   async create(@Body() dto: CreateActionDto) {
-    const result = await this.actionService.create(dto);
-    return returnValidResponse('Actiunea a fost creata cu succes.', result.data);
+    const result =
+      await this.actionService.create(dto);
+    return returnValidResponse(
+      'Actiunea a fost creata cu succes.',
+      result.data,
+    );
   }
 
   @Put('reorder/ranks')
   async reorder(@Body() dto: ReorderDto) {
-    const result = await this.actionService.reorder(dto.items);
-    return returnValidResponse('Ordinea actiunilor a fost actualizata.', result.data);
+    const result =
+      await this.actionService.reorder(dto.items);
+    return returnValidResponse(
+      'Ordinea actiunilor a fost actualizata.',
+      result.data,
+    );
   }
 
   @Put(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdateActionDto) {
-    const result = await this.actionService.update(id, dto);
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateActionDto,
+  ) {
+    const result =
+      await this.actionService.update(id, dto);
     return returnValidResponse(
       'Actiunea a fost actualizata cu succes.',
       result.data,
@@ -57,12 +76,19 @@ export class AdminActionController {
   @Delete(':id')
   async remove(@Param('id') id: string) {
     await this.actionService.remove(id);
-    return returnValidResponse('Actiunea a fost stearsa cu succes.', null);
+    return returnValidResponse(
+      'Actiunea a fost stearsa cu succes.',
+      null,
+    );
   }
 
   @Delete()
   async removeMany(@Body('ids') ids: string[]) {
-    const result = await this.actionService.removeMany(ids);
-    return returnValidResponse(result.message, null);
+    const result =
+      await this.actionService.removeMany(ids);
+    return returnValidResponse(
+      result.message,
+      null,
+    );
   }
 }

@@ -1,0 +1,461 @@
+import { WorkflowCompilerService } from './workflow-compiler.service';
+
+function compiler() {
+  const registry = {
+    get: jest.fn((type: string) => {
+      const definitions: Record<string, any> = {
+        start: {
+          type: 'start',
+          version: 1,
+          configFields: [],
+          beforePolicy: 'all',
+        },
+        condition: {
+          type: 'condition',
+          version: 1,
+          configFields: [],
+          beforePolicy: 'all',
+        },
+        app_get_record: {
+          type: 'app_get_record',
+          version: 1,
+          configFields: [],
+          beforePolicy: 'all',
+        },
+        app_update_record: {
+          type: 'app_update_record',
+          version: 1,
+          configFields: [],
+          beforePolicy: 'insert-update',
+        },
+        for_each: {
+          type: 'for_each',
+          version: 1,
+          configFields: [],
+          beforePolicy: 'none',
+        },
+        email: {
+          type: 'email',
+          version: 1,
+          configFields: [],
+          beforePolicy: 'none',
+        },
+        set_data: {
+          type: 'set_data',
+          version: 1,
+          configFields: [],
+          beforePolicy: 'insert-update',
+        },
+      };
+      return definitions[type];
+    }),
+  };
+  const service = new WorkflowCompilerService(
+    { knex: jest.fn() } as any,
+    registry as any,
+    {} as any,
+  );
+  jest
+    .spyOn(service as any, 'resolveDependencies')
+    .mockResolvedValue(undefined);
+  return service;
+}
+
+describe('WorkflowCompilerService', () => {
+  it('rezolva entitatile fara o coloana is_active inexistenta', async () => {
+    const entitySelect = jest
+      .fn()
+      .mockResolvedValue([
+        {
+          id_entity: 'entity-1',
+          slug: 'contacts',
+        },
+      ]);
+    const fieldWhere = jest
+      .fn()
+      .mockResolvedValue([]);
+    const fieldSelect = jest.fn(() => ({
+      where: fieldWhere,
+    }));
+    const knex = jest.fn((table: string) =>
+      table === 'entity'
+        ? { select: entitySelect }
+        : { select: fieldSelect },
+    );
+    const service = new WorkflowCompilerService(
+      { knex } as any,
+      {} as any,
+      {} as any,
+    );
+    jest
+      .spyOn(
+        service as any,
+        'resolveFieldDependencies',
+      )
+      .mockResolvedValue(undefined);
+    const entityIds = new Set<string>();
+    const errors: any[] = [];
+
+    await (service as any).resolveDependencies(
+      [
+        {
+          id: 'start',
+          type: 'start',
+          parameters: { entity: 'contacts' },
+        },
+        {
+          id: 'update',
+          type: 'app_update_record',
+          parameters: {
+            entity: 'contacts',
+            recordIdSource: {
+              sourceType: 'node_output',
+              value: 'id',
+              sourceNodeId: 'start',
+              sourceFieldSlug: 'id',
+            },
+          },
+        },
+      ],
+      entityIds,
+      new Set<string>(),
+      new Set<string>(),
+      new Set<string>(),
+      errors,
+    );
+
+    expect(entitySelect).toHaveBeenCalledWith(
+      'id_entity',
+      'slug',
+    );
+    expect(entityIds).toContain('entity-1');
+    expect(errors).toEqual([]);
+    expect(fieldWhere).toHaveBeenCalledWith(
+      'id_entity',
+      'entity-1',
+    );
+  });
+
+  it('respinge Delay si Cod Custom', async () => {
+    const service = compiler();
+    const result = await service.compile(
+      [
+        {
+          id: 'start',
+          type: 'start',
+          parameters: {},
+        },
+        {
+          id: 'wait',
+          type: 'delay',
+          parameters: {},
+        },
+        {
+          id: 'code',
+          type: 'code',
+          parameters: {},
+        },
+      ],
+      [
+        { source: 'start', target: 'wait' },
+        { source: 'wait', target: 'code' },
+      ],
+    );
+    expect(
+      result.errors.map((error) => error.code),
+    ).toEqual(
+      expect.arrayContaining([
+        'unsupported_delay',
+        'unsupported_code',
+      ]),
+    );
+  });
+
+  it('respinge ciclurile si nodurile inaccesibile', async () => {
+    const service = compiler();
+    const result = await service.compile(
+      [
+        {
+          id: 'start',
+          type: 'start',
+          parameters: {},
+        },
+        {
+          id: 'a',
+          type: 'condition',
+          parameters: {},
+        },
+        {
+          id: 'orphan',
+          type: 'condition',
+          parameters: {},
+        },
+      ],
+      [
+        { source: 'start', target: 'a' },
+        {
+          source: 'a',
+          target: 'start',
+          sourceHandle: 'true',
+        },
+      ],
+    );
+    expect(
+      result.errors.map((error) => error.code),
+    ).toEqual(
+      expect.arrayContaining([
+        'workflow_cycle',
+        'unreachable_node',
+      ]),
+    );
+  });
+
+  it('aplica politica stricta pentru before_delete', async () => {
+    const service = compiler();
+    const result = await service.compile(
+      [
+        {
+          id: 'start',
+          type: 'start',
+          parameters: {},
+        },
+        {
+          id: 'mail',
+          type: 'email',
+          parameters: {},
+        },
+      ],
+      [{ source: 'start', target: 'mail' }],
+      { triggerEvents: ['before_delete'] },
+    );
+    expect(
+      result.errors.map((error) => error.code),
+    ).toContain('unsafe_before_node');
+  });
+
+  it('permite ID-ul recordului curent din START in before_update', async () => {
+    const service = compiler();
+    const result = await service.compile(
+      [
+        {
+          id: 'start',
+          type: 'start',
+          parameters: { entity: 'contacts' },
+        },
+        {
+          id: 'update',
+          type: 'app_update_record',
+          parameters: {
+            entity: 'contacts',
+            recordIdSource: {
+              sourceType: 'node_output',
+              value: 'id',
+              sourceNodeId: 'start',
+              sourceFieldSlug: 'id',
+            },
+          },
+        },
+      ],
+      [{ source: 'start', target: 'update' }],
+      { triggerEvents: ['before_update'] },
+    );
+
+    expect(
+      result.errors.map((error) => error.code),
+    ).not.toContain('unsafe_before_update');
+  });
+
+  it('respinge in before_update un ID care nu vine din START', async () => {
+    const service = compiler();
+    const result = await service.compile(
+      [
+        {
+          id: 'start',
+          type: 'start',
+          parameters: { entity: 'contacts' },
+        },
+        {
+          id: 'update',
+          type: 'app_update_record',
+          parameters: {
+            entity: 'contacts',
+            recordIdSource: {
+              sourceType: 'static',
+              value:
+                '00000000-0000-0000-0000-000000000001',
+            },
+          },
+        },
+      ],
+      [{ source: 'start', target: 'update' }],
+      { triggerEvents: ['before_update'] },
+    );
+
+    expect(
+      result.errors.map((error) => error.code),
+    ).toContain('unsafe_before_update');
+  });
+
+  it('cere foreach pentru referintele la liste', async () => {
+    const service = compiler();
+    const result = await service.compile(
+      [
+        {
+          id: 'start',
+          type: 'start',
+          parameters: {},
+        },
+        {
+          id: 'list',
+          type: 'app_get_record',
+          parameters: { limit: null },
+        },
+        {
+          id: 'calc',
+          type: 'set_data',
+          parameters: {
+            assignments: [
+              {
+                key: 'total',
+                tokens: [
+                  {
+                    type: 'field',
+                    sourceNodeId: 'list',
+                    fieldSlug: 'cf_total',
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+      [
+        { source: 'start', target: 'list' },
+        { source: 'list', target: 'calc' },
+      ],
+    );
+    expect(
+      result.errors.map((error) => error.code),
+    ).toContain('list_requires_foreach');
+  });
+
+  it('respinge referintele unui nod catre propriul output', async () => {
+    const service = compiler();
+    const result = await service.compile(
+      [
+        {
+          id: 'start',
+          type: 'start',
+          parameters: {},
+        },
+        {
+          id: 'calc',
+          type: 'set_data',
+          parameters: {
+            assignments: [
+              {
+                key: 'total',
+                tokens: [
+                  {
+                    type: 'field',
+                    sourceNodeId: 'calc',
+                    fieldSlug: 'total',
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+      [{ source: 'start', target: 'calc' }],
+    );
+
+    expect(
+      result.errors.map((error) => error.code),
+    ).toContain('invalid_upstream_reference');
+  });
+
+  it('respinge operatorii si operanzii cu tipuri incompatibile', async () => {
+    const service = compiler();
+    const result = await service.compile(
+      [
+        {
+          id: 'start',
+          type: 'start',
+          parameters: {},
+        },
+        {
+          id: 'if',
+          type: 'condition',
+          parameters: {
+            conditions: [
+              {
+                leftOperand: {
+                  sourceType: 'static',
+                  value: 10,
+                  dataType: 'integer',
+                },
+                operator: 'contains',
+                rightOperand: {
+                  sourceType: 'static',
+                  value: '1',
+                  dataType: 'varchar',
+                },
+              },
+            ],
+          },
+        },
+      ],
+      [{ source: 'start', target: 'if' }],
+    );
+
+    expect(
+      result.errors.map((error) => error.code),
+    ).toEqual(
+      expect.arrayContaining([
+        'condition_operator_type_mismatch',
+        'condition_operand_type_mismatch',
+      ]),
+    );
+  });
+
+  it('respinge formulele aritmetice cu text', async () => {
+    const service = compiler();
+    const result = await service.compile(
+      [
+        {
+          id: 'start',
+          type: 'start',
+          parameters: {},
+        },
+        {
+          id: 'calc',
+          type: 'set_data',
+          parameters: {
+            assignments: [
+              {
+                key: 'total',
+                tokens: [
+                  {
+                    type: 'literal',
+                    value: 'abc',
+                  },
+                  {
+                    type: 'operator',
+                    value: '*',
+                  },
+                  { type: 'literal', value: '2' },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+      [{ source: 'start', target: 'calc' }],
+    );
+
+    expect(
+      result.errors.map((error) => error.code),
+    ).toContain('formula_type_mismatch');
+  });
+});

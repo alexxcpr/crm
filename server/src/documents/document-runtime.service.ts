@@ -57,6 +57,7 @@ export class DocumentRuntimeService {
     request: DocumentExecuteRequest,
     actor: AuthenticatedUser,
   ): Promise<{ data: DocumentExecuteData }> {
+    this.assertWithinDeadline(request);
     this.validateRequest(request);
     const existing = await this.findOperation(
       request,
@@ -432,8 +433,11 @@ export class DocumentRuntimeService {
                 mimeType: session.mime_type,
                 fileName: session.file_name,
               },
+              signal: request.signal,
+              deadlineAt: request.deadlineAt,
             },
           );
+          this.assertWithinDeadline(request);
           if (result.kind === 'value') {
             response = {
               data: this.responseData(
@@ -595,6 +599,20 @@ export class DocumentRuntimeService {
         return response;
       },
     );
+  }
+
+  private assertWithinDeadline(
+    request: DocumentExecuteRequest,
+  ): void {
+    if (
+      request.signal?.aborted ||
+      (request.deadlineAt !== undefined &&
+        Date.now() >= request.deadlineAt)
+    ) {
+      throw new ServiceUnavailableException(
+        'Operatia documentului a depasit timpul ramas al workflow-ului.',
+      );
+    }
   }
 
   private validateSession(

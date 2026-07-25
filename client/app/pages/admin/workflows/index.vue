@@ -115,8 +115,8 @@ const columns: TableColumn<any>[] = [
   { accessorKey: 'slug', header: 'Slug' },
   { accessorKey: 'status', header: 'Status' },
   { accessorKey: 'rank', header: 'Ordine' },
-  { accessorKey: 'version', header: 'Versiune' },
-  { accessorKey: 'n8n_workflow_id', header: 'n8n ID' },
+  { accessorKey: 'revision', header: 'Revizie' },
+  { accessorKey: 'is_valid', header: 'Validare' },
   { id: 'actions', header: '' }
 ]
 
@@ -235,11 +235,12 @@ function getDropdownItems(wf: any) {
           />
         </template>
 
-        <template #n8n_workflow_id-cell="{ row }">
-          <span v-if="row.original.n8n_workflow_id" class="text-xs font-mono text-gray-500">
-            {{ row.original.n8n_workflow_id }}
-          </span>
-          <span v-else class="text-xs text-gray-400">-</span>
+        <template #is_valid-cell="{ row }">
+          <UBadge
+            :label="row.original.is_valid ? 'Valid' : 'Necesita corectii'"
+            :color="row.original.is_valid ? 'success' : 'error'"
+            variant="subtle"
+          />
         </template>
 
         <template #actions-cell="{ row }">
@@ -268,9 +269,6 @@ function getDropdownItems(wf: any) {
         <p>
           Esti sigur ca vrei sa stergi workflow-ul
           <strong>{{ deletingWorkflow?.name }}</strong>?
-        </p>
-        <p class="text-sm text-gray-500 mt-1">
-          Aceasta actiune va sterge si workflow-ul din n8n (daca exista).
         </p>
         <div class="flex items-center gap-3 justify-end mt-4">
           <UButton

@@ -63,6 +63,7 @@ describe('OfficeConversionService', () => {
       ]),
       expect.stringContaining('moduvis-office-'),
       expect.any(Number),
+      undefined,
     );
     await expect(
       access(workspace),

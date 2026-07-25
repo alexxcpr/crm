@@ -6,7 +6,11 @@ import { SmtpMailService } from './smtp-mail.service';
 
 @Module({
   controllers: [AdminIntegrationsController],
-  providers: [IntegrationCryptoService, IntegrationsService, SmtpMailService],
+  providers: [
+    IntegrationCryptoService,
+    IntegrationsService,
+    SmtpMailService,
+  ],
   exports: [IntegrationsService, SmtpMailService],
 })
 export class IntegrationsModule {}

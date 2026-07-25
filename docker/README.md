@@ -20,8 +20,8 @@ cd /opt/moduvis/docker
 cp .env.example .env
 ```
 
-Editeaza `.env` si seteaza parole reale pentru `JWT_SECRET`, `DB_PASSWORD`, `CF_DNS_API_TOKEN`,
-`N8N_ENCRYPTION_KEY` si `N8N_BASIC_AUTH_PASSWORD`.
+Editeaza `.env` si seteaza valori reale pentru `JWT_SECRET`, `DB_PASSWORD`,
+`INTEGRATIONS_ENCRYPTION_KEY` si `CF_DNS_API_TOKEN`.
 
 Porneste stack-ul:
 
@@ -29,7 +29,7 @@ Porneste stack-ul:
 docker compose up -d --build
 ```
 
-Prima pornire creeaza automat DB-urile `devdb`, `meta` si `n8n_db`. Traefik obtine certificatul
+Prima pornire creeaza automat DB-urile `devdb` si `meta`. Traefik obtine certificatul
 wildcard prin DNS-01 Cloudflare.
 
 ## Migrații
@@ -157,6 +157,6 @@ Credentialele nu se adauga niciodata in frontend. Hetzner Object Storage nu apli
 
 ## Note
 
-- n8n nu are router Traefik și nu este expus public.
+- Workflow-urile ruleaza sincron in backend-ul Moduvis.
 - Postgres nu expune port pe host; este accesibil doar din rețeaua Docker `moduvis-internal`.
 - Cookie-urile de auth sunt scope-uite pe subdomeniu, deci tenanții sunt izolați la nivel de browser.

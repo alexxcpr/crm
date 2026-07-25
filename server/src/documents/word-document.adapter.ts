@@ -68,6 +68,8 @@ export class WordDocumentAdapter implements DocumentPackageAdapter {
           typeof args.fileName === 'string'
             ? args.fileName
             : undefined,
+          input.signal,
+          input.deadlineAt,
         );
       return {
         kind: 'new-document',

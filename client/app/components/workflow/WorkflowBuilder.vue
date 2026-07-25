@@ -14,6 +14,9 @@ const emit = defineEmits<{
   dirty: [isDirty: boolean];
 }>();
 
+const { fetchNodeTypes } = useNodeTypes();
+await fetchNodeTypes();
+
 const flowId = computed(() => props.workflowId ?? "workflow-builder");
 
 const {
@@ -181,27 +184,11 @@ async function enrichBeforeSave(exported: {
     const relField = srcSource.fields.find((f) => f.slug === relFieldSlug);
     if (!relField?.relation_entity_slug || !relField?.column_name) return node;
 
-    const isStart =
-      srcSource.entitySlug === startEntitySlug.value &&
-      (nodes.value.find((n) => n.id === srcNodeId)?.data?.nodeType ===
-        "start" ||
-        nodes.value.find((n) => n.id === srcNodeId)?.data?.nodeType ===
-          "trigger" ||
-        nodes.value.find((n) => n.id === srcNodeId)?.data?.nodeType ===
-          "webhook_trigger");
-
-    const recordIdExpr = isStart
-      ? `={{$('${srcNodeId}').first().json.body.record.${relField.column_name}}}`
-      : srcSource.cardinality === "item"
-        ? `={{$('${srcNodeId}').item.json.${relField.column_name}}}`
-        : `={{$('${srcNodeId}').first().json.data.${relField.column_name}}}`;
-
     return {
       ...node,
       parameters: {
         ...node.parameters,
         relationEntitySlug: relField.relation_entity_slug,
-        relationRecordIdExpr: recordIdExpr,
       },
     };
   });
@@ -286,6 +273,7 @@ function onDeleteSelectedNode() {
 }
 
 const toast = useToast();
+const { apiFetch } = useApi();
 const { getNodeType } = useNodeTypes();
 const {
   integrations: smtpIntegrations,
@@ -374,67 +362,6 @@ function templateHasContent(tokens: any[]) {
       token?.type === "field" ||
       (token?.type === "literal" && String(token.value ?? "").trim()),
   );
-}
-
-function maximumDelayBefore(
-  nodeId: string,
-  visiting = new Set<string>(),
-  memo = new Map<string, number>(),
-): number {
-  if (memo.has(nodeId)) return memo.get(nodeId)!;
-  if (visiting.has(nodeId)) throw new Error("cycle");
-  const nextVisiting = new Set(visiting).add(nodeId);
-  const incoming = edges.value.filter((edge) => edge.target === nodeId);
-  const multipliers: Record<string, number> = {
-    seconds: 1000,
-    minutes: 60_000,
-    hours: 3_600_000,
-    days: 86_400_000,
-  };
-  let maximum = 0;
-  for (const edge of incoming) {
-    const parent = nodes.value.find((node) => node.id === edge.source);
-    const parentDelay =
-      parent?.data?.nodeType === "delay"
-        ? Math.max(0, Number(parent.data?.parameters?.duration ?? 0)) *
-          (multipliers[parent.data?.parameters?.unit ?? "minutes"] ?? 60_000)
-        : 0;
-    maximum = Math.max(
-      maximum,
-      maximumDelayBefore(edge.source, nextVisiting, memo) + parentDelay,
-    );
-  }
-  memo.set(nodeId, maximum);
-  return maximum;
-}
-
-function maximumDelayBetween(sourceId: string, targetId: string): number {
-  const multipliers: Record<string, number> = {
-    seconds: 1000,
-    minutes: 60_000,
-    hours: 3_600_000,
-    days: 86_400_000,
-  };
-  function visit(current: string, visiting = new Set<string>()): number {
-    if (current === targetId) return 0;
-    if (visiting.has(current)) return Number.NEGATIVE_INFINITY;
-    const nextVisiting = new Set(visiting).add(current);
-    let maximum = Number.NEGATIVE_INFINITY;
-    for (const edge of edges.value.filter((edge) => edge.source === current)) {
-      const next = nodes.value.find((node) => node.id === edge.target);
-      const delay =
-        next?.data?.nodeType === "delay"
-          ? Math.max(0, Number(next.data?.parameters?.duration ?? 0)) *
-            (multipliers[next.data?.parameters?.unit ?? "minutes"] ?? 60_000)
-          : 0;
-      const downstream = visit(edge.target, nextVisiting);
-      if (Number.isFinite(downstream))
-        maximum = Math.max(maximum, delay + downstream);
-    }
-    return maximum;
-  }
-  const result = visit(sourceId);
-  return Number.isFinite(result) ? result : 0;
 }
 
 async function save() {
@@ -611,18 +538,6 @@ async function save() {
         });
         return;
       }
-      if (
-        maximumDelayBetween(documentSource.nodeId, node.id) >=
-        24 * 60 * 60 * 1000
-      ) {
-        toast.add({
-          title: `Sesiune expirata inainte de "${node.data.label}"`,
-          description:
-            "Un document nu poate traversa un Delay cumulat de 24 de ore sau mai mult.",
-          color: "error",
-        });
-        return;
-      }
     }
 
     const requiredValues: Array<[any, string, boolean?]> = [];
@@ -744,25 +659,6 @@ async function save() {
       }
     }
 
-    try {
-      if (maximumDelayBefore(node.id) > 30 * 24 * 60 * 60 * 1000) {
-        toast.add({
-          title: `Intarziere prea mare in nodul "${node.data.label}"`,
-          description:
-            "Durata cumulata pana la notificare nu poate depasi 30 de zile.",
-          color: "error",
-        });
-        return;
-      }
-    } catch {
-      toast.add({
-        title: `Ciclu invalid inainte de "${node.data.label}"`,
-        description:
-          "Notificarile intarziate nu pot fi configurate pe un traseu ciclic.",
-        color: "error",
-      });
-      return;
-    }
   }
 
   for (const node of nodes.value) {
@@ -814,6 +710,27 @@ async function save() {
 
   const data = exportWorkflow();
   const enriched = await enrichBeforeSave(data);
+  const validation = await apiFetch<{
+    data: {
+      valid: boolean;
+      errors: Array<{ message: string }>;
+    };
+  }>("/v1/admin/workflows/validate", {
+    method: "POST",
+    body: {
+      ...enriched,
+      workflowId: props.workflowId,
+    },
+  });
+  if (!validation.data.valid) {
+    toast.add({
+      title: "Revizia va fi salvata cu erori",
+      description: validation.data.errors
+        .map((error) => error.message)
+        .join(" "),
+      color: "warning",
+    });
+  }
   emit("save", enriched);
   isDirty.value = false;
 }
