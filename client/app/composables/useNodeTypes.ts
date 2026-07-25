@@ -275,6 +275,15 @@ export interface NodeConfigField {
   options?: Array<{ label: string; value: string }>;
   required?: boolean;
   inputKind?: "email" | "text" | "textarea" | "file-name";
+  sourceModes?: Array<"static" | "node_output">;
+  acceptedDataTypes?: string[];
+}
+
+export interface NodeOutputField {
+  key: string;
+  label: string;
+  dataType: string;
+  uiType?: string;
 }
 
 export interface NodeTypeDefinition {
@@ -296,6 +305,7 @@ export interface NodeTypeDefinition {
   description: string;
   defaults: Record<string, any>;
   configFields: NodeConfigField[];
+  outputFields?: NodeOutputField[];
 }
 
 const categories = [

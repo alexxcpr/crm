@@ -599,6 +599,78 @@ export class NodeRegistryService {
         beforePolicy: 'all',
         outputKind: 'value',
       },
+      {
+        type: 'format_date',
+        version: 1,
+        label: 'Formateaza data',
+        icon: 'i-lucide-calendar-clock',
+        category: 'logic',
+        color: '#0ea5e9',
+        description:
+          'Formateaza o data si expune variantele cu si fara ora.',
+        defaults: {
+          source: null,
+          preset: 'ro_numeric',
+        },
+        configFields: [
+          {
+            key: 'source',
+            label: 'Data sursa',
+            type: 'workflow-value-source',
+            required: true,
+            sourceModes: ['node_output'],
+            acceptedDataTypes: [
+              'date',
+              'datetime',
+              'timestamp',
+            ],
+          },
+          {
+            key: 'preset',
+            label: 'Format',
+            type: 'select',
+            required: true,
+            options: [
+              {
+                label:
+                  '19.07.2026 / 19.07.2026 15:56',
+                value: 'ro_numeric',
+              },
+              {
+                label:
+                  '19 iulie 2026 / 19 iulie 2026 15:56',
+                value: 'ro_long',
+              },
+              {
+                label:
+                  '19/07/2026 / 19/07/2026 15:56',
+                value: 'slash',
+              },
+              {
+                label:
+                  '2026-07-19 / 2026-07-19 15:56',
+                value: 'iso',
+              },
+            ],
+          },
+        ],
+        beforePolicy: 'all',
+        outputKind: 'value',
+        outputFields: [
+          {
+            key: 'date',
+            label: 'Data formatata',
+            dataType: 'varchar',
+            uiType: 'text',
+          },
+          {
+            key: 'datetime',
+            label: 'Data si ora formatate',
+            dataType: 'varchar',
+            uiType: 'text',
+          },
+        ],
+      },
       ...documentNodes,
       {
         type: 'notification',
@@ -791,6 +863,9 @@ export class NodeRegistryService {
       configFields: structuredClone(
         definition.configFields,
       ),
+      outputFields: definition.outputFields
+        ? structuredClone(definition.outputFields)
+        : undefined,
     }));
   }
 

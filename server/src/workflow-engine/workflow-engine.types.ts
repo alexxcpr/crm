@@ -72,10 +72,19 @@ export interface WorkflowNodeConfigField {
   required?: boolean;
   placeholder?: string;
   inputKind?: string;
+  sourceModes?: Array<'static' | 'node_output'>;
+  acceptedDataTypes?: string[];
   options?: Array<{
     label: string;
     value: string;
   }>;
+}
+
+export interface WorkflowNodeOutputField {
+  key: string;
+  label: string;
+  dataType: string;
+  uiType?: string;
 }
 
 export interface WorkflowNodeDefinition {
@@ -100,6 +109,7 @@ export interface WorkflowNodeDefinition {
     | 'list'
     | 'value'
     | 'document';
+  outputFields?: WorkflowNodeOutputField[];
   documentPackage?: 'word' | 'pdf';
   inputDocumentPackage?: 'word' | 'pdf';
 }

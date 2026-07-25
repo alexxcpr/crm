@@ -46,6 +46,60 @@ function compiler() {
           configFields: [],
           beforePolicy: 'insert-update',
         },
+        format_date: {
+          type: 'format_date',
+          version: 1,
+          configFields: [
+            {
+              key: 'source',
+              label: 'Data sursa',
+              required: true,
+              sourceModes: ['node_output'],
+              acceptedDataTypes: [
+                'date',
+                'datetime',
+                'timestamp',
+              ],
+            },
+            {
+              key: 'preset',
+              label: 'Format',
+              required: true,
+              options: [
+                {
+                  label: 'Romanesc',
+                  value: 'ro_numeric',
+                },
+                {
+                  label: 'Lung',
+                  value: 'ro_long',
+                },
+                {
+                  label: 'Slash',
+                  value: 'slash',
+                },
+                {
+                  label: 'ISO',
+                  value: 'iso',
+                },
+              ],
+            },
+          ],
+          beforePolicy: 'all',
+          outputKind: 'value',
+          outputFields: [
+            {
+              key: 'date',
+              label: 'Data formatata',
+              dataType: 'varchar',
+            },
+            {
+              key: 'datetime',
+              label: 'Data si ora formatate',
+              dataType: 'varchar',
+            },
+          ],
+        },
       };
       return definitions[type];
     }),
@@ -546,5 +600,206 @@ describe('WorkflowCompilerService', () => {
     expect(
       result.errors.map((error) => error.code),
     ).toContain('formula_type_mismatch');
+  });
+
+  it('permite format_date cu o sursa Datetime inclusiv in before_delete', async () => {
+    const service = compiler();
+    const result = await service.compile(
+      [
+        {
+          id: 'start',
+          type: 'start',
+          parameters: {},
+        },
+        {
+          id: 'format',
+          type: 'format_date',
+          parameters: {
+            source: {
+              sourceType: 'node_output',
+              sourceNodeId: 'start',
+              sourceFieldSlug: 'date_created',
+              dataType: 'timestamp',
+            },
+            preset: 'ro_numeric',
+          },
+        },
+      ],
+      [{ source: 'start', target: 'format' }],
+      { triggerEvents: ['before_delete'] },
+    );
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('respinge sursa statica, tipul incompatibil si presetul invalid pentru format_date', async () => {
+    const service = compiler();
+    const result = await service.compile(
+      [
+        {
+          id: 'start',
+          type: 'start',
+          parameters: {},
+        },
+        {
+          id: 'static-format',
+          type: 'format_date',
+          parameters: {
+            source: {
+              sourceType: 'static',
+              value: '2026-07-19',
+            },
+            preset: 'ro_numeric',
+          },
+        },
+        {
+          id: 'text-format',
+          type: 'format_date',
+          parameters: {
+            source: {
+              sourceType: 'node_output',
+              sourceNodeId: 'start',
+              sourceFieldSlug: 'name',
+              dataType: 'varchar',
+            },
+            preset: 'format-necunoscut',
+          },
+        },
+      ],
+      [
+        {
+          source: 'start',
+          target: 'static-format',
+        },
+        {
+          source: 'start',
+          target: 'text-format',
+        },
+      ],
+    );
+
+    expect(
+      result.errors.map((error) => error.code),
+    ).toEqual(
+      expect.arrayContaining([
+        'invalid_source_mode',
+        'source_type_mismatch',
+        'invalid_config_option',
+      ]),
+    );
+  });
+
+  it('rezolva outputurile declarate de registry si respinge outputurile inexistente', async () => {
+    const service = compiler();
+    const validReference = {
+      sourceType: 'node_output',
+      sourceNodeId: 'format',
+      sourceFieldSlug: 'datetime',
+    };
+    const invalidReference = {
+      sourceType: 'node_output',
+      sourceNodeId: 'format',
+      sourceFieldSlug: 'missing',
+    };
+    const errors: any[] = [];
+
+    await (
+      service as any
+    ).resolveSourceFieldDependencies(
+      [
+        {
+          id: 'format',
+          type: 'format_date',
+          parameters: {},
+        },
+        {
+          id: 'valid-consumer',
+          type: 'set_data',
+          parameters: {
+            value: validReference,
+          },
+        },
+        {
+          id: 'invalid-consumer',
+          type: 'set_data',
+          parameters: {
+            value: invalidReference,
+          },
+        },
+      ],
+      new Map(),
+      new Set<string>(),
+      errors,
+    );
+
+    expect(validReference).toMatchObject({
+      sourceFieldSnapshot: 'datetime',
+      dataType: 'varchar',
+    });
+    expect(errors).toEqual([
+      expect.objectContaining({
+        code: 'source_field_not_found',
+        nodeId: 'invalid-consumer',
+      }),
+    ]);
+  });
+
+  it('determina tipul campului Date dintr-un item Pentru Fiecare', async () => {
+    const service = compiler();
+    const where = jest.fn().mockResolvedValue([]);
+    const select = jest.fn(() => ({ where }));
+    (service as any).tenantContext = {
+      knex: jest.fn(() => ({ select })),
+    };
+    const source = {
+      sourceType: 'node_output',
+      sourceNodeId: 'loop',
+      sourceFieldSlug: 'date_created',
+    };
+    const errors: any[] = [];
+
+    await (
+      service as any
+    ).resolveSourceFieldDependencies(
+      [
+        {
+          id: 'list',
+          type: 'app_get_record',
+          parameters: { entity: 'contacts' },
+        },
+        {
+          id: 'loop',
+          type: 'for_each',
+          parameters: {
+            sourceNodeId: 'list',
+          },
+        },
+        {
+          id: 'format',
+          type: 'format_date',
+          parameters: { source },
+        },
+      ],
+      new Map([['contacts', 'entity-1']]),
+      new Set<string>(),
+      errors,
+      [
+        {
+          source: 'list',
+          target: 'loop',
+        },
+        {
+          source: 'loop',
+          target: 'format',
+        },
+      ],
+    );
+
+    expect(source).toMatchObject({
+      sourceFieldSnapshot: 'date_created',
+      dataType: 'timestamp',
+    });
+    expect(errors).toEqual([]);
   });
 });

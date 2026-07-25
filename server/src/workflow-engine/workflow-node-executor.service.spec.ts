@@ -10,19 +10,30 @@ function createExecutor() {
     .mockResolvedValue({ slug: 'contacts' });
   const where = jest.fn(() => ({ first }));
   const knex = jest.fn(() => ({ where }));
+  const documents = {
+    execute: jest.fn().mockResolvedValue({
+      data: {
+        document_handle: {
+          id: 'document-1',
+        },
+      },
+    }),
+  };
   const service = new WorkflowNodeExecutorService(
     data as any,
     {} as any,
     {} as any,
-    {} as any,
+    documents as any,
     {} as any,
     { knex } as any,
   );
 
-  return { service, data, where };
+  return { service, data, where, documents };
 }
 
-function executionInput(startRecordId: string) {
+function executionInput(
+  startRecordId: string,
+): any {
   const record = {
     id: 'record-1',
     cf_status: 'draft',
@@ -113,5 +124,126 @@ describe('WorkflowNodeExecutorService', () => {
       service.execute(executionInput('record-2')),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(data.update).not.toHaveBeenCalled();
+  });
+
+  it('formateaza data si expune ambele variante', async () => {
+    const { service } = createExecutor();
+    const input = executionInput('record-1');
+    input.context.outputs.get('start')![0].value.date_created =
+      '2026-07-19T12:56:40.000Z';
+    input.node = {
+      id: 'format-date',
+      type: 'format_date',
+      version: 1,
+      config: {
+        source: {
+          sourceType: 'node_output',
+          sourceNodeId: 'start',
+          sourceFieldSlug: 'date_created',
+        },
+        preset: 'ro_numeric',
+      },
+    };
+
+    await expect(
+      service.execute(input),
+    ).resolves.toEqual({
+      date: '19.07.2026',
+      datetime: '19.07.2026 15:56',
+    });
+  });
+
+  it.each([null, '', 'data-invalida'])(
+    'respinge data lipsa sau invalida %p',
+    async (value) => {
+      const { service } = createExecutor();
+      const input = executionInput('record-1');
+      input.context.outputs.get('start')![0].value.date_created =
+        value;
+      input.node = {
+        id: 'format-date',
+        type: 'format_date',
+        version: 1,
+        config: {
+          source: {
+            sourceType: 'node_output',
+            sourceNodeId: 'start',
+            sourceFieldSlug: 'date_created',
+          },
+          preset: 'ro_numeric',
+        },
+      };
+
+      await expect(
+        service.execute(input),
+      ).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    },
+  );
+
+  it('foloseste outputul formatat in Word Replace', async () => {
+    const { service, documents } =
+      createExecutor();
+    const input = executionInput('record-1');
+    input.context.outputs.set(
+      'format-date',
+      [
+        {
+          nodeId: 'format-date',
+          runIndex: 0,
+          itemIndex: 0,
+          value: {
+            date: '19.07.2026',
+            datetime:
+              '19.07.2026 15:56',
+          },
+        },
+      ],
+    );
+    input.context.outputs.set('word-open', [
+      {
+        nodeId: 'word-open',
+        runIndex: 0,
+        itemIndex: 0,
+        value: {
+          document_handle: {
+            id: 'document-1',
+          },
+        },
+      },
+    ]);
+    input.node = {
+      id: 'word-replace',
+      type: 'word_replace_text',
+      version: 1,
+      config: {
+        documentSourceNodeId: 'word-open',
+        search: {
+          sourceType: 'static',
+          value: '{{date_created}}',
+        },
+        replace: {
+          sourceType: 'node_output',
+          sourceNodeId: 'format-date',
+          sourceFieldSlug: 'datetime',
+        },
+      },
+    };
+
+    await service.execute(input);
+
+    expect(
+      documents.execute,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        args: {
+          search: '{{date_created}}',
+          replace:
+            '19.07.2026 15:56',
+        },
+      }),
+      input.context.actor,
+    );
   });
 });

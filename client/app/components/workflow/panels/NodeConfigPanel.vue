@@ -490,6 +490,8 @@ watch(
           "
           :data-sources="fieldSelectableDataSources"
           :input-kind="field.inputKind"
+          :source-modes="field.sourceModes"
+          :accepted-data-types="field.acceptedDataTypes"
           :fetch-source-fields="fetchSourceFields"
           @update:model-value="onParamChange(field.key, $event)"
         />

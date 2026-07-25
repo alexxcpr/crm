@@ -12,6 +12,7 @@ interface BaseDataSource {
 
 export type DataSource =
   | (BaseDataSource & { kind: "entity" })
+  | (BaseDataSource & { kind: "value" })
   | (BaseDataSource & {
       kind: "document";
       documentPackage: DocumentPackage;
@@ -338,6 +339,7 @@ export function useWorkflowDataRegistry(
         if (processed.has(node.id)) continue;
         const data = nodeData(node);
         const nodeType: string = data.nodeType ?? "";
+        const definition = getNodeType(nodeType);
 
         if (nodeType === "system_get_current_profile") {
           sources.push({
@@ -409,8 +411,41 @@ export function useWorkflowDataRegistry(
           });
           processed.add(node.id);
           changed = true;
-        } else if (getNodeType(nodeType)?.category === "files") {
-          const definition = getNodeType(nodeType);
+        } else if (definition?.outputFields?.length) {
+          const sourceField =
+            definition.configFields.find((field) =>
+              field.sourceModes?.includes("node_output"),
+            );
+          const sourceNodeId = String(
+            data.parameters?.[sourceField?.key ?? ""]?.sourceNodeId ?? "",
+          );
+          const source = sources.find(
+            (candidate) =>
+              candidate.nodeId === sourceNodeId
+              && candidate.cardinality !== "list",
+          );
+          if (!source) continue;
+
+          sources.push({
+            kind: "value",
+            nodeId: node.id,
+            label: data.label || definition.label,
+            entitySlug: `__value_${nodeType}`,
+            fields: definition.outputFields.map(
+              (field) =>
+                ({
+                  column_name: field.key,
+                  name: field.label,
+                  slug: `_output_${field.key}`,
+                  data_type: field.dataType,
+                  ui_type: field.uiType ?? "text",
+                }) as Field,
+            ),
+            cardinality: source.cardinality,
+          });
+          processed.add(node.id);
+          changed = true;
+        } else if (definition?.category === "files") {
           const outputPackage =
             definition?.outputDocumentPackage ?? definition?.package;
           if (!outputPackage) continue;

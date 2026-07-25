@@ -251,6 +251,11 @@ export class WorkflowCompilerService {
       integrationIds,
       httpDomains,
       errors,
+      edges,
+    );
+    this.validateConfigConstraints(
+      normalizedNodes,
+      errors,
     );
     for (const node of normalizedNodes) {
       if (node.type === 'set_data') {
@@ -580,6 +585,105 @@ export class WorkflowCompilerService {
     }
   }
 
+  private validateConfigConstraints(
+    nodes: WorkflowSourceNode[],
+    errors: WorkflowValidationIssue[],
+  ) {
+    for (const node of nodes) {
+      const definition = this.registry.get(
+        node.type,
+      );
+      if (!definition) continue;
+
+      for (const field of definition.configFields) {
+        const value =
+          node.parameters?.[field.key];
+        if (this.isMissing(value)) continue;
+
+        if (
+          field.options?.length &&
+          !field.options.some(
+            (option) => option.value === value,
+          )
+        ) {
+          errors.push({
+            code: 'invalid_config_option',
+            message: `Valoarea campului "${field.label}" nu este valida.`,
+            nodeId: node.id,
+            field: field.key,
+          });
+        }
+
+        if (
+          !field.sourceModes?.length &&
+          !field.acceptedDataTypes?.length
+        ) {
+          continue;
+        }
+        if (
+          !value ||
+          typeof value !== 'object' ||
+          Array.isArray(value)
+        ) {
+          errors.push({
+            code: 'invalid_value_source',
+            message: `Sursa pentru "${field.label}" nu este valida.`,
+            nodeId: node.id,
+            field: field.key,
+          });
+          continue;
+        }
+
+        const source = value as Record<
+          string,
+          any
+        >;
+        if (
+          field.sourceModes?.length &&
+          !field.sourceModes.includes(
+            source.sourceType,
+          )
+        ) {
+          errors.push({
+            code: 'invalid_source_mode',
+            message: `Campul "${field.label}" trebuie sa foloseasca o valoare dintr-un nod anterior.`,
+            nodeId: node.id,
+            field: field.key,
+          });
+          continue;
+        }
+
+        if (
+          field.acceptedDataTypes?.length &&
+          source.sourceType === 'node_output'
+        ) {
+          const dataType = String(
+            source.dataType ?? '',
+          ).toLowerCase();
+          if (!dataType) {
+            errors.push({
+              code: 'source_type_unknown',
+              message: `Tipul campului sursa pentru "${field.label}" nu poate fi determinat.`,
+              nodeId: node.id,
+              field: field.key,
+            });
+          } else if (
+            !field.acceptedDataTypes.includes(
+              dataType,
+            )
+          ) {
+            errors.push({
+              code: 'source_type_mismatch',
+              message: `Campul "${field.label}" accepta numai valori Date sau Datetime.`,
+              nodeId: node.id,
+              field: field.key,
+            });
+          }
+        }
+      }
+    }
+  }
+
   private validateConditions(
     node: WorkflowSourceNode,
     errors: WorkflowValidationIssue[],
@@ -838,6 +942,10 @@ export class WorkflowCompilerService {
     integrationIds: Set<string>,
     httpDomains: Set<string>,
     errors: WorkflowValidationIssue[],
+    edges: Array<{
+      source: string;
+      target: string;
+    }> = [],
   ) {
     const entities = await this.knex(
       'entity',
@@ -1039,6 +1147,7 @@ export class WorkflowCompilerService {
       entityBySlug,
       fieldIds,
       errors,
+      edges,
     );
   }
 
@@ -1047,10 +1156,58 @@ export class WorkflowCompilerService {
     entityBySlug: Map<string, string>,
     fieldIds: Set<string>,
     errors: WorkflowValidationIssue[],
+    edges: Array<{
+      source: string;
+      target: string;
+    }> = [],
   ) {
     const nodeById = new Map(
       nodes.map((node) => [node.id, node]),
     );
+    const sourceEntitySlugFor = (
+      source: WorkflowSourceNode | undefined,
+      visited = new Set<string>(),
+    ): string => {
+      if (!source || visited.has(source.id))
+        return '';
+      visited.add(source.id);
+
+      if (source.type === 'app_get_related') {
+        return String(
+          source.parameters
+            ?.relationEntitySlug ?? '',
+        );
+      }
+      if (source.parameters?.entity) {
+        return String(source.parameters.entity);
+      }
+      if (source.type === 'for_each') {
+        return sourceEntitySlugFor(
+          nodeById.get(
+            String(
+              source.parameters?.sourceNodeId ??
+                '',
+            ),
+          ),
+          visited,
+        );
+      }
+      if (
+        source.type === 'set_data' ||
+        source.type === 'app_update_record'
+      ) {
+        const incoming = edges.find(
+          (edge) => edge.target === source.id,
+        );
+        return sourceEntitySlugFor(
+          incoming
+            ? nodeById.get(incoming.source)
+            : undefined,
+          visited,
+        );
+      }
+      return '';
+    };
     const fieldsByEntity = new Map<
       string,
       Map<
@@ -1126,13 +1283,8 @@ export class WorkflowCompilerService {
           const source = nodeById.get(
             reference.sourceNodeId,
           );
-          const sourceEntitySlug = String(
-            source?.type === 'app_get_related'
-              ? source.parameters
-                  ?.relationEntitySlug
-              : (source?.parameters?.entity ??
-                  ''),
-          );
+          const sourceEntitySlug =
+            sourceEntitySlugFor(source);
           const fieldKey = String(
             reference.sourceFieldSlug ??
               reference.fieldSlug ??
@@ -1161,6 +1313,30 @@ export class WorkflowCompilerService {
               reference.sourceFieldSnapshot =
                 fieldKey;
               reference.dataType = field.dataType;
+            }
+          } else if (source && fieldKey) {
+            const sourceDefinition =
+              this.registry.get(source.type);
+            const outputFields =
+              sourceDefinition?.outputFields;
+            if (outputFields) {
+              const outputField =
+                outputFields.find(
+                  (field) =>
+                    field.key === fieldKey,
+                );
+              if (!outputField) {
+                errors.push({
+                  code: 'source_field_not_found',
+                  message: `Campul sursa "${fieldKey}" nu exista.`,
+                  nodeId: node.id,
+                });
+              } else {
+                reference.sourceFieldSnapshot =
+                  fieldKey;
+                reference.dataType =
+                  outputField.dataType;
+              }
             }
           }
         }

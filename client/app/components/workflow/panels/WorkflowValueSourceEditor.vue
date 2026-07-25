@@ -7,6 +7,8 @@ const props = defineProps<{
   modelValue: WorkflowValueSource | null
   dataSources: DataSource[]
   inputKind?: 'email' | 'text' | 'textarea' | 'file-name'
+  sourceModes?: Array<WorkflowValueSource['sourceType']>
+  acceptedDataTypes?: string[]
   fetchSourceFields?: (nodeId: string) => Promise<Field[]>
 }>()
 
@@ -18,23 +20,44 @@ const sourceFieldSlug = ref('')
 const fields = ref<Field[]>([])
 const loading = ref(false)
 
-const sourceOptions = [
+const allSourceOptions = [
   { label: 'Valoare fixa', value: 'static' },
   { label: 'Din nod anterior', value: 'node_output' }
 ]
+const sourceOptions = computed(() => {
+  const allowed = props.sourceModes ?? ['static', 'node_output']
+  return allSourceOptions.filter(option =>
+    allowed.includes(option.value as WorkflowValueSource['sourceType'])
+  )
+})
 const nodeOptions = computed(() => props.dataSources.map(source => ({
-  label: `${source.label} (${source.entitySlug})`,
+  label: source.kind === 'value'
+    ? source.label
+    : `${source.label} (${source.entitySlug})`,
   value: source.nodeId
 })))
 const fieldOptions = computed(() => fields.value
-  .filter(field =>
-    !['email', 'file-name'].includes(props.inputKind ?? '')
-    || ['varchar', 'text'].includes(field.data_type)
-  )
+  .filter(field => {
+    if (
+      props.acceptedDataTypes?.length
+      && !props.acceptedDataTypes.includes(field.data_type)
+    ) {
+      return false
+    }
+    return (
+      !['email', 'file-name'].includes(props.inputKind ?? '')
+      || ['varchar', 'text'].includes(field.data_type)
+    )
+  })
   .map(field => ({ label: `${field.name} (${field.column_name})`, value: field.column_name })))
 
 watch(() => props.modelValue, async (value) => {
-  sourceType.value = value?.sourceType ?? 'static'
+  const defaultSourceType = props.sourceModes?.[0] ?? 'static'
+  sourceType.value = value?.sourceType && sourceOptions.value.some(
+    option => option.value === value.sourceType
+  )
+    ? value.sourceType
+    : defaultSourceType
   staticValue.value = value?.value ?? ''
   sourceNodeId.value = value?.sourceNodeId ?? ''
   sourceFieldSlug.value = value?.sourceFieldSlug ?? ''

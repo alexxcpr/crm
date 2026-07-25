@@ -14,6 +14,10 @@ import type {
   WorkflowExecutionToken,
   WorkflowIrNode,
 } from './workflow-engine.types';
+import {
+  formatWorkflowDate,
+  isWorkflowDateFormatPreset,
+} from './workflow-date-formatter';
 import { WorkflowHttpClientService } from './workflow-http-client.service';
 
 interface ExecuteNodeInput {
@@ -152,6 +156,12 @@ export class WorkflowNodeExecutorService {
           context,
           token,
         );
+      case 'format_date':
+        return this.formatDate(
+          config,
+          context,
+          token,
+        );
       case 'notification':
         return this.sendNotification(
           context,
@@ -248,6 +258,47 @@ export class WorkflowNodeExecutorService {
     if (Number(config.limit) === 1)
       return result.data[0] ?? null;
     return result.data;
+  }
+
+  private formatDate(
+    config: Record<string, any>,
+    context: WorkflowExecutionContext,
+    token: WorkflowExecutionToken,
+  ) {
+    const value = this.resolveValue(
+      config.source,
+      context,
+      token,
+    );
+    if (
+      value === null ||
+      value === undefined ||
+      (typeof value === 'string' &&
+        value.trim() === '')
+    ) {
+      throw new BadRequestException(
+        'Valoarea datei lipseste.',
+      );
+    }
+    if (
+      !isWorkflowDateFormatPreset(
+        config.preset,
+      )
+    ) {
+      throw new BadRequestException(
+        'Formatul datei nu este valid.',
+      );
+    }
+    try {
+      return formatWorkflowDate(
+        value,
+        config.preset,
+      );
+    } catch {
+      throw new BadRequestException(
+        'Valoarea nu este o data valida.',
+      );
+    }
   }
 
   private async getRelated(
