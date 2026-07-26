@@ -8,13 +8,18 @@ import {
   Query,
   ServiceUnavailableException,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import { timingSafeEqual } from 'crypto';
+import { PUBLIC_RATE_LIMITS } from 'src/security/public-rate-limit.constants';
+import { PublicRateLimitGuard } from 'src/security/public-rate-limit.guard';
 import { ProvisionTenantDto, SetAdminCredentialsDto, SyncBillingStatusDto, TenantAvailabilityQueryDto } from './dto/provision-tenant.dto';
 import { TenantProvisioningService } from './tenant-provisioning.service';
 
 @Controller('internal/provisioning/tenants')
+@UseGuards(PublicRateLimitGuard)
 export class InternalProvisioningController {
   constructor(
     private readonly config: ConfigService,
@@ -22,6 +27,7 @@ export class InternalProvisioningController {
   ) {}
 
   @Post()
+  @Throttle(PUBLIC_RATE_LIMITS.provisioning.write)
   async provision(
     @Headers('x-provisioning-secret') secret: string | undefined,
     @Body() dto: ProvisionTenantDto,
@@ -41,6 +47,7 @@ export class InternalProvisioningController {
   }
 
   @Get('availability')
+  @Throttle(PUBLIC_RATE_LIMITS.provisioning.read)
   async availability(
     @Headers('x-provisioning-secret') secret: string | undefined,
     @Query() query: TenantAvailabilityQueryDto,
@@ -54,6 +61,7 @@ export class InternalProvisioningController {
   }
 
   @Get(':slug/status')
+  @Throttle(PUBLIC_RATE_LIMITS.provisioning.read)
   async status(
     @Headers('x-provisioning-secret') secret: string | undefined,
     @Param('slug') slug: string,
@@ -67,6 +75,7 @@ export class InternalProvisioningController {
   }
 
   @Post(':slug/admin-credentials')
+  @Throttle(PUBLIC_RATE_LIMITS.provisioning.write)
   async setAdminCredentials(
     @Headers('x-provisioning-secret') secret: string | undefined,
     @Param('slug') slug: string,
@@ -92,6 +101,7 @@ export class InternalProvisioningController {
   }
 
   @Post(':slug/billing-status')
+  @Throttle(PUBLIC_RATE_LIMITS.provisioning.write)
   async syncBillingStatus(
     @Headers('x-provisioning-secret') secret: string | undefined,
     @Param('slug') slug: string,
