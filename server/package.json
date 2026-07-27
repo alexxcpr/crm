@@ -13,6 +13,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "tenant:provision": "tsx scripts/provision-tenant.ts",
     "tenant:migrate-all": "tsx scripts/migrate-all-tenants.ts",
+    "tenant:sync-platform-owner": "node dist/scripts/sync-platform-owner.js",
+    "tenant:sync-platform-owner:dev": "tsx scripts/sync-platform-owner.ts",
     "workflow:preflight": "tsx scripts/workflow-cutover.ts preflight",
     "workflow:cutover": "tsx scripts/workflow-cutover.ts cutover",
     "db-dev-rm": "cd .. && cd docker && docker compose rm postgres -s -f -v",

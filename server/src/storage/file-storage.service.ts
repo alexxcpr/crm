@@ -12,6 +12,7 @@ import { randomUUID } from 'crypto';
 import type { Knex } from 'knex';
 import { Readable } from 'stream';
 import { AuthorizationService } from 'src/security/authorization.service';
+import { AccessControlService } from 'src/security/access-control.service';
 import type { AuthenticatedUser } from 'src/security/security.types';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { MetaDbService } from 'src/tenant/meta-db.service';
@@ -26,6 +27,7 @@ import {
 import { StorageQuotaService } from './storage-quota.service';
 import type { StorageProvider } from './storage.types';
 import type { CreateUploadSessionDto } from './dto/create-upload-session.dto';
+import type { CreateOrganizationLogoUploadDto } from './dto/create-organization-logo-upload.dto';
 
 export interface GeneratedFileResult {
   id_file: string;
@@ -41,6 +43,7 @@ export class FileStorageService {
     private readonly tenantContext: TenantContext,
     private readonly metaDb: MetaDbService,
     private readonly authorization: AuthorizationService,
+    private readonly access: AccessControlService,
     private readonly config: ConfigService,
     private readonly quota: StorageQuotaService,
     @Inject(STORAGE_PROVIDER)
@@ -232,6 +235,196 @@ export class FileStorageService {
     } catch (error) {
       await this.knex('stored_file')
         .where({ id_file: storedFile.id_file })
+        .update({
+          status: 'failed',
+          date_updated: this.knex.fn.now(),
+        });
+      await this.quota.fail(
+        storedFile.id_file,
+        'failed',
+        'PRESIGN_FAILED',
+      );
+      throw error;
+    }
+  }
+
+  async createOrganizationLogoUploadSession(
+    dto: CreateOrganizationLogoUploadDto,
+    actor: AuthenticatedUser,
+  ) {
+    this.ensureEnabled();
+
+    const idReservation = randomUUID();
+    const fileId = randomUUID();
+    const fileVersionId = fileId;
+    const tenantId = await this.tenantId();
+    const temporaryObjectKey = `_uploads/${tenantId}/${idReservation}`;
+    const finalObjectKey = `tenants/${tenantId}/branding/${fileId}`;
+    const uploadTtl = this.numberConfig(
+      'STORAGE_UPLOAD_URL_TTL_SECONDS',
+      DEFAULT_UPLOAD_URL_TTL_SECONDS,
+    );
+    const expiresAt = new Date(
+      Date.now() + uploadTtl * 1_000,
+    );
+    const result = await this.quota.reserve({
+      idReservation,
+      fileId,
+      fileVersionId,
+      ownerProfileId: actor.profileId,
+      idempotencyKey: dto.idempotencyKey,
+      temporaryObjectKey,
+      finalObjectKey,
+      expectedBytes: dto.sizeBytes,
+      expiresAt,
+    });
+    const reservation = result.reservation;
+
+    let storedFile = await this.knex(
+      'stored_file',
+    )
+      .where({
+        id_file: reservation.file_id,
+      })
+      .first();
+    if (result.created) {
+      try {
+        storedFile = await this.knex.transaction(
+          async (trx) => {
+            const fileName =
+              this.sanitizeFileName(dto.fileName);
+            const [createdFile] = await trx(
+              'stored_file',
+            )
+              .insert({
+                id_file: reservation.file_id,
+                reservation_id:
+                  reservation.id_reservation,
+                storage_provider: 's3',
+                bucket: this.bucket,
+                object_key:
+                  reservation.final_object_key,
+                original_name: fileName,
+                mime_type:
+                  dto.mimeType.toLowerCase(),
+                size_bytes: dto.sizeBytes,
+                status: 'pending',
+                purpose: 'organization_logo',
+                id_entity: null,
+                id_field: null,
+                record_id: null,
+                id_owner_profile:
+                  actor.profileId,
+                current_version_id:
+                  reservation.file_version_id,
+                current_version_number: 1,
+              })
+              .returning('*');
+            await trx(
+              'stored_file_version',
+            ).insert({
+              id_file_version:
+                reservation.file_version_id,
+              id_file: reservation.file_id,
+              version_number: 1,
+              reservation_id:
+                reservation.id_reservation,
+              storage_provider: 's3',
+              bucket: this.bucket,
+              object_key:
+                reservation.final_object_key,
+              file_name: fileName,
+              mime_type:
+                dto.mimeType.toLowerCase(),
+              size_bytes: dto.sizeBytes,
+              status: 'pending',
+              id_creator_profile:
+                actor.profileId,
+            });
+            return createdFile;
+          },
+        );
+      } catch (error) {
+        await this.quota.fail(
+          reservation.file_id,
+          'failed',
+          'TENANT_METADATA_INSERT_FAILED',
+        );
+        throw error;
+      }
+    }
+
+    if (!storedFile) {
+      await this.quota.fail(
+        reservation.file_id,
+        'failed',
+        'TENANT_METADATA_MISSING',
+      );
+      throw new ServiceUnavailableException(
+        'Metadatele uploadului nu au putut fi create.',
+      );
+    }
+
+    if (
+      reservation.status === 'completed' ||
+      storedFile.status === 'active'
+    ) {
+      return {
+        file: this.toPublicFile(storedFile),
+        uploadUrl: null,
+        uploadHeaders: {},
+        expiresAt: null,
+      };
+    }
+    if (reservation.status !== 'pending') {
+      return {
+        file: this.toPublicFile(storedFile),
+        uploadUrl: null,
+        uploadHeaders: {},
+        expiresAt: reservation.expires_at,
+      };
+    }
+
+    try {
+      const uploadUrl =
+        await this.provider.createUploadUrl({
+          bucket: this.bucket,
+          objectKey:
+            reservation.temporary_object_key,
+          contentType: storedFile.mime_type,
+          fileId: storedFile.id_file,
+          expectedBytes: Number(
+            reservation.expected_bytes,
+          ),
+          expiresInSeconds: Math.max(
+            1,
+            Math.floor(
+              (new Date(
+                reservation.expires_at,
+              ).getTime() -
+                Date.now()) /
+                1_000,
+            ),
+          ),
+        });
+      return {
+        file: this.toPublicFile(storedFile),
+        uploadUrl,
+        uploadHeaders: {
+          'Content-Type': storedFile.mime_type,
+          'x-amz-meta-file-id':
+            storedFile.id_file,
+          'x-amz-meta-expected-bytes': String(
+            reservation.expected_bytes,
+          ),
+        },
+        expiresAt: reservation.expires_at,
+      };
+    } catch (error) {
+      await this.knex('stored_file')
+        .where({
+          id_file: storedFile.id_file,
+        })
         .update({
           status: 'failed',
           date_updated: this.knex.fn.now(),
@@ -442,6 +635,48 @@ export class FileStorageService {
         Date.now() + expiresInSeconds * 1_000,
       ),
     };
+  }
+
+  async organizationLogoDownloadUrl(
+    fileId: string,
+  ) {
+    this.ensureEnabled();
+    const file = await this.requireFile(fileId);
+    if (
+      file.status !== 'active' ||
+      file.purpose !== 'organization_logo'
+    ) {
+      throw new NotFoundException(
+        'Logo-ul organizatiei nu este disponibil.',
+      );
+    }
+    const expiresInSeconds = this.numberConfig(
+      'STORAGE_DOWNLOAD_URL_TTL_SECONDS',
+      DEFAULT_DOWNLOAD_URL_TTL_SECONDS,
+    );
+    return this.provider.createDownloadUrl({
+      bucket: file.bucket,
+      objectKey: file.object_key,
+      downloadName: file.original_name,
+      expiresInSeconds,
+      contentType: file.mime_type,
+      disposition: 'inline',
+    });
+  }
+
+  async requireOrganizationLogo(
+    fileId: string,
+  ) {
+    const file = await this.requireFile(fileId);
+    if (
+      file.status !== 'active' ||
+      file.purpose !== 'organization_logo'
+    ) {
+      throw new BadRequestException(
+        'Fisierul selectat nu este un logo activ.',
+      );
+    }
+    return file;
   }
 
   async getFileBufferForWorkflow(
@@ -781,7 +1016,7 @@ export class FileStorageService {
     }
     if (
       file.id_owner_profile !== actor.profileId &&
-      !actor.roles.includes('admin')
+      !this.access.has(actor, 'data.manage_all')
     ) {
       throw new ForbiddenException(
         'Nu poti sterge acest fisier.',
@@ -900,7 +1135,7 @@ export class FileStorageService {
     if (
       !file.record_id &&
       file.id_owner_profile !== actor.profileId &&
-      !actor.roles.includes('admin')
+      !this.access.has(actor, 'data.manage_all')
     ) {
       throw new ForbiddenException(
         'Nu poti folosi fisierul incarcat de alt profil.',
@@ -942,7 +1177,7 @@ export class FileStorageService {
     if (
       !file.record_id &&
       file.id_owner_profile !== actor.profileId &&
-      !actor.roles.includes('admin')
+      !this.access.has(actor, 'data.manage_all')
     ) {
       throw new ForbiddenException(
         'Nu poti folosi fisierul incarcat de alt profil.',
@@ -1077,6 +1312,7 @@ export class FileStorageService {
           mime_type: input.mimeType,
           size_bytes: input.sizeBytes,
           status: 'pending',
+          purpose: 'workflow_generated',
           id_entity: null,
           id_field: null,
           record_id: null,
@@ -1449,7 +1685,7 @@ export class FileStorageService {
       if (
         file.id_owner_profile !==
           actor.profileId &&
-        !actor.roles.includes('admin')
+        !this.access.has(actor, 'data.manage_all')
       ) {
         throw new ForbiddenException(
           'Nu ai acces la acest fisier.',
@@ -1598,7 +1834,7 @@ export class FileStorageService {
     const file = await this.requireFile(fileId);
     if (
       file.id_owner_profile !== actor.profileId &&
-      !actor.roles.includes('admin')
+      !this.access.has(actor, 'data.manage_all')
     ) {
       throw new ForbiddenException(
         'Nu poti confirma acest fisier.',

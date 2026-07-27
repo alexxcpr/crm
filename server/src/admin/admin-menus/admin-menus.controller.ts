@@ -1,15 +1,15 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { Roles } from 'src/guards/roles.decorator';
-import { RolesGuard } from 'src/guards/roles.guard';
+import { CapabilityGuard } from 'src/security/capability.guard';
+import { RequireCapability } from 'src/security/require-capability.decorator';
 import { returnValidResponse } from 'src/utils/crud.utils';
 import { MenuDto, MenuItemDto } from '../dto/menu.dto';
 import { AdminMenusService } from './admin-menus.service';
 import { ReorderDto } from '../dto/reorder.dto';
 
 @Controller('v1/admin')
-@UseGuards(AuthGuard('jwt'), RolesGuard)
-@Roles('admin')
+@UseGuards(AuthGuard('jwt'), CapabilityGuard)
+@RequireCapability('builder.manage')
 export class AdminMenusController {
   constructor(private readonly menusService: AdminMenusService) {}
 

@@ -1,0 +1,133 @@
+<script setup lang="ts">
+import { Handle, Position } from '@vue-flow/core'
+
+const props = defineProps<{
+  id: string
+  data: {
+    nodeType: string
+    label: string
+    icon: string
+    color: string
+    parameters: Record<string, any>
+  }
+  selected?: boolean
+}>()
+
+const isCondition = computed(() => props.data.nodeType === 'condition')
+const isTrigger = computed(() => ['start', 'trigger', 'webhook_trigger'].includes(props.data.nodeType))
+const isTerminal = computed(() => props.data.nodeType === 'stop_error')
+const isSetData = computed(() => props.data.nodeType === 'set_data')
+const isForEach = computed(() => props.data.nodeType === 'for_each')
+const isEmail = computed(() => props.data.nodeType === 'email')
+
+// Resolve entity display info from node parameters
+const entityDisplay = computed(() => {
+  const params = props.data.parameters ?? {}
+  if (params.entity) {
+    return params.entityName ?? params.entity
+  }
+  if (params.relationEntitySlug) {
+    return params.relationEntityName ?? params.relationEntitySlug
+  }
+  return null
+})
+
+const setDataInfo = computed(() => {
+  if (!isSetData.value) return null
+  const count = (props.data.parameters?.assignments as any[])?.length ?? 0
+  return count > 0 ? `${count} campuri configurate` : 'Nicio formula configurata'
+})
+
+const forEachInfo = computed(() => {
+  if (!isForEach.value) return null
+  return props.data.parameters?.sourceNodeId ? 'Iterare lista configurata' : 'Alege lista de parcurs'
+})
+
+const emailInfo = computed(() => {
+  if (!isEmail.value) return null
+  return props.data.parameters?.integrationName || 'Alege integrarea SMTP'
+})
+</script>
+
+<template>
+  <div
+    class="workflow-node rounded-lg border-2 shadow-sm min-w-[180px] bg-white dark:bg-gray-900 transition-all"
+    :class="[
+      selected ? 'ring-2 ring-primary-500 border-primary-500' : 'border-gray-200 dark:border-gray-700'
+    ]"
+  >
+    <!-- Header -->
+    <div
+      class="flex items-center gap-2 px-3 py-2 rounded-t-md"
+      :style="{ backgroundColor: data.color + '15', borderBottom: `2px solid ${data.color}30` }"
+    >
+      <UIcon :name="data.icon" class="size-4 shrink-0" :style="{ color: data.color }" />
+      <span class="text-xs font-medium truncate text-gray-800 dark:text-gray-200">
+        {{ data.label }}
+      </span>
+    </div>
+
+    <!-- Body -->
+    <div class="px-3 py-2 space-y-0.5">
+      <p class="text-[10px] text-gray-500 dark:text-gray-400 truncate">
+        {{ data.nodeType }}
+      </p>
+      <p
+        v-if="setDataInfo"
+        class="text-[10px] text-gray-600 dark:text-gray-300 truncate font-medium"
+      >
+        {{ setDataInfo }}
+      </p>
+      <p
+        v-else-if="forEachInfo"
+        class="text-[10px] text-gray-600 dark:text-gray-300 truncate font-medium"
+      >
+        {{ forEachInfo }}
+      </p>
+      <p
+        v-else-if="emailInfo"
+        class="text-[10px] text-gray-600 dark:text-gray-300 truncate font-medium"
+      >
+        {{ emailInfo }}
+      </p>
+      <p
+        v-else-if="entityDisplay"
+        class="text-[10px] text-gray-600 dark:text-gray-300 truncate font-medium"
+      >
+        Entitate: {{ entityDisplay }}
+      </p>
+    </div>
+
+    <!-- Handles -->
+    <Handle
+      v-if="!isTrigger"
+      type="target"
+      :position="Position.Left"
+      class="w-3! h-3! bg-gray-400! border-2! border-white! dark:border-gray-900!"
+    />
+
+    <Handle
+      v-if="!isTerminal"
+      :id="isCondition ? 'true' : undefined"
+      type="source"
+      :position="Position.Right"
+      class="w-3! h-3! border-2! border-white! dark:border-gray-900!"
+      :style="{ backgroundColor: isCondition ? '#22c55e' : data.color }"
+    />
+
+    <Handle
+      v-if="isCondition"
+      id="false"
+      type="source"
+      :position="Position.Right"
+      class="w-3! h-3! bg-red-500! border-2! border-white! dark:border-gray-900!"
+      :style="{ top: '75%' }"
+    />
+  </div>
+</template>
+
+<style scoped>
+.workflow-node:hover {
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.1);
+}
+</style>

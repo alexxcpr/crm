@@ -7,16 +7,16 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { Roles } from 'src/guards/roles.decorator';
-import { RolesGuard } from 'src/guards/roles.guard';
+import { CapabilityGuard } from 'src/security/capability.guard';
+import { RequireCapability } from 'src/security/require-capability.decorator';
 import { returnValidResponse } from 'src/utils/crud.utils';
 import { WorkflowHistoryService } from './workflow-history.service';
 
 @Controller(
   'v1/admin/workflows/:workflowId/executions',
 )
-@UseGuards(AuthGuard('jwt'), RolesGuard)
-@Roles('admin')
+@UseGuards(AuthGuard('jwt'), CapabilityGuard)
+@RequireCapability('builder.manage')
 export class WorkflowHistoryController {
   constructor(
     private readonly history: WorkflowHistoryService,

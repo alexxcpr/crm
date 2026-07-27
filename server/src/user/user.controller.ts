@@ -34,6 +34,10 @@ export class UserController {
   async activeProfiles() {
     return this.tenantContext.knex('profile')
       .where('is_active', true)
+      .whereNot(
+        'access_level',
+        'platform_owner',
+      )
       .select('id_profile', 'display_name', 'username', 'email')
       .orderByRaw('COALESCE(display_name, username, email) ASC');
   }

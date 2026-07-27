@@ -1,8 +1,12 @@
 import { ForbiddenException } from '@nestjs/common';
+import { AccessControlService } from './access-control.service';
 import { AuthorizationService } from './authorization.service';
 import { AuthenticatedUser } from './security.types';
 
-function actor(roles: string[] = ['user']): AuthenticatedUser {
+function actor(
+  accessLevel: AuthenticatedUser['accessLevel'] = 'user',
+): AuthenticatedUser {
+  const access = new AccessControlService();
   return {
     id: 'user-1',
     login_username: 'demo',
@@ -11,9 +15,11 @@ function actor(roles: string[] = ['user']): AuthenticatedUser {
     profileId: 'profile-1',
     profile: {
       id_profile: 'profile-1', id_user: 'user-1', username: 'demo', email: 'demo@example.com',
-      display_name: null, is_default: true, is_active: true,
+      display_name: null, access_level: accessLevel, is_default: true, is_active: true,
     },
-    roles,
+    roles: ['user'],
+    accessLevel,
+    globalCapabilities: access.capabilitiesFor(accessLevel),
     tenant: 'dev',
     dbName: 'devdb',
   };
@@ -23,16 +29,20 @@ function serviceWithRows(rows: Array<{ scope: string | null, action: string }>) 
   const query: any = {
     join: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
+    whereNotIn: jest.fn().mockReturnThis(),
     whereIn: jest.fn().mockReturnThis(),
     select: jest.fn().mockResolvedValue(rows),
   };
   const knex: any = jest.fn(() => query);
-  return new AuthorizationService({ knex } as any);
+  return new AuthorizationService(
+    { knex } as any,
+    new AccessControlService(),
+  );
 }
 
 describe('AuthorizationService', () => {
-  it('admin primeste scope all fara query', async () => {
-    expect(await serviceWithRows([]).getScope(actor(['admin']), 'entity-1', 'delete')).toBe('all');
+  it('tenant admin primeste scope all fara query', async () => {
+    expect(await serviceWithRows([]).getScope(actor('tenant_admin'), 'entity-1', 'delete')).toBe('all');
   });
 
   it('all domina owner cand rolurile sunt aditive', async () => {
@@ -55,7 +65,7 @@ describe('AuthorizationService', () => {
   });
 
   it('blocheaza permisiunile pana la schimbarea parolei temporare', async () => {
-    const user = actor(['admin']);
+    const user = actor('platform_owner');
     user.must_change_password = true;
     expect(await serviceWithRows([]).getScope(user, 'entity-1', 'read')).toBeNull();
   });

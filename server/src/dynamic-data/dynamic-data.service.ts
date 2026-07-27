@@ -520,6 +520,10 @@ export class DynamicDataService {
           id_profile: requestedOwner,
           is_active: true,
         })
+        .whereNot(
+          'access_level',
+          'platform_owner',
+        )
         .first();
       if (!target)
         throw new ForbiddenException(

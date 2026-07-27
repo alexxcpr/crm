@@ -18,6 +18,9 @@ function validateProductionEnv(): void {
     'DOMAIN_BASE',
     'PROVISIONING_INTERNAL_SECRET',
     'INTEGRATIONS_ENCRYPTION_KEY',
+    'PLATFORM_OWNER_LOGIN_USERNAME',
+    'PLATFORM_OWNER_EMAIL',
+    'PLATFORM_OWNER_PASSWORD',
   ];
 
   if (process.env.STORAGE_ENABLED === 'true') {

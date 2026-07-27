@@ -1,15 +1,15 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
-import { Roles } from 'src/guards/roles.decorator';
+import { RequireCapability } from 'src/security/require-capability.decorator';
 import { AdminEntitiesService } from './admin-entities.service';
 import { returnValidResponse } from 'src/utils/crud.utils';
 import { CreateEntityDto, UpdateEntityDto } from '../dto/entity.dto';
 import { AuthGuard } from '@nestjs/passport';
-import { RolesGuard } from 'src/guards/roles.guard';
+import { CapabilityGuard } from 'src/security/capability.guard';
 import { ReorderDto } from '../dto/reorder.dto';
 
 @Controller('v1/admin/entities')
-@UseGuards(AuthGuard('jwt'), RolesGuard)
-@Roles('admin')
+@UseGuards(AuthGuard('jwt'), CapabilityGuard)
+@RequireCapability('builder.manage')
 export class AdminEntitiesController {
     constructor(private readonly entitiesService: AdminEntitiesService){}
 

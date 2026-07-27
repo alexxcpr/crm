@@ -1,15 +1,15 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { Roles } from 'src/guards/roles.decorator';
-import { RolesGuard } from 'src/guards/roles.guard';
+import { CapabilityGuard } from 'src/security/capability.guard';
+import { RequireCapability } from 'src/security/require-capability.decorator';
 import { AdminTabsService } from './admin-tabs.service';
 import { returnValidResponse } from 'src/utils/crud.utils';
 import { CreateTabDto, UpdateTabDto } from '../dto/tab.dto';
 import { ReorderDto } from '../dto/reorder.dto';
 
 @Controller('v1/admin/entities/:entityId/tabs')
-@UseGuards(AuthGuard('jwt'), RolesGuard)
-@Roles('admin')
+@UseGuards(AuthGuard('jwt'), CapabilityGuard)
+@RequireCapability('builder.manage')
 export class AdminTabsController {
   constructor(private readonly tabsService: AdminTabsService) {}
 

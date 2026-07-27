@@ -1,0 +1,346 @@
+<script setup lang="ts">
+definePageMeta({ middleware: ['capability'], requiredCapability: 'builder.manage' })
+
+import { h } from 'vue'
+import type { AdminEntity } from '~/types/admin'
+import type { TableColumn } from '@nuxt/ui'
+
+const UCheckbox = resolveComponent('UCheckbox')
+
+const { entities, loading, error, fetchEntities, deleteEntity, deleteEntities } = useAdminEntities()
+const { modules, fetchModules } = useAdminModules()
+const toast = useToast()
+const entitiesTableRoot = ref<HTMLElement | null>(null)
+const { savingRank, persistRankOrder } = useRankReorder()
+
+await Promise.all([fetchEntities(), fetchModules()])
+
+// ─── Filter by module ───
+const ALL_MODULES = '_all'
+const selectedModuleId = ref<string>(ALL_MODULES)
+const canReorder = computed(() => selectedModuleId.value !== ALL_MODULES)
+
+watch(selectedModuleId, (moduleId) => {
+  fetchEntities(moduleId === ALL_MODULES ? undefined : moduleId)
+})
+
+useRankedTableDrag(entitiesTableRoot, {
+  async onReorder(_group, oldIndex, newIndex) {
+    if (!canReorder.value) return
+    const previous = [...entities.value]
+    entities.value = normalizeRankOrder(moveRankedItem(entities.value, oldIndex, newIndex))
+    try {
+      entities.value = await persistRankOrder(
+        '/v1/admin/entities/reorder/ranks',
+        entities.value,
+        entity => entity.id_entity
+      )
+    } catch (err: any) {
+      entities.value = previous
+      toast.add({
+        title: 'Ordinea nu a putut fi salvata',
+        description: err?.data?.message || err.message,
+        color: 'error'
+      })
+    }
+  }
+})
+
+const moduleFilterOptions = computed(() => [
+  { label: 'Toate modulele', value: ALL_MODULES },
+  ...modules.value.map(m => ({ label: m.name, value: m.id_module }))
+])
+
+// ─── Modal state ───
+const showModal = ref(false)
+const editingEntity = ref<AdminEntity | null>(null)
+
+function openCreate() {
+  editingEntity.value = null
+  showModal.value = true
+}
+
+function openEdit(entity: AdminEntity) {
+  editingEntity.value = entity
+  showModal.value = true
+}
+
+function onSaved() {
+  showModal.value = false
+  editingEntity.value = null
+}
+
+// ─── Bulk selection ───
+const table = useTemplateRef('table')
+const rowSelection = ref({})
+const selectedCount = computed(() => Object.keys(rowSelection.value).length)
+
+async function bulkDelete() {
+  const selectedIndices = Object.keys(rowSelection.value).map(Number)
+  const ids = selectedIndices.map(i => entities.value[i]?.id_entity).filter((id): id is string => !!id)
+  const msg = await deleteEntities(ids)
+  rowSelection.value = {}
+  if (msg) {
+    toast.add({ title: msg, color: 'success' })
+  } else {
+    toast.add({ title: 'Eroare la stergere', description: error.value ?? '', color: 'error' })
+  }
+}
+
+// ─── Delete ───
+const showDeleteConfirm = ref(false)
+const deletingEntity = ref<AdminEntity | null>(null)
+
+function confirmDelete(entity: AdminEntity) {
+  if (entity.is_system) {
+    toast.add({ title: 'Nu se poate sterge o entitate system', color: 'warning' })
+    return
+  }
+  deletingEntity.value = entity
+  showDeleteConfirm.value = true
+}
+
+async function onConfirmDelete() {
+  if (!deletingEntity.value) return
+
+  const success = await deleteEntity(deletingEntity.value.id_entity)
+  if (success) {
+    toast.add({ title: 'Entitate stearsa', color: 'success' })
+  } else {
+    toast.add({ title: 'Eroare la stergere', description: error.value ?? '', color: 'error' })
+  }
+
+  showDeleteConfirm.value = false
+  deletingEntity.value = null
+}
+
+// ─── Navigate to detail ───
+function goToDetail(entity: AdminEntity) {
+  navigateTo(`/builder/entities/${entity.id_entity}`)
+}
+
+// ─── Table ───
+const columns: TableColumn<AdminEntity>[] = [
+  { id: 'drag', meta: { class: { th: 'w-8', td: 'w-8' } } },
+  {
+    id: 'select',
+    meta: { class: { th: 'w-4', td: 'w-4' } },
+    header: ({ table }) => h(UCheckbox, {
+      'modelValue': table.getIsSomePageRowsSelected()
+        ? 'indeterminate'
+        : table.getIsAllPageRowsSelected(),
+      'onUpdate:modelValue': (value: boolean | 'indeterminate') =>
+        table.toggleAllPageRowsSelected(!!value),
+      'ariaLabel': 'Selecteaza tot'
+    }),
+    cell: ({ row }) => h(UCheckbox, {
+      'modelValue': row.getIsSelected(),
+      'onUpdate:modelValue': (value: boolean | 'indeterminate') =>
+        row.toggleSelected(!!value),
+      'ariaLabel': 'Selecteaza rand'
+    })
+  },
+  { id: 'edit', meta: { class: { th: 'w-10', td: 'w-10' } } },
+  { id: 'open', meta: { class: { th: 'w-10', td: 'w-10' } } },
+  { accessorKey: 'name', header: 'Nume' },
+  { accessorKey: 'slug', header: 'Slug' },
+  { accessorKey: 'table_name', header: 'Tabela' },
+  { id: 'module', header: 'Modul' },
+  { accessorKey: 'is_system', header: 'System' },
+  { accessorKey: 'rank', header: 'Ordine' },
+  { id: 'actions', header: '' }
+]
+
+function getModuleName(moduleId: string | null): string {
+  if (!moduleId) return '-'
+  const mod = modules.value.find(m => m.id_module === moduleId)
+  return mod?.name ?? '-'
+}
+
+function getDropdownItems(entity: AdminEntity) {
+  return [[{
+    label: 'Deschide',
+    icon: 'i-lucide-external-link',
+    onClick: () => goToDetail(entity)
+  }, {
+    label: 'Editeaza',
+    icon: 'i-lucide-pencil',
+    onClick: () => openEdit(entity)
+  }], [{
+    label: 'Sterge',
+    icon: 'i-lucide-trash-2',
+    color: 'error' as const,
+    disabled: entity.is_system,
+    onClick: () => confirmDelete(entity)
+  }]]
+}
+</script>
+
+<template>
+  <div>
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="text-lg font-semibold">
+          Entitati
+        </h2>
+        <p class="text-sm text-muted">
+          Gestioneaza entitatile si campurile lor
+        </p>
+      </div>
+      <div class="flex items-center gap-3">
+        <USelect
+          v-model="selectedModuleId"
+          :items="moduleFilterOptions"
+          value-key="value"
+          class="w-48"
+        />
+        <UButton
+          v-if="selectedCount > 0"
+          label="Sterge"
+          color="error"
+          variant="subtle"
+          icon="i-lucide-trash"
+          @click="bulkDelete"
+        >
+          <template #trailing>
+            <UKbd>{{ selectedCount }}</UKbd>
+          </template>
+        </UButton>
+        <UButton
+          label="Adauga entitate"
+          icon="i-lucide-plus"
+          @click="openCreate"
+        />
+      </div>
+    </div>
+
+    <p v-if="!canReorder" class="mb-2 text-xs text-muted">
+      Selecteaza un modul pentru a reordona entitatile prin drag & drop.
+    </p>
+    <div
+      ref="entitiesTableRoot"
+      data-rank-group="entities"
+      :data-rank-disabled="!canReorder || savingRank || loading"
+    >
+      <UTable
+        ref="table"
+        v-model:row-selection="rowSelection"
+        row-key="id_entity"
+        :data="entities"
+        :columns="columns"
+        :loading="loading"
+        class="w-full"
+      >
+        <template #drag-cell>
+          <UButton
+            :class="canReorder ? 'rank-drag-handle cursor-grab active:cursor-grabbing' : 'cursor-not-allowed opacity-35'"
+            icon="i-lucide-grip-vertical"
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            :aria-label="canReorder ? 'Muta entitatea' : 'Selecteaza un modul pentru reordonare'"
+          />
+        </template>
+        <!-- Butonul Edit -->
+        <template #edit-cell="{ row }">
+          <UButton
+            icon="i-lucide-pencil"
+            label="Edit"
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            @click="openEdit(row.original)"
+          />
+        </template>
+
+        <!-- Butonul Deschide -->
+        <template #open-cell="{ row }">
+          <UButton
+            icon="i-lucide-external-link"
+            label="Deschide"
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            @click="goToDetail(row.original)"
+          />
+        </template>
+
+        <template #module-cell="{ row }">
+          <span>{{ getModuleName(row.original.id_module) }}</span>
+        </template>
+
+        <template #is_system-cell="{ row }">
+          <UBadge
+            v-if="row.original.is_system"
+            label="System"
+            color="warning"
+            variant="subtle"
+            size="sm"
+          />
+        </template>
+
+        <template #actions-cell="{ row }">
+          <UDropdownMenu :items="getDropdownItems(row.original)">
+            <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" />
+          </UDropdownMenu>
+        </template>
+      </UTable>
+    </div>
+
+    <div v-if="!loading && entities.length === 0" class="py-12">
+      <UEmpty
+        icon="i-lucide-database"
+        title="Nicio entitate"
+        description="Creeaza prima entitate pentru a incepe."
+      >
+        <template #actions>
+          <UButton label="Adauga entitate" icon="i-lucide-plus" @click="openCreate" />
+        </template>
+      </UEmpty>
+    </div>
+
+    <!-- Create/Edit Modal -->
+    <UModal
+      v-model:open="showModal"
+      :title="editingEntity ? 'Editeaza entitate' : 'Entitate noua'"
+    >
+      <template #body>
+        <AdminEntityForm
+          :entity="editingEntity"
+          :modules="modules"
+          @saved="onSaved"
+          @cancel="showModal = false"
+        />
+      </template>
+    </UModal>
+
+    <!-- Delete Confirm Modal -->
+    <UModal
+      v-model:open="showDeleteConfirm"
+      title="Confirmare stergere"
+      description="Aceasta actiune va sterge tabela SQL asociata si toate datele din ea."
+    >
+      <template #body>
+        <p>
+          Esti sigur ca vrei sa stergi entitatea
+          <strong>{{ deletingEntity?.name }}</strong>?
+        </p>
+        <div class="flex items-center gap-3 justify-end mt-4">
+          <UButton
+            label="Anuleaza"
+            color="neutral"
+            variant="outline"
+            @click="showDeleteConfirm = false"
+          />
+          <UButton
+            label="Sterge"
+            color="error"
+            icon="i-lucide-trash-2"
+            :loading="loading"
+            @click="onConfirmDelete"
+          />
+        </div>
+      </template>
+    </UModal>
+  </div>
+</template>

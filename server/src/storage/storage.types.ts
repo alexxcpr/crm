@@ -32,6 +32,8 @@ export interface StorageProvider {
     objectKey: string;
     downloadName: string;
     expiresInSeconds: number;
+    contentType?: string;
+    disposition?: 'attachment' | 'inline';
   }): Promise<string>;
   headObject(
     bucket: string,

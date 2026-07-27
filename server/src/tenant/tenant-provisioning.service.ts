@@ -162,6 +162,13 @@ export class TenantProvisioningService {
         input.adminPassword,
         input.adminName,
       );
+      await this.syncPlatformOwnerAccount(
+        dbName,
+      );
+      await this.initializeTenantConfiguration(
+        dbName,
+        registry.companyName,
+      );
       await this.markTenantProvisioned(registry);
     } catch (error) {
       await this.markTenantProvisioningFailed(
@@ -281,7 +288,10 @@ export class TenantProvisioningService {
           .whereRaw('LOWER(email) = ?', [
             adminEmail,
           ])
-          .where({ is_active: true })
+          .where({
+            is_active: true,
+            access_level: 'tenant_admin',
+          })
           .first();
         if (!profile)
           throw this.invalidAdminCredentialsRequest();
@@ -814,8 +824,307 @@ export class TenantProvisioningService {
             display_name:
               this.optionalString(adminName) ||
               'Admin',
+            access_level: 'tenant_admin',
           });
       });
+    } finally {
+      await tenantDb.destroy();
+    }
+  }
+
+  async syncPlatformOwnerAccount(
+    dbName: string,
+    options: { dryRun?: boolean } = {},
+  ): Promise<{
+    status: 'created' | 'updated' | 'missing_config';
+    ownerExists: boolean;
+    activeTenantAdmins: number;
+  }> {
+    const credentials =
+      this.platformOwnerCredentials();
+    if (!credentials) {
+      if (
+        this.config.get<string>('NODE_ENV') ===
+        'production'
+      ) {
+        throw new BadRequestException(
+          'Credentialele Platform Owner nu sunt configurate.',
+        );
+      }
+      this.logger.warn(
+        'Platform Owner nu a fost creat: configureaza PLATFORM_OWNER_LOGIN_USERNAME, PLATFORM_OWNER_EMAIL si PLATFORM_OWNER_PASSWORD.',
+      );
+      return {
+        status: 'missing_config',
+        ownerExists: false,
+        activeTenantAdmins: -1,
+      };
+    }
+
+    const tenantDb =
+      this.createTenantConnection(dbName);
+    try {
+      const ownerProfiles = await tenantDb(
+        'profile',
+      )
+        .where(
+          'access_level',
+          'platform_owner',
+        )
+        .select('*');
+      if (ownerProfiles.length > 1) {
+        throw new ConflictException(
+          'Tenantul are mai multe profiluri Platform Owner.',
+        );
+      }
+      const existingProfile =
+        ownerProfiles[0] ?? null;
+      const existingUser = existingProfile
+        ? await tenantDb('user')
+            .where(
+              'id',
+              existingProfile.id_user,
+            )
+            .first()
+        : null;
+      if (existingProfile && !existingUser) {
+        throw new ConflictException(
+          'Profilul Platform Owner nu are un cont local valid.',
+        );
+      }
+      if (
+        existingUser &&
+        (await tenantDb('profile')
+          .where('id_user', existingUser.id)
+          .whereNot(
+            'id_profile',
+            existingProfile.id_profile,
+          )
+          .first())
+      ) {
+        throw new ConflictException(
+          'Contul Platform Owner are profiluri suplimentare si trebuie corectat manual.',
+        );
+      }
+      const [{ count: tenantAdminCount }] =
+        await tenantDb('profile')
+          .where({
+            access_level: 'tenant_admin',
+            is_active: true,
+          })
+          .count('* as count');
+      const activeTenantAdmins = Number(
+        tenantAdminCount,
+      );
+      const userByLogin = await tenantDb('user')
+        .whereRaw('LOWER(login_username) = ?', [
+          credentials.loginUsername,
+        ])
+        .first();
+      const profileByEmail = await tenantDb(
+        'profile',
+      )
+        .whereRaw('LOWER(email) = ?', [
+          credentials.email,
+        ])
+        .first();
+      const profileByUsername = await tenantDb(
+        'profile',
+      )
+        .whereRaw('LOWER(username) = ?', [
+          credentials.loginUsername,
+        ])
+        .first();
+
+      if (
+        (userByLogin &&
+          userByLogin.id !== existingUser?.id) ||
+        (profileByEmail &&
+          profileByEmail.id_profile !==
+            existingProfile?.id_profile) ||
+        (profileByUsername &&
+          profileByUsername.id_profile !==
+            existingProfile?.id_profile)
+      ) {
+        throw new ConflictException(
+          'Credentialele Platform Owner intra in conflict cu un cont obisnuit.',
+        );
+      }
+
+      if (options.dryRun) {
+        return {
+          status: existingProfile
+            ? 'updated'
+            : 'created',
+          ownerExists: Boolean(
+            existingProfile,
+          ),
+          activeTenantAdmins,
+        };
+      }
+
+      const hash = await argon.hash(
+        credentials.password,
+      );
+      const status = existingProfile
+        ? 'updated'
+        : 'created';
+      await tenantDb.transaction(async (trx) => {
+        let userId = existingUser?.id;
+        let profileId =
+          existingProfile?.id_profile;
+
+        if (!existingProfile) {
+          const [createdUser] = await trx(
+            'user',
+          )
+            .insert({
+              login_username:
+                credentials.loginUsername,
+              hash,
+              must_change_password: false,
+              is_active: true,
+            })
+            .returning('id');
+          userId = createdUser.id;
+
+          const [createdProfile] = await trx(
+            'profile',
+          )
+            .insert({
+              id_user: userId,
+              username:
+                credentials.loginUsername,
+              email: credentials.email,
+              display_name:
+                credentials.displayName,
+              access_level: 'platform_owner',
+              is_default: true,
+              is_active: true,
+            })
+            .returning('id_profile');
+          profileId =
+            createdProfile.id_profile;
+        } else if (existingUser) {
+          await trx('user')
+            .where('id', existingUser.id)
+            .update({
+              login_username:
+                credentials.loginUsername,
+              hash,
+              must_change_password: false,
+              is_active: true,
+              date_updated: trx.fn.now(),
+            });
+          await trx('profile')
+            .where(
+              'id_profile',
+              existingProfile.id_profile,
+            )
+            .update({
+              username:
+                credentials.loginUsername,
+              email: credentials.email,
+              display_name:
+                credentials.displayName,
+              access_level: 'platform_owner',
+              is_default: true,
+              is_active: true,
+              date_updated: trx.fn.now(),
+            });
+          await trx('refresh_token')
+            .where('user_id', existingUser.id)
+            .update({ is_revoked: true });
+        }
+
+        await trx('profile_role')
+          .where('id_profile', profileId)
+          .del();
+        await trx('tenant_audit_log').insert({
+          id_actor_profile: null,
+          action:
+            status === 'created'
+              ? 'platform_owner.created'
+              : 'platform_owner.synchronized',
+          target_type: 'profile',
+          target_id: profileId,
+          after_value: {
+            accessLevel: 'platform_owner',
+            isActive: true,
+          },
+        });
+      });
+
+      return {
+        status,
+        ownerExists: true,
+        activeTenantAdmins,
+      };
+    } finally {
+      await tenantDb.destroy();
+    }
+  }
+
+  private platformOwnerCredentials(): {
+    loginUsername: string;
+    email: string;
+    password: string;
+    displayName: string;
+  } | null {
+    const loginUsername = this.optionalString(
+      this.config.get<string>(
+        'PLATFORM_OWNER_LOGIN_USERNAME',
+      ),
+    )?.toLowerCase();
+    const email = this.optionalString(
+      this.config.get<string>(
+        'PLATFORM_OWNER_EMAIL',
+      ),
+    )?.toLowerCase();
+    const password = this.optionalString(
+      this.config.get<string>(
+        'PLATFORM_OWNER_PASSWORD',
+      ),
+    );
+    if (!loginUsername || !email || !password)
+      return null;
+    if (password.length < 12) {
+      throw new BadRequestException(
+        'PLATFORM_OWNER_PASSWORD trebuie sa aiba minimum 12 caractere.',
+      );
+    }
+    return {
+      loginUsername,
+      email,
+      password,
+      displayName:
+        this.optionalString(
+          this.config.get<string>(
+            'PLATFORM_OWNER_DISPLAY_NAME',
+          ),
+        ) || 'Moduvis Platform Owner',
+    };
+  }
+
+  private async initializeTenantConfiguration(
+    dbName: string,
+    organizationName: string | null,
+  ): Promise<void> {
+    const tenantDb =
+      this.createTenantConnection(dbName);
+    try {
+      await tenantDb('tenant_configuration')
+        .insert({
+          id_configuration: 1,
+          organization_name:
+            organizationName || null,
+        })
+        .onConflict('id_configuration')
+        .merge({
+          organization_name:
+            organizationName || null,
+          date_updated: tenantDb.fn.now(),
+        });
     } finally {
       await tenantDb.destroy();
     }

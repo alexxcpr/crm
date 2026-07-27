@@ -5,6 +5,9 @@ import {
 } from '@nestjs/throttler';
 import { AuthorizationService } from './authorization.service';
 import { PublicRateLimitGuard } from './public-rate-limit.guard';
+import { AccessControlService } from './access-control.service';
+import { CapabilityGuard } from './capability.guard';
+import { TenantAuditService } from './tenant-audit.service';
 
 @Global()
 @Module({
@@ -24,10 +27,16 @@ import { PublicRateLimitGuard } from './public-rate-limit.guard';
   ],
   providers: [
     AuthorizationService,
+    AccessControlService,
+    CapabilityGuard,
+    TenantAuditService,
     PublicRateLimitGuard,
   ],
   exports: [
     AuthorizationService,
+    AccessControlService,
+    CapabilityGuard,
+    TenantAuditService,
     PublicRateLimitGuard,
   ],
 })

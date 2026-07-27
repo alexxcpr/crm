@@ -5,12 +5,17 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Request } from 'express';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { JwtPayload } from 'src/types/entities';
+import { AccessControlService } from 'src/security/access-control.service';
 
 const cookieExtractor = (req: Request): string | null => req.cookies?.['auth.token'] ?? null;
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
-  constructor(config: ConfigService, private readonly tenantContext: TenantContext) {
+  constructor(
+    config: ConfigService,
+    private readonly tenantContext: TenantContext,
+    private readonly access: AccessControlService,
+  ) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([cookieExtractor, ExtractJwt.fromAuthHeaderAsBearerToken()]),
       ignoreExpiration: false,
@@ -27,13 +32,25 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     const roles = await knex('profile_role')
       .join('role', 'profile_role.id_role', 'role.id_role')
       .where('profile_role.id_profile', profile.id_profile)
+      .whereNotIn('role.slug', [
+        'admin',
+        'platform_owner',
+        'tenant_admin',
+      ])
       .select('role.slug');
+    const accessLevel =
+      this.access.normalizeAccessLevel(
+        profile.access_level,
+      );
     const { hash: _, ...safeUser } = user;
     return {
       ...safeUser,
       profile,
       profileId: profile.id_profile,
       roles: roles.map((row: { slug: string }) => row.slug),
+      accessLevel,
+      globalCapabilities:
+        this.access.capabilitiesFor(accessLevel),
       tenant: payload.tenant,
       dbName: payload.dbName,
     };

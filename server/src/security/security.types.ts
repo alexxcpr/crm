@@ -1,3 +1,8 @@
+import type {
+  AccessLevel,
+  GlobalCapability,
+} from './access-control.types';
+
 export type PermissionAction = 'read' | 'create' | 'update' | 'delete' | 'manage' | 'change_ownership';
 export type PermissionScope = 'all' | 'owner';
 
@@ -7,6 +12,7 @@ export interface RequestProfile {
   username: string;
   email: string;
   display_name: string | null;
+  access_level: AccessLevel;
   is_default: boolean;
   is_active: boolean;
 }
@@ -19,6 +25,8 @@ export interface AuthenticatedUser {
   profile: RequestProfile;
   profileId: string;
   roles: string[];
+  accessLevel: AccessLevel;
+  globalCapabilities: GlobalCapability[];
   tenant: string;
   dbName: string;
 }

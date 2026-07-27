@@ -237,6 +237,7 @@ model Profile {
   username String @unique @db.VarChar(100)
   email String @unique
   display_name String? @db.VarChar(200)
+  access_level String @default("user") @db.VarChar(30)
   is_default Boolean @default(false)
   is_active Boolean @default(true)
   date_created DateTime @default(now())
@@ -245,7 +246,43 @@ model Profile {
   roles ProfileRole[]
   refreshTokens RefreshToken[]
   notifications Notification[]
+  configuration_updates TenantConfiguration[] @relation("TenantConfigurationUpdater")
+  audit_events TenantAuditLog[] @relation("TenantAuditActor")
+  @@index([access_level, is_active])
   @@map("profile")
+}
+
+model TenantConfiguration {
+  id_configuration Int @id @default(1) @db.SmallInt
+  organization_name String? @db.VarChar(100)
+  logo_file_id String?
+  primary_color String @default("violet") @db.VarChar(30)
+  locale String @default("ro-RO") @db.VarChar(35)
+  timezone String @default("Europe/Bucharest") @db.VarChar(100)
+  date_format String @default("dd.MM.yyyy") @db.VarChar(30)
+  default_currency String @default("RON") @db.VarChar(3)
+  updated_by_profile String?
+  date_created DateTime @default(now())
+  date_updated DateTime @updatedAt
+
+  updater Profile? @relation("TenantConfigurationUpdater", fields: [updated_by_profile], references: [id_profile], onDelete: SetNull)
+
+  @@map("tenant_configuration")
+}
+
+model TenantAuditLog {
+  id_audit String @id @default(uuid())
+  id_actor_profile String?
+  action String @db.VarChar(100)
+  target_type String @db.VarChar(100)
+  target_id String? @db.VarChar(255)
+  before_value Json?
+  after_value Json?
+  date_created DateTime @default(now())
+
+  actor Profile? @relation("TenantAuditActor", fields: [id_actor_profile], references: [id_profile], onDelete: SetNull)
+
+  @@map("tenant_audit_log")
 }
 
 model Notification {

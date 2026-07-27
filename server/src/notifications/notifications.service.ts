@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { AuthorizationService } from 'src/security/authorization.service';
+import { AccessControlService } from 'src/security/access-control.service';
 import { AuthenticatedUser } from 'src/security/security.types';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { CreateWorkflowNotificationDto, ListNotificationsQueryDto } from './dto';
@@ -13,6 +14,7 @@ export class NotificationsService {
   constructor(
     private readonly tenantContext: TenantContext,
     private readonly authorization: AuthorizationService,
+    private readonly access: AccessControlService,
   ) {}
 
   private get knex() {
@@ -192,7 +194,16 @@ export class NotificationsService {
     const roles = await this.knex('profile_role')
       .join('role', 'profile_role.id_role', 'role.id_role')
       .where('profile_role.id_profile', profileId)
+      .whereNotIn('role.slug', [
+        'admin',
+        'platform_owner',
+        'tenant_admin',
+      ])
       .select('role.slug');
+    const accessLevel =
+      this.access.normalizeAccessLevel(
+        row.access_level,
+      );
 
     return {
       id: row.id,
@@ -205,11 +216,15 @@ export class NotificationsService {
         username: row.username,
         email: row.email,
         display_name: row.display_name,
+        access_level: accessLevel,
         is_default: row.is_default,
         is_active: row.is_active,
       },
       profileId: row.id_profile,
       roles: roles.map((role: { slug: string }) => role.slug),
+      accessLevel,
+      globalCapabilities:
+        this.access.capabilitiesFor(accessLevel),
       tenant: this.tenantContext.slug,
       dbName: this.tenantContext.dbName,
     };

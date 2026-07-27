@@ -25,6 +25,12 @@ describe('TenantProvisioningService', () => {
       ensureDatabase: jest.spyOn(serviceAny, 'ensureDatabase').mockResolvedValue(undefined),
       runTenantMigrations: jest.spyOn(serviceAny, 'runTenantMigrations').mockResolvedValue(undefined),
       seedAdminUser: jest.spyOn(serviceAny, 'seedAdminUser').mockResolvedValue(undefined),
+      syncPlatformOwnerAccount: jest.spyOn(serviceAny, 'syncPlatformOwnerAccount').mockResolvedValue({
+        status: 'created',
+        ownerExists: true,
+        activeTenantAdmins: 1,
+      }),
+      initializeTenantConfiguration: jest.spyOn(serviceAny, 'initializeTenantConfiguration').mockResolvedValue(undefined),
       markTenantProvisioned: jest.spyOn(serviceAny, 'markTenantProvisioned').mockResolvedValue(undefined),
       markTenantProvisioningFailed: jest.spyOn(serviceAny, 'markTenantProvisioningFailed').mockResolvedValue(undefined),
     };
@@ -55,6 +61,8 @@ describe('TenantProvisioningService', () => {
     expect(spies.ensureDatabase).toHaveBeenCalledWith('acme');
     expect(spies.runTenantMigrations).toHaveBeenCalledWith('acme');
     expect(spies.seedAdminUser).toHaveBeenCalledWith('acme', 'ion@acme.ro', undefined, 'Ion Popescu');
+    expect(spies.syncPlatformOwnerAccount).toHaveBeenCalledWith('acme');
+    expect(spies.initializeTenantConfiguration).toHaveBeenCalledWith('acme', 'Acme SRL');
     expect(spies.markTenantProvisioned).toHaveBeenCalled();
     expect(spies.markTenantProvisioningFailed).not.toHaveBeenCalled();
   });

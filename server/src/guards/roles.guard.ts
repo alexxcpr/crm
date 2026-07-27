@@ -30,11 +30,6 @@ import {
         throw new ForbiddenException('Parola temporara trebuie schimbata inainte de a continua.');
       }
   
-      // "admin" cu permisiune "manage" are acces la orice
-      if (user.roles.includes('admin')) {
-        return true;
-      }
-  
       const hasRole = requiredRoles.some((role) => user.roles.includes(role));
       if (!hasRole) {
         throw new ForbiddenException('Acces interzis. Rol insuficient.');

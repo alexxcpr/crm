@@ -355,6 +355,13 @@ export class StorageJobsService {
         await db('stored_file')
           .where({ status: 'active' })
           .whereNull('record_id')
+          .whereNotExists(function excludeActiveOrganizationLogo() {
+            this.select(db.raw('1'))
+              .from('tenant_configuration')
+              .whereRaw(
+                'tenant_configuration.logo_file_id = stored_file.id_file',
+              );
+          })
           .where('date_updated', '<=', cutoff)
           .update({
             status: 'deleting',

@@ -11,8 +11,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { Roles } from 'src/guards/roles.decorator';
-import { RolesGuard } from 'src/guards/roles.guard';
+import { CapabilityGuard } from 'src/security/capability.guard';
+import { RequireCapability } from 'src/security/require-capability.decorator';
 import {
   CreateSmtpIntegrationDto,
   DeleteIntegrationDto,
@@ -24,8 +24,8 @@ import { SmtpMailService } from './smtp-mail.service';
 import type { AuthenticatedUser } from 'src/security/security.types';
 
 @Controller('v1/admin/integrations')
-@UseGuards(AuthGuard('jwt'), RolesGuard)
-@Roles('admin')
+@UseGuards(AuthGuard('jwt'), CapabilityGuard)
+@RequireCapability('tenant.manage')
 export class AdminIntegrationsController {
   constructor(
     private readonly integrations: IntegrationsService,

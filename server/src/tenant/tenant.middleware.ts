@@ -107,6 +107,7 @@ export class TenantMiddleware implements NestMiddleware {
     return path.startsWith('/auth/')
       || path === '/user/me'
       || path.startsWith('/v1/admin/billing')
+      || path.startsWith('/v1/public/tenant-branding')
       || path === '/health';
   }
 }

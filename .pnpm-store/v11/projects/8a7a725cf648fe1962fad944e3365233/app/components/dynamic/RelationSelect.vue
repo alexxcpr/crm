@@ -1,0 +1,177 @@
+<script setup lang="ts">
+import type { Field } from '~/types/schema'
+import { INLINE_CREATE_DEPTH_KEY, MAX_INLINE_CREATE_DEPTH } from '~/utils/inlineCreate'
+
+const props = defineProps<{
+  field: Field
+  modelValue: string | null | undefined
+  disabled?: boolean
+}>()
+
+const emit = defineEmits<{
+  'update:modelValue': [value: string | null]
+}>()
+
+// ─── Inline-create ───
+const inlineCreateDepth = inject(INLINE_CREATE_DEPTH_KEY, 0)
+const entitySlug = computed(() => props.field.relation_entity_slug)
+const selectedRecordId = computed(() => props.modelValue ? String(props.modelValue) : '')
+const showInlineCreate = computed(() =>
+  inlineCreateDepth <= MAX_INLINE_CREATE_DEPTH
+  && !!entitySlug.value
+  && !props.disabled
+  && !selectedRecordId.value
+)
+const inlineCreateOpen = ref(false)
+// entitySlug garantat non-null când showInlineCreate e true (verificat de v-if)
+const inlineCreateEntitySlug = computed(() => entitySlug.value!)
+const inlineEditOpen = ref(false)
+const showInlineEdit = computed(() =>
+  inlineCreateDepth <= MAX_INLINE_CREATE_DEPTH
+  && !!entitySlug.value
+  && !!selectedRecordId.value
+)
+
+const {
+  getRelationOptions,
+  getRelationOptionLabel,
+  isRelationOptionsLoading,
+  shouldRefreshRelationOptions,
+  refreshRelationOptions,
+  upsertRelationOption
+} = useRelationOptionsCache()
+
+const searchQuery = ref('')
+const open = ref(false)
+
+watch(open, (isOpen) => {
+  if (!isOpen) return
+  if (shouldRefreshRelationOptions(props.field, searchQuery.value)) {
+    refreshOptions(searchQuery.value, items.value.length > 0)
+  }
+})
+
+const items = computed(() => getRelationOptions(props.field, searchQuery.value))
+const loading = computed(() => isRelationOptionsLoading(props.field, searchQuery.value))
+const displayItems = computed(() => {
+  const currentItems = items.value
+  const selectedValue = props.modelValue ? String(props.modelValue) : ''
+  if (!selectedValue || currentItems.some(item => item.value === selectedValue)) {
+    return currentItems
+  }
+
+  const selectedLabel = getRelationOptionLabel(props.field, selectedValue)
+  if (!selectedLabel) return currentItems
+
+  return [
+    { label: selectedLabel, value: selectedValue },
+    ...currentItems
+  ]
+})
+
+function onInlineCreated(record: Record<string, unknown>) {
+  if (!record.id) return
+  upsertRelationOption(props.field, record)
+  searchQuery.value = ''
+  emit('update:modelValue', String(record.id))
+}
+
+function onInlineSaved(record: Record<string, unknown>) {
+  upsertRelationOption(props.field, record)
+}
+
+function refreshOptions(search?: string, background = false) {
+  refreshRelationOptions(props.field, { search, background }).catch((err) => {
+    console.error('[RelationSelect] Eroare la incarcarea optiunilor:', err)
+  })
+}
+
+watch(() => props.modelValue, (newVal) => {
+  if (newVal && open.value && shouldRefreshRelationOptions(props.field, searchQuery.value)) {
+    refreshOptions(searchQuery.value, items.value.length > 0)
+  }
+}, { immediate: true })
+
+let debounceTimer: ReturnType<typeof setTimeout> | undefined
+function onSearch(query: string) {
+  searchQuery.value = query
+  if (debounceTimer) clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(() => {
+    if (shouldRefreshRelationOptions(props.field, query)) {
+      refreshOptions(query, getRelationOptions(props.field, query).length > 0)
+    }
+  }, 300)
+}
+
+onUnmounted(() => {
+  if (debounceTimer) clearTimeout(debounceTimer)
+})
+
+function onUpdate(val: string | string[] | undefined) {
+  const nextValue = Array.isArray(val) ? val[0] ?? null : val ?? null
+  const selectedItem = items.value.find(item => item.value === nextValue)
+  if (selectedItem) {
+    upsertRelationOption(props.field, selectedItem)
+  }
+  emit('update:modelValue', nextValue)
+}
+</script>
+
+<template>
+  <div class="w-full min-w-0">
+    <div class="flex items-center gap-1.5">
+      <USelectMenu
+        v-model:open="open"
+        :model-value="modelValue ?? undefined"
+        :items="displayItems"
+        value-key="value"
+        :loading="loading"
+        :placeholder="field.placeholder ?? `Selecteaza ${field.name.toLowerCase()}...`"
+        :search-input="{ placeholder: 'Cauta...' }"
+        :disabled="disabled"
+        class="flex-1 min-w-0"
+        :clear="!disabled"
+        @update:model-value="onUpdate"
+        @update:search-term="onSearch"
+      />
+      <UButton
+        v-if="showInlineEdit"
+        icon="i-lucide-arrow-up-right"
+        color="primary"
+        variant="soft"
+        size="sm"
+        class="shrink-0"
+        :title="`Deschide ${field.name.toLowerCase()}`"
+        @click="inlineEditOpen = true"
+      />
+      <UButton
+        v-if="showInlineCreate"
+        icon="i-lucide-plus"
+        color="primary"
+        variant="outline"
+        size="sm"
+        class="shrink-0"
+        :title="`Crează ${field.name.toLowerCase()}`"
+        @click="inlineCreateOpen = true"
+      />
+    </div>
+
+    <DynamicInlineCreateModal
+      v-if="showInlineCreate"
+      v-model:open="inlineCreateOpen"
+      :entity-slug="inlineCreateEntitySlug"
+      :entity-label="field.name"
+      @created="onInlineCreated"
+    />
+
+    <DynamicInlineEditModal
+      v-if="showInlineEdit && entitySlug"
+      :key="selectedRecordId"
+      v-model:open="inlineEditOpen"
+      :entity-slug="entitySlug"
+      :entity-label="field.name"
+      :record-id="selectedRecordId"
+      @saved="onInlineSaved"
+    />
+  </div>
+</template>

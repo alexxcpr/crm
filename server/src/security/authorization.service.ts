@@ -2,10 +2,14 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { Knex } from 'knex';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { AuthenticatedUser, PermissionAction, PermissionScope } from './security.types';
+import { AccessControlService } from './access-control.service';
 
 @Injectable()
 export class AuthorizationService {
-  constructor(private readonly tenantContext: TenantContext) {}
+  constructor(
+    private readonly tenantContext: TenantContext,
+    private readonly access: AccessControlService,
+  ) {}
 
   private get knex() { return this.tenantContext.knex; }
 
@@ -17,12 +21,23 @@ export class AuthorizationService {
 
   async getScope(user: AuthenticatedUser, entityId: string, action: PermissionAction): Promise<PermissionScope | null> {
     if (user.must_change_password) return null;
-    if (user.roles.includes('admin')) return 'all';
+    if (this.access.has(user, 'data.manage_all'))
+      return 'all';
     const actions = action === 'change_ownership' ? [action] : [action, 'manage'];
     const rows = await this.knex('profile_role')
       .join('role_permission', 'profile_role.id_role', 'role_permission.id_role')
+      .join(
+        'role',
+        'profile_role.id_role',
+        'role.id_role',
+      )
       .where('profile_role.id_profile', user.profileId)
       .where('role_permission.id_entity', entityId)
+      .whereNotIn('role.slug', [
+        'admin',
+        'platform_owner',
+        'tenant_admin',
+      ])
       .whereIn('role_permission.action', actions)
       .select('role_permission.scope', 'role_permission.action');
     if (!rows.length) return null;

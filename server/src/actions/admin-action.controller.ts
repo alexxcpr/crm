@@ -10,8 +10,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { Roles } from 'src/guards/roles.decorator';
-import { RolesGuard } from 'src/guards/roles.guard';
+import { CapabilityGuard } from 'src/security/capability.guard';
+import { RequireCapability } from 'src/security/require-capability.decorator';
 import { returnValidResponse } from 'src/utils/crud.utils';
 import { ActionService } from './action.service';
 import {
@@ -21,8 +21,8 @@ import {
 import { ReorderDto } from 'src/admin/dto/reorder.dto';
 
 @Controller('v1/admin/actions')
-@UseGuards(AuthGuard('jwt'), RolesGuard)
-@Roles('admin')
+@UseGuards(AuthGuard('jwt'), CapabilityGuard)
+@RequireCapability('builder.manage')
 export class AdminActionController {
   constructor(
     private readonly actionService: ActionService,

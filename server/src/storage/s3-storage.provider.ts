@@ -92,6 +92,8 @@ export class S3StorageProvider implements StorageProvider {
     objectKey: string;
     downloadName: string;
     expiresInSeconds: number;
+    contentType?: string;
+    disposition?: 'attachment' | 'inline';
   }): Promise<string> {
     this.ensureConfigured();
     const safeName = input.downloadName.replace(
@@ -103,8 +105,9 @@ export class S3StorageProvider implements StorageProvider {
       new GetObjectCommand({
         Bucket: input.bucket,
         Key: input.objectKey,
-        ResponseContentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(safeName)}`,
+        ResponseContentDisposition: `${input.disposition ?? 'attachment'}; filename*=UTF-8''${encodeURIComponent(safeName)}`,
         ResponseContentType:
+          input.contentType ??
           'application/octet-stream',
       }),
       { expiresIn: input.expiresInSeconds },
