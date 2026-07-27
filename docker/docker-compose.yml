@@ -153,12 +153,17 @@ services:
   provisioning:
     build:
       context: ../../Moduvis-Provisioning
+      args:
+        NUXT_PUBLIC_SITE_URL: https://provisioning.${DOMAIN_BASE}
+        NUXT_PUBLIC_APP_DOMAIN_BASE: ${DOMAIN_BASE}
+        NUXT_PUBLIC_MARKETING_SITE_URL: https://moduvis.${DOMAIN_BASE}
     container_name: moduvis-provisioning
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      NUXT_PUBLIC_SITE_URL: http://moduvis.${DOMAIN_BASE}
+      NUXT_PUBLIC_SITE_URL: https://provisioning.${DOMAIN_BASE}
       NUXT_PUBLIC_APP_DOMAIN_BASE: ${DOMAIN_BASE}
+      NUXT_PUBLIC_MARKETING_SITE_URL: https://moduvis.${DOMAIN_BASE}
       NUXT_STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       NUXT_STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
       NUXT_STRIPE_BASE_PRICE_ID: ${STRIPE_BASE_PRICE_ID}
@@ -178,16 +183,38 @@ services:
       - traefik.enable=true
       - traefik.docker.network=moduvis-web
       - traefik.http.routers.moduvis-provisioning.rule=Host(`provisioning.${DOMAIN_BASE}`)
-      - traefik.http.routers.moduvis-provisioning.entrypoints=${TRAEFIK_ENTRYPOINTS:-web}
+      - traefik.http.routers.moduvis-provisioning.entrypoints=${TRAEFIK_ENTRYPOINTS:-websecure}
       - traefik.http.routers.moduvis-provisioning.priority=300
-      - traefik.http.routers.moduvis-provisioning.tls=${TRAEFIK_TLS:-false}
-      - traefik.http.routers.moduvis-provisioning.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-}
-      - traefik.http.routers.moduvis-provisioning.middlewares=${TRAEFIK_HTTPS_REDIRECT:-} 
+      - traefik.http.routers.moduvis-provisioning.tls=${TRAEFIK_TLS:-true}
+      - traefik.http.routers.moduvis-provisioning.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-cloudflare}
       - traefik.http.services.moduvis-provisioning.loadbalancer.server.port=3000
       - traefik.http.services.moduvis-provisioning.loadbalancer.healthcheck.path=/
     networks:
       - web
       - internal
+
+  presentation:
+    build:
+      context: ../../Moduvis-Prezentare
+      args:
+        NUXT_PUBLIC_SITE_URL: https://moduvis.${DOMAIN_BASE}
+        NUXT_PUBLIC_PROVISIONING_URL: https://provisioning.${DOMAIN_BASE}
+        NUXT_PUBLIC_CONTACT_ENDPOINT: ${MARKETING_CONTACT_ENDPOINT:-}
+        NUXT_PUBLIC_CONTACT_EMAIL: ${MARKETING_CONTACT_EMAIL:-alexciprian1501@gmail.com}
+    container_name: moduvis-presentation
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=moduvis-web
+      - traefik.http.routers.moduvis-presentation.rule=Host(`moduvis.${DOMAIN_BASE}`)
+      - traefik.http.routers.moduvis-presentation.entrypoints=${TRAEFIK_ENTRYPOINTS:-websecure}
+      - traefik.http.routers.moduvis-presentation.priority=300
+      - traefik.http.routers.moduvis-presentation.tls=${TRAEFIK_TLS:-true}
+      - traefik.http.routers.moduvis-presentation.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-cloudflare}
+      - traefik.http.services.moduvis-presentation.loadbalancer.server.port=80
+      - traefik.http.services.moduvis-presentation.loadbalancer.healthcheck.path=/
+    networks:
+      - web
 
 networks:
   web:
