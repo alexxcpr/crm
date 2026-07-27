@@ -177,7 +177,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=moduvis-web
-      - traefik.http.routers.moduvis-provisioning.rule=Host(`moduvis.${DOMAIN_BASE}`)
+      - traefik.http.routers.moduvis-provisioning.rule=Host(`provisioning.${DOMAIN_BASE}`)
       - traefik.http.routers.moduvis-provisioning.entrypoints=${TRAEFIK_ENTRYPOINTS:-web}
       - traefik.http.routers.moduvis-provisioning.priority=300
       - traefik.http.routers.moduvis-provisioning.tls=${TRAEFIK_TLS:-false}
