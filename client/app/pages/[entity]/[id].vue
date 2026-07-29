@@ -11,7 +11,11 @@ const { entity: entityMeta } = useEntitySchema(entitySlug)
 </script>
 
 <template>
-  <UDashboardPanel :id="`${entitySlug}-edit`" :ui="{ body: 'p-3 sm:p-3' }">
+  <UDashboardPanel
+    :id="`${entitySlug}-edit`"
+    class="min-w-0 overflow-x-hidden"
+    :ui="{ body: 'min-w-0 overflow-x-hidden p-3 sm:p-3' }"
+  >
     <template #header>
       <UDashboardNavbar
         :ui="{

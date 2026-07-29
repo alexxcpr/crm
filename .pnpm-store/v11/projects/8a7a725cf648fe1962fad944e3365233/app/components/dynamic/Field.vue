@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Field } from '~/types/schema'
+import type { RelatedRecordContext } from '~/composables/useFiles'
 import { CalendarDate, CalendarDateTime, parseDate, fromDate } from '@internationalized/date'
 import type { DateValue } from '@internationalized/date'
 
@@ -8,6 +9,7 @@ const props = defineProps<{
   modelValue: any
   autofocus?: boolean
   recordId?: string
+  relatedContext?: RelatedRecordContext
 }>()
 const { branding } = useTenantBranding()
 const fieldCurrency = computed(() =>
@@ -574,7 +576,7 @@ const applyDateTime = () => {
         v-else-if="field.ui_type === 'relation'"
         :field="field"
         :model-value="value"
-        :disabled="field.is_readonly"
+        :disabled="field.is_readonly || (field.relation_kind === 'composition' && !!recordId) || field.slug === relatedContext?.relationFieldSlug"
         @update:model-value="value = $event"
       />
 
@@ -583,6 +585,7 @@ const applyDateTime = () => {
         :field="field"
         :model-value="value"
         :record-id="recordId"
+        :related-context="relatedContext"
         :disabled="field.is_readonly"
         @update:model-value="value = $event"
       />

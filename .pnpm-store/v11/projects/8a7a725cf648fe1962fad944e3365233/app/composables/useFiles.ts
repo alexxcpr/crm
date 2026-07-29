@@ -16,12 +16,20 @@ interface UploadSession {
   expiresAt: string | null
 }
 
+export interface RelatedRecordContext {
+  parentSlug: string
+  parentId: string
+  collectionSlug: string
+  relationFieldSlug: string
+}
+
 export function useFiles() {
   const { apiFetch } = useApi()
 
   async function createUploadSession(input: {
     fieldId: string
     recordId?: string
+    relatedContext?: Omit<RelatedRecordContext, 'relationFieldSlug'>
     fileName: string
     mimeType: string
     sizeBytes: number

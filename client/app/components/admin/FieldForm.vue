@@ -68,6 +68,7 @@ const state = reactive({
   default_value: props.field?.default_value ?? '',
   options: props.field?.options ?? [] as { label: string, value: string }[],
   id_relation_entity: props.field?.id_relation_entity ?? '',
+  relation_kind: (props.field?.relation_kind ?? 'reference') as 'reference' | 'composition',
   relation_display_field: props.field?.relation_display_field ?? '',
   is_required: props.field?.is_required ?? false,
   is_unique: props.field?.is_unique ?? false,
@@ -150,10 +151,12 @@ const showNumericValidation = computed(() =>
 )
 
 const tabOptions = computed(() =>
-  props.tabs.map(t => ({
-    label: t.name,
-    value: t.id_ui_tab
-  }))
+  props.tabs
+    .filter(t => !t.content_type || t.content_type === 'fields')
+    .map(t => ({
+      label: t.name,
+      value: t.id_ui_tab
+    }))
 )
 
 // ─── Entity options for relation ───
@@ -194,6 +197,10 @@ async function fetchRelationEntityFields(entityId: string) {
 watch(() => state.id_relation_entity, (entityId) => {
   fetchRelationEntityFields(entityId ?? '')
 }, { immediate: true })
+
+watch(() => state.relation_kind, (relationKind) => {
+  if (relationKind === 'composition') state.is_required = true
+})
 
 watch(() => state.ui_type, (uiType) => {
   if (uiType !== 'file') return
@@ -312,6 +319,7 @@ async function onSubmit() {
         default_value: state.default_value || undefined,
         options: undefined,
         id_relation_entity: showRelationFields.value ? state.id_relation_entity || undefined : undefined,
+        relation_kind: showRelationFields.value ? state.relation_kind : undefined,
         relation_display_field: showRelationFields.value ? state.relation_display_field || undefined : undefined,
         is_required: state.is_required,
         is_unique: state.is_unique,
@@ -338,6 +346,7 @@ async function onSubmit() {
         default_value: state.default_value || undefined,
         options: undefined,
         id_relation_entity: showRelationFields.value ? state.id_relation_entity || undefined : undefined,
+        relation_kind: showRelationFields.value ? state.relation_kind : undefined,
         relation_display_field: showRelationFields.value ? state.relation_display_field || undefined : undefined,
         is_required: state.is_required,
         is_unique: state.is_unique,
@@ -519,9 +528,34 @@ async function onSubmit() {
           :items="entityOptions"
           value-key="value"
           placeholder="Selecteaza entitatea"
+          :disabled="isEdit"
           class="w-full"
         />
       </UFormField>
+
+      <UFormField
+        label="Semantica relatiei"
+        name="relation_kind"
+        description="Composition inseamna ca inregistrarea copil apartine ciclului de viata al parintelui."
+      >
+        <USelect
+          v-model="state.relation_kind"
+          :items="[
+            { label: 'Referinta independenta', value: 'reference' },
+            { label: 'Copil composition', value: 'composition' }
+          ]"
+          value-key="value"
+          class="w-full"
+        />
+      </UFormField>
+
+      <UAlert
+        v-if="props.field?.relation_kind === 'composition' && state.relation_kind === 'reference'"
+        color="warning"
+        variant="subtle"
+        title="Conversie la reference"
+        description="Conversia nu elimina automat NOT NULL. Debifeaza explicit Obligatoriu doar daca relatia trebuie sa accepte valori goale."
+      />
 
       <UFormField
         label="Camp de afisat"
@@ -551,7 +585,7 @@ async function onSubmit() {
 
       <div class="grid grid-cols-2 gap-x-6 gap-y-3">
         <UFormField label="Obligatoriu" name="is_required">
-          <USwitch v-model="state.is_required" />
+          <USwitch v-model="state.is_required" :disabled="showRelationFields && state.relation_kind === 'composition'" />
         </UFormField>
 
         <UFormField label="Unic" name="is_unique">

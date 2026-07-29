@@ -13,7 +13,7 @@ import {
   CreateActionDto,
   UpdateActionDto,
 } from './dto';
-import { AuthorizationService } from 'src/security/authorization.service';
+import { RecordAccessService } from 'src/security/record-access.service';
 import { AuthenticatedUser } from 'src/security/security.types';
 import type { RankedItemDto } from 'src/admin/dto/reorder.dto';
 import { reorderRanks } from 'src/admin/rank-reorder.util';
@@ -32,7 +32,7 @@ export class ActionService {
     private readonly tenantContext: TenantContext,
     private readonly workflowRuntime: WorkflowRuntimeService,
     private readonly workflowCompiler: WorkflowCompilerService,
-    private readonly authorization: AuthorizationService,
+    private readonly recordAccess: RecordAccessService,
   ) {}
 
   private get knex() {
@@ -77,9 +77,9 @@ export class ActionService {
         `Entitatea "${entitySlug}" nu exista.`,
       );
     }
-    await this.authorization.require(
+    await this.recordAccess.require(
       actor,
-      entity.id_entity,
+      entity,
       'update',
     );
 
@@ -358,13 +358,6 @@ export class ActionService {
         `Entitatea "${entitySlug}" nu exista.`,
       );
     }
-    const scope =
-      await this.authorization.require(
-        actor,
-        entity.id_entity,
-        'update',
-      );
-
     const action = await this.knex(this.TABLE)
       .where('slug', actionSlug)
       .andWhere('id_entity', entity.id_entity)
@@ -377,21 +370,13 @@ export class ActionService {
       );
     }
 
-    const recordQuery = this.knex(
-      entity.table_name,
-    ).where('id', recordId);
-    this.authorization.applyScope(
-      recordQuery,
-      entity.table_name,
-      scope,
-      actor.profileId,
-    );
-    const record = await recordQuery.first();
-    if (!record) {
-      throw new NotFoundException(
-        `Inregistrarea "${recordId}" nu exista in "${entitySlug}".`,
+    const { record } =
+      await this.recordAccess.assertRecord(
+        actor,
+        entity,
+        recordId,
+        'update',
       );
-    }
 
     this.logger.log(
       `Executare manuala: ${actionSlug} pe ${entitySlug}#${recordId} de profilul ${actor.profileId}`,

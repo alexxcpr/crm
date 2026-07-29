@@ -80,6 +80,7 @@ export interface FieldPayload {
   is_readonly?: boolean
   validation_rules?: Record<string, any>
   id_relation_entity?: string
+  relation_kind?: 'reference' | 'composition'
   relation_display_field?: string
   id_ui_tab?: string
   rank?: number
@@ -95,6 +96,7 @@ export interface UpdateFieldPayload {
   default_value?: string
   options?: { label: string, value: string }[]
   id_relation_entity?: string
+  relation_kind?: 'reference' | 'composition'
   relation_display_field?: string
   is_required?: boolean
   is_unique?: boolean
@@ -119,9 +121,48 @@ export interface AdminTab {
   slug: string
   rank: number
   is_system: boolean
+  content_type: 'fields' | 'related_collection'
+  related_collection?: AdminRelatedCollection | null
   date_created: string
   date_updated: string
   _count?: { fields: number }
+}
+
+export interface RelatedCollectionRelationOption {
+  id_field: string
+  field_name: string
+  field_slug: string
+  relation_kind: 'reference' | 'composition'
+  child_entity_id: string
+  child_entity_name: string
+  child_entity_slug: string
+  fields: Array<{
+    id_field: string
+    name: string
+    slug: string
+    column_name: string
+    data_type: Field['data_type']
+    ui_type: Field['ui_type']
+    is_required: boolean
+    is_readonly: boolean
+    default_value: string | null
+  }>
+}
+
+export interface AdminRelatedCollection {
+  id_relation_field: string
+  default_view: 'table' | 'cards'
+  allow_table: boolean
+  allow_cards: boolean
+  card_title_field_id?: string | null
+  card_field_ids: string[]
+  page_size: number
+  default_sort: string
+  allow_create: boolean
+  allow_update: boolean
+  allow_delete: boolean
+  quick_add_mode: 'none' | 'multi_file'
+  id_quick_add_file_field?: string | null
 }
 
 export interface CreateTabPayload {
@@ -129,12 +170,15 @@ export interface CreateTabPayload {
   slug: string
   rank?: number
   is_system?: boolean
+  content_type?: 'fields' | 'related_collection'
+  related_collection?: AdminRelatedCollection
 }
 
 export interface UpdateTabPayload {
   name?: string
   slug?: string
   rank?: number
+  related_collection?: AdminRelatedCollection
 }
 
 // ─── Menu ───

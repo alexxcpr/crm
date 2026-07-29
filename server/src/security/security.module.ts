@@ -8,6 +8,7 @@ import { PublicRateLimitGuard } from './public-rate-limit.guard';
 import { AccessControlService } from './access-control.service';
 import { CapabilityGuard } from './capability.guard';
 import { TenantAuditService } from './tenant-audit.service';
+import { RecordAccessService } from './record-access.service';
 
 @Global()
 @Module({
@@ -31,6 +32,7 @@ import { TenantAuditService } from './tenant-audit.service';
     CapabilityGuard,
     TenantAuditService,
     PublicRateLimitGuard,
+    RecordAccessService,
   ],
   exports: [
     AuthorizationService,
@@ -38,6 +40,7 @@ import { TenantAuditService } from './tenant-audit.service';
     CapabilityGuard,
     TenantAuditService,
     PublicRateLimitGuard,
+    RecordAccessService,
   ],
 })
 export class SecurityModule {}

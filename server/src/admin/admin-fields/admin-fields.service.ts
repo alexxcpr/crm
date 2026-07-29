@@ -1,7 +1,15 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { DynamicSchemaService } from 'src/dynamic-schema/dynamic-schema.service';
 import { TenantContext } from 'src/tenant/tenant-context.service';
-import { CreateFieldDto, UpdateFieldDto } from '../dto/field.dto';
+import {
+  CreateFieldDto,
+  UpdateFieldDto,
+} from '../dto/field.dto';
 import { validateGroupFieldLayout } from './field-layout.util';
 import type { RankedItemDto } from '../dto/reorder.dto';
 import { reorderRanks } from '../rank-reorder.util';
@@ -13,13 +21,19 @@ export class AdminFieldsService {
     private readonly dynamicSchema: DynamicSchemaService,
   ) {}
 
-  private get knex() { return this.tenantContext.knex; }
+  private get knex() {
+    return this.tenantContext.knex;
+  }
 
   async findAllByEntity(entityId: string) {
     await this.ensureEntityExists(entityId);
 
     const fields = await this.knex('field')
-      .leftJoin('ui_tab', 'field.id_ui_tab', 'ui_tab.id_ui_tab')
+      .leftJoin(
+        'ui_tab',
+        'field.id_ui_tab',
+        'ui_tab.id_ui_tab',
+      )
       .where('field.id_entity', entityId)
       .orderBy([
         { column: 'ui_tab.rank', order: 'asc' },
@@ -32,21 +46,33 @@ export class AdminFieldsService {
       const relationEntity = f.id_relation_entity
         ? await this.knex('entity')
             .select('id_entity', 'slug', 'name')
-            .where('id_entity', f.id_relation_entity)
+            .where(
+              'id_entity',
+              f.id_relation_entity,
+            )
             .first()
         : null;
 
-      result.push({ ...f, relation_entity: relationEntity });
+      result.push({
+        ...f,
+        relation_entity: relationEntity,
+      });
     }
 
     return result;
   }
 
-  async findOne(entityId: string, fieldId: string) {
+  async findOne(
+    entityId: string,
+    fieldId: string,
+  ) {
     await this.ensureEntityExists(entityId);
 
     const field = await this.knex('field')
-      .where({ id_field: fieldId, id_entity: entityId })
+      .where({
+        id_field: fieldId,
+        id_entity: entityId,
+      })
       .first();
 
     if (!field) {
@@ -55,29 +81,50 @@ export class AdminFieldsService {
       );
     }
 
-    const relationEntity = field.id_relation_entity
-      ? await this.knex('entity')
-          .select('id_entity', 'slug', 'name')
-          .where('id_entity', field.id_relation_entity)
-          .first()
-      : null;
+    const relationEntity =
+      field.id_relation_entity
+        ? await this.knex('entity')
+            .select('id_entity', 'slug', 'name')
+            .where(
+              'id_entity',
+              field.id_relation_entity,
+            )
+            .first()
+        : null;
 
-    return { ...field, relation_entity: relationEntity };
+    return {
+      ...field,
+      relation_entity: relationEntity,
+    };
   }
 
-  async create(entityId: string, dto: CreateFieldDto) {
-    const entity = await this.ensureEntityExists(entityId);
+  async create(
+    entityId: string,
+    dto: CreateFieldDto,
+  ) {
+    const entity =
+      await this.ensureEntityExists(entityId);
 
     this.validateFileConfiguration(dto);
-    if (dto.ui_type === 'file' && dto.is_required) {
-      const [{ count }] = await this.knex(entity.table_name).count('* as count');
+    if (
+      dto.ui_type === 'file' &&
+      dto.is_required
+    ) {
+      const [{ count }] = await this.knex(
+        entity.table_name,
+      ).count('* as count');
       if (Number(count) > 0) {
-        throw new BadRequestException('Un camp de fisier nou nu poate fi obligatoriu cat timp entitatea are deja inregistrari.');
+        throw new BadRequestException(
+          'Un camp de fisier nou nu poate fi obligatoriu cat timp entitatea are deja inregistrari.',
+        );
       }
     }
 
     const existingSlug = await this.knex('field')
-      .where({ id_entity: entityId, slug: dto.slug })
+      .where({
+        id_entity: entityId,
+        slug: dto.slug,
+      })
       .first();
 
     if (existingSlug) {
@@ -86,18 +133,52 @@ export class AdminFieldsService {
       );
     }
 
-    if (dto.ui_type === 'relation' && dto.id_relation_entity) {
-      const targetEntity = await this.knex('entity')
-        .where('id_entity', dto.id_relation_entity)
+    if (
+      dto.ui_type === 'relation' &&
+      dto.id_relation_entity
+    ) {
+      const targetEntity = await this.knex(
+        'entity',
+      )
+        .where(
+          'id_entity',
+          dto.id_relation_entity,
+        )
         .first();
       if (!targetEntity) {
         throw new NotFoundException(
           `Entitatea tinta pentru relatie cu id "${dto.id_relation_entity}" nu exista.`,
         );
       }
+      await this.validateRelationKind(
+        entityId,
+        dto.id_relation_entity,
+        dto.relation_kind ?? 'reference',
+      );
+      if (dto.relation_kind === 'composition') {
+        const [{ count }] = await this.knex(
+          entity.table_name,
+        ).count('* as count');
+        if (Number(count) > 0) {
+          throw new BadRequestException(
+            'Nu poti adauga un parinte composition unei entitati care are deja inregistrari. Creeaza mai intai relatia reference si completeaza toate valorile.',
+          );
+        }
+      }
+      if (
+        dto.relation_kind === 'composition' &&
+        dto.is_required === false
+      ) {
+        throw new BadRequestException(
+          'O relatie composition trebuie sa fie obligatorie.',
+        );
+      }
     }
 
-    await this.validateLayoutForCreate(entityId, dto);
+    await this.validateLayoutForCreate(
+      entityId,
+      dto,
+    );
 
     const columnName = `cf_${dto.slug}`;
 
@@ -105,19 +186,35 @@ export class AdminFieldsService {
     let idUiTab = dto.id_ui_tab ?? null;
     if (!idUiTab) {
       const generalTab = await this.knex('ui_tab')
-        .where({ id_entity: entityId, slug: 'general' })
+        .where({
+          id_entity: entityId,
+          slug: 'general',
+        })
         .first();
       idUiTab = generalTab?.id_ui_tab ?? null;
+    }
+    if (idUiTab) {
+      await this.ensureFieldsTab(
+        entityId,
+        idUiTab,
+      );
     }
 
     // Auto-calculate rank within the selected tab
     let nextRank = 1;
     if (idUiTab) {
-      const maxRankResult = await this.knex('field')
-        .where({ id_entity: entityId, id_ui_tab: idUiTab })
+      const maxRankResult = await this.knex(
+        'field',
+      )
+        .where({
+          id_entity: entityId,
+          id_ui_tab: idUiTab,
+        })
         .max('rank as max_rank')
         .first();
-      nextRank = ((maxRankResult?.max_rank as number) ?? 0) + 1;
+      nextRank =
+        ((maxRankResult?.max_rank as number) ??
+          0) + 1;
     }
 
     const [field] = await this.knex('field')
@@ -131,18 +228,48 @@ export class AdminFieldsService {
         default_value: dto.default_value ?? null,
         placeholder: dto.placeholder ?? null,
         help_text: dto.help_text ?? null,
-        options: dto.options ? JSON.stringify(dto.options) : null,
-        is_required: dto.is_required ?? false,
-        is_unique: dto.ui_type === 'file' ? false : (dto.is_unique ?? false),
-        is_filterable: dto.ui_type === 'file' ? false : (dto.is_filterable ?? false),
-        is_sortable: dto.ui_type === 'file' ? false : (dto.is_sortable ?? true),
-        visible_in_table: dto.visible_in_table ?? true,
-        visible_in_form: dto.visible_in_form ?? true,
+        options: dto.options
+          ? JSON.stringify(dto.options)
+          : null,
+        is_required:
+          dto.ui_type === 'relation' &&
+          dto.relation_kind === 'composition'
+            ? true
+            : (dto.is_required ?? false),
+        is_unique:
+          dto.ui_type === 'file'
+            ? false
+            : (dto.is_unique ?? false),
+        is_filterable:
+          dto.ui_type === 'file'
+            ? false
+            : (dto.is_filterable ?? false),
+        is_sortable:
+          dto.ui_type === 'file'
+            ? false
+            : (dto.is_sortable ?? true),
+        visible_in_table:
+          dto.visible_in_table ?? true,
+        visible_in_form:
+          dto.visible_in_form ?? true,
         is_readonly: dto.is_readonly ?? false,
         is_system: false,
-        validation_rules: dto.validation_rules ? JSON.stringify(dto.validation_rules) : null,
-        id_relation_entity: dto.ui_type === 'file' ? null : (dto.id_relation_entity ?? null),
-        relation_display_field: dto.ui_type === 'file' ? null : (dto.relation_display_field ?? null),
+        validation_rules: dto.validation_rules
+          ? JSON.stringify(dto.validation_rules)
+          : null,
+        id_relation_entity:
+          dto.ui_type === 'file'
+            ? null
+            : (dto.id_relation_entity ?? null),
+        relation_kind:
+          dto.ui_type === 'relation'
+            ? (dto.relation_kind ?? 'reference')
+            : null,
+        relation_display_field:
+          dto.ui_type === 'file'
+            ? null
+            : (dto.relation_display_field ??
+              null),
         id_ui_tab: idUiTab,
         rank: dto.rank ?? nextRank,
         grid_col: dto.grid_col ?? 1,
@@ -151,20 +278,33 @@ export class AdminFieldsService {
       .returning('*');
 
     try {
-      await this.dynamicSchema.addColumn(entity, field);
+      await this.dynamicSchema.addColumn(
+        entity,
+        field,
+      );
     } catch (error) {
-      await this.knex('field').where('id_field', field.id_field).del();
+      await this.knex('field')
+        .where('id_field', field.id_field)
+        .del();
       throw error;
     }
 
     return field;
   }
 
-  async update(entityId: string, fieldId: string, dto: UpdateFieldDto) {
-    const entity = await this.ensureEntityExists(entityId);
+  async update(
+    entityId: string,
+    fieldId: string,
+    dto: UpdateFieldDto,
+  ) {
+    const entity =
+      await this.ensureEntityExists(entityId);
 
     const field = await this.knex('field')
-      .where({ id_field: fieldId, id_entity: entityId })
+      .where({
+        id_field: fieldId,
+        id_entity: entityId,
+      })
       .first();
 
     if (!field) {
@@ -173,63 +313,207 @@ export class AdminFieldsService {
       );
     }
 
-    if (field.ui_type === 'file' && dto.ui_type && dto.ui_type !== 'file') {
-      throw new BadRequestException('Tipul unui camp de fisier nu poate fi schimbat dupa creare.');
+    if (
+      field.ui_type === 'file' &&
+      dto.ui_type &&
+      dto.ui_type !== 'file'
+    ) {
+      throw new BadRequestException(
+        'Tipul unui camp de fisier nu poate fi schimbat dupa creare.',
+      );
     }
-    if (field.ui_type !== 'file' && dto.ui_type === 'file') {
-      throw new BadRequestException('Un camp existent nu poate fi convertit in camp de fisier. Creeaza un camp nou.');
+    if (
+      field.ui_type !== 'file' &&
+      dto.ui_type === 'file'
+    ) {
+      throw new BadRequestException(
+        'Un camp existent nu poate fi convertit in camp de fisier. Creeaza un camp nou.',
+      );
     }
-    if (field.ui_type === 'file') this.validateFileConfiguration({ ...field, ...dto });
+    if (field.ui_type === 'file')
+      this.validateFileConfiguration({
+        ...field,
+        ...dto,
+      });
+    if (
+      dto.id_relation_entity !== undefined &&
+      dto.id_relation_entity !==
+        field.id_relation_entity
+    ) {
+      throw new BadRequestException(
+        'Entitatea tinta a unei relatii nu poate fi schimbata dupa crearea campului.',
+      );
+    }
+    if (
+      (field.ui_type === 'relation' ||
+        dto.ui_type === 'relation') &&
+      dto.ui_type !== undefined &&
+      dto.ui_type !== field.ui_type
+    ) {
+      throw new BadRequestException(
+        'Un camp existent nu poate fi convertit in sau din tipul relation.',
+      );
+    }
 
-    await this.validateLayoutForUpdate(entityId, field, dto);
+    const nextRelationKind =
+      field.ui_type === 'relation'
+        ? (dto.relation_kind ??
+          field.relation_kind ??
+          'reference')
+        : null;
+    if (
+      field.ui_type === 'relation' &&
+      nextRelationKind === 'composition'
+    ) {
+      if (dto.is_required === false) {
+        throw new BadRequestException(
+          'O relatie composition trebuie sa fie obligatorie.',
+        );
+      }
+      await this.validateRelationKind(
+        entityId,
+        field.id_relation_entity,
+        'composition',
+        field.id_field,
+      );
+      if (
+        (field.relation_kind ?? 'reference') !==
+        'composition'
+      ) {
+        const [{ count }] = await this.knex(
+          entity.table_name,
+        )
+          .whereNull(field.column_name)
+          .count('* as count');
+        if (Number(count) > 0) {
+          throw new BadRequestException(
+            `Relatia nu poate deveni composition: ${count} inregistrari nu au parintele completat.`,
+          );
+        }
+      }
+    }
+    if (dto.id_ui_tab) {
+      await this.ensureFieldsTab(
+        entityId,
+        dto.id_ui_tab,
+      );
+    }
+
+    await this.validateLayoutForUpdate(
+      entityId,
+      field,
+      dto,
+    );
 
     // Daca tab-ul se schimba si rank-ul nu e setat explicit, recalculeaza automat
-    const tabChanged = dto.id_ui_tab !== undefined && dto.id_ui_tab !== field.id_ui_tab;
+    const tabChanged =
+      dto.id_ui_tab !== undefined &&
+      dto.id_ui_tab !== field.id_ui_tab;
     let effectiveRank = dto.rank;
-    if (tabChanged && dto.rank === undefined && dto.id_ui_tab) {
+    if (
+      tabChanged &&
+      dto.rank === undefined &&
+      dto.id_ui_tab
+    ) {
       const newTabMax = await this.knex('field')
-        .where({ id_entity: entityId, id_ui_tab: dto.id_ui_tab })
+        .where({
+          id_entity: entityId,
+          id_ui_tab: dto.id_ui_tab,
+        })
         .max('rank as max_rank')
         .first();
-      effectiveRank = ((newTabMax?.max_rank as number) ?? 0) + 1;
+      effectiveRank =
+        ((newTabMax?.max_rank as number) ?? 0) +
+        1;
     }
 
     const updateData: Record<string, any> = {
       name: dto.name ?? field.name,
       ui_type: dto.ui_type ?? field.ui_type,
-      placeholder: dto.placeholder !== undefined ? dto.placeholder : field.placeholder,
-      help_text: dto.help_text !== undefined ? dto.help_text : field.help_text,
-      id_relation_entity: dto.id_relation_entity !== undefined ? dto.id_relation_entity : field.id_relation_entity,
-      relation_display_field: dto.relation_display_field !== undefined ? dto.relation_display_field : field.relation_display_field,
-      is_required: dto.is_required ?? field.is_required,
-      is_unique: field.ui_type === 'file' ? false : (dto.is_unique ?? field.is_unique),
-      is_filterable: field.ui_type === 'file' ? false : (dto.is_filterable ?? field.is_filterable),
-      is_sortable: field.ui_type === 'file' ? false : (dto.is_sortable ?? field.is_sortable),
-      visible_in_table: dto.visible_in_table ?? field.visible_in_table,
-      visible_in_form: dto.visible_in_form ?? field.visible_in_form,
-      is_readonly: dto.is_readonly ?? field.is_readonly,
-      id_ui_tab: dto.id_ui_tab !== undefined ? dto.id_ui_tab : field.id_ui_tab,
+      placeholder:
+        dto.placeholder !== undefined
+          ? dto.placeholder
+          : field.placeholder,
+      help_text:
+        dto.help_text !== undefined
+          ? dto.help_text
+          : field.help_text,
+      id_relation_entity:
+        dto.id_relation_entity !== undefined
+          ? dto.id_relation_entity
+          : field.id_relation_entity,
+      relation_kind: nextRelationKind,
+      relation_display_field:
+        dto.relation_display_field !== undefined
+          ? dto.relation_display_field
+          : field.relation_display_field,
+      is_required:
+        nextRelationKind === 'composition'
+          ? true
+          : (dto.is_required ??
+            field.is_required),
+      is_unique:
+        field.ui_type === 'file'
+          ? false
+          : (dto.is_unique ?? field.is_unique),
+      is_filterable:
+        field.ui_type === 'file'
+          ? false
+          : (dto.is_filterable ??
+            field.is_filterable),
+      is_sortable:
+        field.ui_type === 'file'
+          ? false
+          : (dto.is_sortable ??
+            field.is_sortable),
+      visible_in_table:
+        dto.visible_in_table ??
+        field.visible_in_table,
+      visible_in_form:
+        dto.visible_in_form ??
+        field.visible_in_form,
+      is_readonly:
+        dto.is_readonly ?? field.is_readonly,
+      id_ui_tab:
+        dto.id_ui_tab !== undefined
+          ? dto.id_ui_tab
+          : field.id_ui_tab,
       rank: effectiveRank ?? field.rank,
       grid_col: dto.grid_col ?? field.grid_col,
       col_span: dto.col_span ?? field.col_span,
-      default_value: dto.default_value !== undefined ? dto.default_value : field.default_value,
+      default_value:
+        dto.default_value !== undefined
+          ? dto.default_value
+          : field.default_value,
       date_updated: new Date(),
     };
 
     if (dto.options !== undefined) {
-      updateData.options = dto.options ? JSON.stringify(dto.options) : null;
+      updateData.options = dto.options
+        ? JSON.stringify(dto.options)
+        : null;
     } else {
       updateData.options = field.options;
     }
 
     if (dto.validation_rules !== undefined) {
-      updateData.validation_rules = dto.validation_rules ? JSON.stringify(dto.validation_rules) : null;
+      updateData.validation_rules =
+        dto.validation_rules
+          ? JSON.stringify(dto.validation_rules)
+          : null;
     } else {
-      updateData.validation_rules = field.validation_rules;
+      updateData.validation_rules =
+        field.validation_rules;
     }
 
-    if (dto.is_required !== undefined) {
-      await this.dynamicSchema.updateColumnRequired(entity, field, dto.is_required);
+    if (
+      updateData.is_required !== field.is_required
+    ) {
+      await this.dynamicSchema.updateColumnRequired(
+        entity,
+        field,
+        updateData.is_required,
+      );
     }
 
     const [updated] = await this.knex('field')
@@ -240,7 +524,10 @@ export class AdminFieldsService {
     return updated;
   }
 
-  async reorder(entityId: string, items: RankedItemDto[]) {
+  async reorder(
+    entityId: string,
+    items: RankedItemDto[],
+  ) {
     await this.ensureEntityExists(entityId);
     const ids = items.map((item) => item.id);
     const fields = await this.knex('field')
@@ -249,12 +536,20 @@ export class AdminFieldsService {
       .whereIn('id_field', ids);
 
     if (fields.length !== items.length) {
-      throw new BadRequestException('Lista de reordonare contine campuri inexistente.');
+      throw new BadRequestException(
+        'Lista de reordonare contine campuri inexistente.',
+      );
     }
 
-    const tabIds = new Set(fields.map((field) => field.id_ui_tab ?? null));
+    const tabIds = new Set(
+      fields.map(
+        (field) => field.id_ui_tab ?? null,
+      ),
+    );
     if (tabIds.size !== 1) {
-      throw new BadRequestException('Campurile pot fi reordonate doar in interiorul aceluiasi tab.');
+      throw new BadRequestException(
+        'Campurile pot fi reordonate doar in interiorul aceluiasi tab.',
+      );
     }
 
     await reorderRanks(this.knex, {
@@ -269,11 +564,18 @@ export class AdminFieldsService {
     return this.findAllByEntity(entityId);
   }
 
-  async remove(entityId: string, fieldId: string) {
-    const entity = await this.ensureEntityExists(entityId);
+  async remove(
+    entityId: string,
+    fieldId: string,
+  ) {
+    const entity =
+      await this.ensureEntityExists(entityId);
 
     const field = await this.knex('field')
-      .where({ id_field: fieldId, id_entity: entityId })
+      .where({
+        id_field: fieldId,
+        id_entity: entityId,
+      })
       .first();
 
     if (!field) {
@@ -289,21 +591,82 @@ export class AdminFieldsService {
     }
 
     if (field.ui_type === 'file') {
-      const file = await this.knex('stored_file').where({ id_field: fieldId }).first();
+      const file = await this.knex('stored_file')
+        .where({ id_field: fieldId })
+        .first();
       if (file) {
-        throw new BadRequestException('Campul nu poate fi sters cat timp exista fisiere incarcate pentru el.');
+        throw new BadRequestException(
+          'Campul nu poate fi sters cat timp exista fisiere incarcate pentru el.',
+        );
+      }
+    }
+    const relatedCollection = await this.knex(
+      'related_collection_definition',
+    )
+      .where((builder) =>
+        builder
+          .where('id_relation_field', fieldId)
+          .orWhere('card_title_field_id', fieldId)
+          .orWhere(
+            'id_quick_add_file_field',
+            fieldId,
+          ),
+      )
+      .first();
+    const cardUsage = await this.knex(
+      'related_collection_card_field',
+    )
+      .where('id_field', fieldId)
+      .first();
+    if (relatedCollection || cardUsage) {
+      throw new BadRequestException(
+        `Campul "${field.name}" este folosit de o colectie asociata. Sterge sau reconfigureaza tab-ul inainte.`,
+      );
+    }
+    if (field.relation_kind === 'composition') {
+      const [{ count }] = await this.knex(
+        entity.table_name,
+      ).count('* as count');
+      if (Number(count) > 0) {
+        throw new BadRequestException(
+          'Campul composition nu poate fi sters cat timp entitatea copil contine inregistrari.',
+        );
       }
     }
 
-    const dashboardUsage = await this.knex('ui_widget as widget')
-      .join('ui_block as block', 'block.id_ui_block', 'widget.id_ui_block')
-      .join('ui_dashboard as dashboard', 'dashboard.id_ui_dashboard', 'block.id_ui_dashboard')
-      .where((builder) => builder
-        .where('widget.id_value_field', fieldId)
-        .orWhere('widget.id_group_field', fieldId)
-        .orWhere('widget.id_series_field', fieldId)
-        .orWhere('widget.id_date_field', fieldId))
-      .select('widget.title as widget_title', 'dashboard.name as dashboard_name')
+    const dashboardUsage = await this.knex(
+      'ui_widget as widget',
+    )
+      .join(
+        'ui_block as block',
+        'block.id_ui_block',
+        'widget.id_ui_block',
+      )
+      .join(
+        'ui_dashboard as dashboard',
+        'dashboard.id_ui_dashboard',
+        'block.id_ui_dashboard',
+      )
+      .where((builder) =>
+        builder
+          .where('widget.id_value_field', fieldId)
+          .orWhere(
+            'widget.id_group_field',
+            fieldId,
+          )
+          .orWhere(
+            'widget.id_series_field',
+            fieldId,
+          )
+          .orWhere(
+            'widget.id_date_field',
+            fieldId,
+          ),
+      )
+      .select(
+        'widget.title as widget_title',
+        'dashboard.name as dashboard_name',
+      )
       .first();
     if (dashboardUsage) {
       throw new BadRequestException(
@@ -311,32 +674,55 @@ export class AdminFieldsService {
       );
     }
 
-    await this.dynamicSchema.removeColumn(entity, field);
+    await this.dynamicSchema.removeColumn(
+      entity,
+      field,
+    );
 
-    await this.knex('field').where('id_field', fieldId).del();
+    await this.knex('field')
+      .where('id_field', fieldId)
+      .del();
 
-    return { message: `Campul "${field.name}" a fost sters.` };
+    return {
+      message: `Campul "${field.name}" a fost sters.`,
+    };
   }
 
-  private async ensureEntityExists(entityId: string) {
-    const entity = await this.knex('entity').where('id_entity', entityId).first();
+  private async ensureEntityExists(
+    entityId: string,
+  ) {
+    const entity = await this.knex('entity')
+      .where('id_entity', entityId)
+      .first();
     if (!entity) {
-      throw new NotFoundException(`Entitatea cu id "${entityId}" nu exista.`);
+      throw new NotFoundException(
+        `Entitatea cu id "${entityId}" nu exista.`,
+      );
     }
     return entity;
   }
 
-  private async validateLayoutForCreate(entityId: string, dto: CreateFieldDto) {
+  private async validateLayoutForCreate(
+    entityId: string,
+    dto: CreateFieldDto,
+  ) {
     // Resolve the effective id_ui_tab for layout validation
     let idUiTab = dto.id_ui_tab ?? null;
     if (!idUiTab) {
       const generalTab = await this.knex('ui_tab')
-        .where({ id_entity: entityId, slug: 'general' })
+        .where({
+          id_entity: entityId,
+          slug: 'general',
+        })
         .first();
       idUiTab = generalTab?.id_ui_tab ?? null;
     }
 
-    const existingFields = await this.getGroupLayoutFields(entityId, idUiTab);
+    const existingFields =
+      await this.getGroupLayoutFields(
+        entityId,
+        idUiTab,
+      );
 
     validateGroupFieldLayout([
       ...existingFields,
@@ -357,8 +743,16 @@ export class AdminFieldsService {
     field: Record<string, any>,
     dto: UpdateFieldDto,
   ) {
-    const idUiTab = dto.id_ui_tab !== undefined ? dto.id_ui_tab : field.id_ui_tab;
-    const existingFields = await this.getGroupLayoutFields(entityId, idUiTab, field.id_field);
+    const idUiTab =
+      dto.id_ui_tab !== undefined
+        ? dto.id_ui_tab
+        : field.id_ui_tab;
+    const existingFields =
+      await this.getGroupLayoutFields(
+        entityId,
+        idUiTab,
+        field.id_field,
+      );
 
     validateGroupFieldLayout([
       ...existingFields,
@@ -374,42 +768,164 @@ export class AdminFieldsService {
     ]);
   }
 
-  private async getGroupLayoutFields(entityId: string, idUiTab: string | null, excludeFieldId?: string) {
+  private async getGroupLayoutFields(
+    entityId: string,
+    idUiTab: string | null,
+    excludeFieldId?: string,
+  ) {
     let query = this.knex('field')
-      .select('id_field', 'name', 'slug', 'id_ui_tab', 'rank', 'grid_col', 'col_span')
-      .where({ id_entity: entityId, id_ui_tab: idUiTab });
+      .select(
+        'id_field',
+        'name',
+        'slug',
+        'id_ui_tab',
+        'rank',
+        'grid_col',
+        'col_span',
+      )
+      .where({
+        id_entity: entityId,
+        id_ui_tab: idUiTab,
+      });
 
     if (excludeFieldId) {
-      query = query.whereNot('id_field', excludeFieldId);
+      query = query.whereNot(
+        'id_field',
+        excludeFieldId,
+      );
     }
 
     return query;
   }
 
-  private validateFileConfiguration(dto: Partial<CreateFieldDto> & { ui_type?: string; data_type?: string }) {
+  private async ensureFieldsTab(
+    entityId: string,
+    tabId: string,
+  ) {
+    const tab = await this.knex('ui_tab')
+      .where({
+        id_entity: entityId,
+        id_ui_tab: tabId,
+      })
+      .first();
+    if (!tab) {
+      throw new BadRequestException(
+        'Tab-ul selectat nu apartine entitatii.',
+      );
+    }
+    if (
+      (tab.content_type ?? 'fields') !== 'fields'
+    ) {
+      throw new BadRequestException(
+        'Campurile pot fi plasate doar in tab-uri de tip fields.',
+      );
+    }
+  }
+
+  private async validateRelationKind(
+    entityId: string,
+    targetEntityId: string,
+    kind: 'reference' | 'composition',
+    currentFieldId?: string,
+  ) {
+    if (kind !== 'composition') return;
+    let existingQuery = this.knex('field').where({
+      id_entity: entityId,
+      ui_type: 'relation',
+      relation_kind: 'composition',
+    });
+    if (currentFieldId) {
+      existingQuery = existingQuery.whereNot(
+        'id_field',
+        currentFieldId,
+      );
+    }
+    if (await existingQuery.first()) {
+      throw new BadRequestException(
+        'O entitate poate avea un singur parinte composition.',
+      );
+    }
+
+    const visited = new Set<string>();
+    let cursor: string | null = targetEntityId;
+    while (cursor) {
+      if (cursor === entityId) {
+        throw new BadRequestException(
+          'Relatia composition ar crea un ciclu.',
+        );
+      }
+      if (visited.has(cursor)) {
+        throw new BadRequestException(
+          'Graful composition existent contine un ciclu.',
+        );
+      }
+      visited.add(cursor);
+      const parentField = await this.knex('field')
+        .where({
+          id_entity: cursor,
+          ui_type: 'relation',
+          relation_kind: 'composition',
+        })
+        .first();
+      cursor =
+        parentField?.id_relation_entity ?? null;
+    }
+  }
+
+  private validateFileConfiguration(
+    dto: Partial<CreateFieldDto> & {
+      ui_type?: string;
+      data_type?: string;
+    },
+  ) {
     if (dto.ui_type !== 'file') return;
     if (dto.data_type !== 'uuid') {
-      throw new BadRequestException('Campurile de fisier trebuie sa foloseasca data_type "uuid".');
+      throw new BadRequestException(
+        'Campurile de fisier trebuie sa foloseasca data_type "uuid".',
+      );
     }
-    const rules = dto.validation_rules as Record<string, unknown> | undefined;
+    const rules = dto.validation_rules as
+      | Record<string, unknown>
+      | undefined;
     if (!rules) return;
     if (rules.max_file_size_bytes !== undefined) {
-      const size = Number(rules.max_file_size_bytes);
+      const size = Number(
+        rules.max_file_size_bytes,
+      );
       if (!Number.isInteger(size) || size <= 0) {
-        throw new BadRequestException('Limita campului de fisier trebuie exprimata in bytes si sa fie pozitiva.');
+        throw new BadRequestException(
+          'Limita campului de fisier trebuie exprimata in bytes si sa fie pozitiva.',
+        );
       }
     }
     if (rules.allowed_mime_types !== undefined) {
-      if (!Array.isArray(rules.allowed_mime_types)
-        || rules.allowed_mime_types.some((mime) => typeof mime !== 'string' || !mime.includes('/'))) {
-        throw new BadRequestException('Lista MIME a campului de fisier este invalida.');
+      if (
+        !Array.isArray(
+          rules.allowed_mime_types,
+        ) ||
+        rules.allowed_mime_types.some(
+          (mime) =>
+            typeof mime !== 'string' ||
+            !mime.includes('/'),
+        )
+      ) {
+        throw new BadRequestException(
+          'Lista MIME a campului de fisier este invalida.',
+        );
       }
     }
     if (rules.multiple === true) {
-      throw new BadRequestException('MVP-ul curent permite un singur fisier per camp.');
+      throw new BadRequestException(
+        'MVP-ul curent permite un singur fisier per camp.',
+      );
     }
-    if (rules.max_files !== undefined && Number(rules.max_files) !== 1) {
-      throw new BadRequestException('MVP-ul curent permite max_files egal cu 1.');
+    if (
+      rules.max_files !== undefined &&
+      Number(rules.max_files) !== 1
+    ) {
+      throw new BadRequestException(
+        'MVP-ul curent permite max_files egal cu 1.',
+      );
     }
   }
 }

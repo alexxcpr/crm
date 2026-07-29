@@ -18,8 +18,18 @@ import { PaginatedResponse } from './dto/query.dto';
 import { EntityEventsService } from 'src/events/entity-events.service';
 import { EntityEvent } from 'src/events/entity-event.enum';
 import { FileStorageService } from 'src/storage/file-storage.service';
+import { RecordAccessService } from 'src/security/record-access.service';
 
 const DELETE_CONFLICT_REFERENCE_ID_LIMIT = 3;
+const DEFAULT_COMPOSITION_DELETE_MAX_DEPTH = 10;
+const DEFAULT_COMPOSITION_DELETE_MAX_RECORDS = 1000;
+
+interface CompositionDeleteNode {
+  entity: Entity;
+  fields: FieldWithRelation[];
+  record: Record<string, any>;
+  depth: number;
+}
 
 @Injectable()
 export class DynamicDataService {
@@ -33,6 +43,7 @@ export class DynamicDataService {
     private readonly validation: DynamicValidationService,
     private readonly entityEvents: EntityEventsService,
     private readonly authorization: AuthorizationService,
+    private readonly recordAccess: RecordAccessService,
     private readonly files: FileStorageService,
   ) {}
 
@@ -165,16 +176,19 @@ export class DynamicDataService {
     entitySlug: string,
     query: Record<string, any>,
     actor: AuthenticatedUser,
-    options: { tableOnly?: boolean } = {},
+    options: {
+      tableOnly?: boolean;
+      fixedWhere?: Record<string, any>;
+    } = {},
   ): Promise<
     PaginatedResponse<Record<string, any>>
   > {
     const { entity, fields } =
       await this.resolveEntity(entitySlug);
-    const scope =
-      await this.authorization.require(
+    const policy =
+      await this.recordAccess.require(
         actor,
-        entity.id_entity,
+        entity,
         'read',
       );
     const tableName = entity.table_name;
@@ -213,18 +227,30 @@ export class DynamicDataService {
     let countQuery = this.knex(tableName).count(
       `${tableName}.id as total`,
     );
-    this.authorization.applyScope(
+    this.recordAccess.applyScope(
       dataQuery,
       tableName,
-      scope,
+      policy,
       actor.profileId,
     );
-    this.authorization.applyScope(
+    this.recordAccess.applyScope(
       countQuery,
       tableName,
-      scope,
+      policy,
       actor.profileId,
     );
+    for (const [column, value] of Object.entries(
+      options.fixedWhere ?? {},
+    )) {
+      dataQuery.where(
+        `${tableName}.${column}`,
+        value,
+      );
+      countQuery.where(
+        `${tableName}.${column}`,
+        value,
+      );
+    }
 
     const filters = this.filterParser.parse(
       query,
@@ -320,10 +346,10 @@ export class DynamicDataService {
   ) {
     const { entity, fields } =
       await this.resolveEntity(entitySlug);
-    const scope =
-      await this.authorization.require(
+    const policy =
+      await this.recordAccess.require(
         actor,
-        entity.id_entity,
+        entity,
         'read',
       );
     const selectColumns = this.buildSelect(
@@ -339,10 +365,10 @@ export class DynamicDataService {
     )
       .select(selectColumns)
       .where(`${entity.table_name}.id`, id);
-    this.authorization.applyScope(
+    this.recordAccess.applyScope(
       query,
       entity.table_name,
-      scope,
+      policy,
       actor.profileId,
     );
     const record = await query.first();
@@ -370,9 +396,9 @@ export class DynamicDataService {
   ) {
     const { entity, fields } =
       await this.resolveEntity(entitySlug);
-    await this.authorization.require(
+    await this.recordAccess.require(
       actor,
-      entity.id_entity,
+      entity,
       'create',
     );
     const sanitized =
@@ -383,6 +409,28 @@ export class DynamicDataService {
         'create',
         undefined,
       );
+    const composition =
+      await this.recordAccess.compositionChain(
+        entity,
+      );
+    if (composition.steps.length) {
+      const parentStep = composition.steps[0];
+      const parentId =
+        sanitized[
+          parentStep.relationField.column_name
+        ];
+      if (!parentId) {
+        throw new ForbiddenException(
+          'Parintele composition este obligatoriu.',
+        );
+      }
+      await this.recordAccess.assertRecord(
+        actor,
+        parentStep.parentEntity,
+        String(parentId),
+        'update',
+      );
+    }
     const fileFields = fields.filter(
       (field) => field.ui_type === 'file',
     );
@@ -411,6 +459,24 @@ export class DynamicDataService {
       eventCtx,
     );
     insertData.id_profile = actor.profileId;
+    if (composition.steps.length) {
+      const parentStep = composition.steps[0];
+      const parentId =
+        insertData[
+          parentStep.relationField.column_name
+        ];
+      if (!parentId) {
+        throw new ForbiddenException(
+          'Parintele composition este obligatoriu.',
+        );
+      }
+      await this.recordAccess.assertRecord(
+        actor,
+        parentStep.parentEntity,
+        String(parentId),
+        'update',
+      );
+    }
     for (const field of fileFields) {
       await this.files.validateFileForBinding(
         field,
@@ -457,25 +523,12 @@ export class DynamicDataService {
   ) {
     const { entity, fields } =
       await this.resolveEntity(entitySlug);
-    const scope =
-      await this.authorization.require(
+    const { record: existing, policy } =
+      await this.recordAccess.assertRecord(
         actor,
-        entity.id_entity,
+        entity,
+        id,
         'update',
-      );
-    const existingQuery = this.knex(
-      entity.table_name,
-    ).where('id', id);
-    this.authorization.applyScope(
-      existingQuery,
-      entity.table_name,
-      scope,
-      actor.profileId,
-    );
-    const existing = await existingQuery.first();
-    if (!existing)
-      throw new NotFoundException(
-        `Inregistrarea cu id "${id}" nu a fost gasita.`,
       );
 
     const requestedOwner = body.id_profile;
@@ -487,6 +540,41 @@ export class DynamicDataService {
         'update',
         id,
       );
+    if (policy.composition.length) {
+      const relationField =
+        policy.composition[0].relationField;
+      const relationColumn =
+        relationField.column_name;
+      for (const key of [
+        relationField.slug,
+        relationColumn,
+      ]) {
+        if (
+          Object.prototype.hasOwnProperty.call(
+            body,
+            key,
+          ) &&
+          body[key] !== existing[relationColumn]
+        ) {
+          throw new ConflictException(
+            'Parintele unui copil composition nu poate fi schimbat.',
+          );
+        }
+      }
+      if (
+        Object.prototype.hasOwnProperty.call(
+          sanitized,
+          relationColumn,
+        ) &&
+        sanitized[relationColumn] !==
+          existing[relationColumn]
+      ) {
+        throw new ConflictException(
+          'Parintele unui copil composition nu poate fi schimbat.',
+        );
+      }
+      delete sanitized[relationColumn];
+    }
     const fileFields = fields.filter(
       (field) => field.ui_type === 'file',
     );
@@ -510,6 +598,11 @@ export class DynamicDataService {
       requestedOwner &&
       requestedOwner !== existing.id_profile
     ) {
+      if (policy.composition.length) {
+        throw new ForbiddenException(
+          'Ownerul unui copil composition este mostenit de la radacina si nu poate fi schimbat.',
+        );
+      }
       await this.authorization.require(
         actor,
         entity.id_entity,
@@ -543,6 +636,38 @@ export class DynamicDataService {
       EntityEvent.BeforeUpdate,
       eventCtx,
     );
+    if (policy.composition.length) {
+      const relationField =
+        policy.composition[0].relationField;
+      const relationColumn =
+        relationField.column_name;
+      if (
+        Object.prototype.hasOwnProperty.call(
+          sanitized,
+          relationColumn,
+        ) &&
+        sanitized[relationColumn] !==
+          existing[relationColumn]
+      ) {
+        throw new ConflictException(
+          'Parintele unui copil composition nu poate fi schimbat.',
+        );
+      }
+      if (
+        Object.prototype.hasOwnProperty.call(
+          sanitized,
+          'id_profile',
+        ) &&
+        sanitized.id_profile !==
+          existing.id_profile
+      ) {
+        throw new ForbiddenException(
+          'Ownerul unui copil composition este mostenit de la radacina si nu poate fi schimbat.',
+        );
+      }
+      delete sanitized[relationColumn];
+      delete sanitized.id_profile;
+    }
     for (const field of fileFields) {
       if (
         Object.prototype.hasOwnProperty.call(
@@ -633,62 +758,72 @@ export class DynamicDataService {
   ) {
     const { entity, fields } =
       await this.resolveEntity(entitySlug);
-    const scope =
-      await this.authorization.require(
+    const { record: existing } =
+      await this.recordAccess.assertRecord(
         actor,
-        entity.id_entity,
+        entity,
+        id,
         'delete',
+        (
+          await this.recordAccess.compositionChain(
+            entity,
+          )
+        ).steps.length === 0,
       );
-    const existingQuery = this.knex(
-      entity.table_name,
-    ).where('id', id);
-    this.authorization.applyScope(
-      existingQuery,
-      entity.table_name,
-      scope,
-      actor.profileId,
-    );
-    const existing = await existingQuery.first();
-    if (!existing)
-      throw new NotFoundException(
-        `Inregistrarea cu id "${id}" nu a fost gasita.`,
+    const deletePlan =
+      await this.buildCompositionDeletePlan(
+        entity,
+        fields,
+        existing,
       );
-    const eventCtx = this.eventContext(
-      entity,
-      entitySlug,
-      id,
-      existing,
-      actor,
-      existing,
+    await this.assertNoExternalReferenceBlockers(
+      deletePlan,
     );
-    await this.entityEvents.emit(
-      EntityEvent.BeforeDelete,
-      eventCtx,
+    const eventContexts = deletePlan.map((node) =>
+      this.eventContext(
+        node.entity,
+        node.entity.slug,
+        node.record.id,
+        node.record,
+        actor,
+        node.record,
+      ),
     );
-    const fileFields = fields.filter(
-      (field) => field.ui_type === 'file',
-    );
-    const filesToDelete = fileFields
-      .map(
-        (field) =>
-          existing[field.column_name] as
-            | string
-            | null,
-      )
-      .filter((fileId): fileId is string =>
-        Boolean(fileId),
+    for (const eventCtx of eventContexts) {
+      await this.entityEvents.emit(
+        EntityEvent.BeforeDelete,
+        eventCtx,
       );
+    }
+
+    const filesToDelete: string[] = [];
     try {
       await this.knex.transaction(async (trx) => {
-        await trx(entity.table_name)
-          .where('id', id)
-          .del();
-        for (const fileId of filesToDelete) {
-          await this.files.markForDeletionInTransaction(
-            trx,
-            fileId,
-            id,
-          );
+        for (const node of deletePlan) {
+          const fileIds = node.fields
+            .filter(
+              (field) => field.ui_type === 'file',
+            )
+            .map(
+              (field) =>
+                node.record[field.column_name] as
+                  | string
+                  | null,
+            )
+            .filter((fileId): fileId is string =>
+              Boolean(fileId),
+            );
+          await trx(node.entity.table_name)
+            .where('id', node.record.id)
+            .del();
+          for (const fileId of fileIds) {
+            await this.files.markForDeletionInTransaction(
+              trx,
+              fileId,
+              node.record.id,
+            );
+            filesToDelete.push(fileId);
+          }
         }
       });
     } catch (error) {
@@ -703,10 +838,12 @@ export class DynamicDataService {
       }
       throw error;
     }
-    await this.entityEvents.emit(
-      EntityEvent.AfterDelete,
-      eventCtx,
-    );
+    for (const eventCtx of eventContexts) {
+      await this.entityEvents.emit(
+        EntityEvent.AfterDelete,
+        eventCtx,
+      );
+    }
     for (const fileId of filesToDelete) {
       this.files
         .finalizeDeletion(fileId)
@@ -716,6 +853,205 @@ export class DynamicDataService {
             error as Error,
           );
         });
+    }
+  }
+
+  private compositionDeleteLimit(
+    envName: string,
+    fallback: number,
+  ) {
+    const value = Number.parseInt(
+      process.env[envName] ?? '',
+      10,
+    );
+    return Number.isFinite(value) && value > 0
+      ? value
+      : fallback;
+  }
+
+  private async buildCompositionDeletePlan(
+    rootEntity: Entity,
+    rootFields: FieldWithRelation[],
+    rootRecord: Record<string, any>,
+  ): Promise<CompositionDeleteNode[]> {
+    const maxDepth = this.compositionDeleteLimit(
+      'COMPOSITION_DELETE_MAX_DEPTH',
+      DEFAULT_COMPOSITION_DELETE_MAX_DEPTH,
+    );
+    const maxRecords =
+      this.compositionDeleteLimit(
+        'COMPOSITION_DELETE_MAX_RECORDS',
+        DEFAULT_COMPOSITION_DELETE_MAX_RECORDS,
+      );
+    const plan: CompositionDeleteNode[] = [];
+    const fieldCache = new Map<
+      string,
+      FieldWithRelation[]
+    >([[rootEntity.id_entity, rootFields]]);
+    let discovered = 0;
+    const walk = async (
+      entity: Entity,
+      record: Record<string, any>,
+      depth: number,
+    ): Promise<void> => {
+      if (depth > maxDepth) {
+        throw new ConflictException(
+          `Stergerea depaseste limita de ${maxDepth} niveluri composition.`,
+        );
+      }
+      discovered += 1;
+      if (discovered > maxRecords) {
+        throw new ConflictException(
+          `Stergerea depaseste limita de ${maxRecords} inregistrari.`,
+        );
+      }
+
+      const relations = await this.knex(
+        'field as relation_field',
+      )
+        .join(
+          'entity as child',
+          'child.id_entity',
+          'relation_field.id_entity',
+        )
+        .where({
+          'relation_field.ui_type': 'relation',
+          'relation_field.relation_kind':
+            'composition',
+          'relation_field.id_relation_entity':
+            entity.id_entity,
+        })
+        .orderBy([
+          {
+            column: 'child.rank',
+            order: 'asc',
+          },
+          {
+            column: 'relation_field.rank',
+            order: 'asc',
+          },
+        ])
+        .select(
+          'relation_field.column_name',
+          'child.id_entity',
+          'child.slug',
+        );
+
+      for (const relation of relations) {
+        const childEntity =
+          await this.recordAccess.getEntity(
+            relation.id_entity,
+          );
+        const children = await this.knex(
+          childEntity.table_name,
+        )
+          .where(relation.column_name, record.id)
+          .orderBy('id', 'asc');
+        let childFields = fieldCache.get(
+          childEntity.id_entity,
+        );
+        if (!childFields) {
+          childFields = (
+            await this.resolveEntity(
+              childEntity.slug,
+            )
+          ).fields;
+          fieldCache.set(
+            childEntity.id_entity,
+            childFields,
+          );
+        }
+        for (const child of children) {
+          await walk(
+            childEntity,
+            child,
+            depth + 1,
+          );
+        }
+      }
+
+      plan.push({
+        entity,
+        fields:
+          fieldCache.get(entity.id_entity) ?? [],
+        record,
+        depth,
+      });
+    };
+
+    await walk(rootEntity, rootRecord, 1);
+    return plan;
+  }
+
+  private async assertNoExternalReferenceBlockers(
+    plan: CompositionDeleteNode[],
+  ) {
+    const idsByEntity = new Map<
+      string,
+      Set<string>
+    >();
+    for (const node of plan) {
+      const ids =
+        idsByEntity.get(node.entity.id_entity) ??
+        new Set<string>();
+      ids.add(node.record.id);
+      idsByEntity.set(node.entity.id_entity, ids);
+    }
+    const targetEntityIds = [
+      ...idsByEntity.keys(),
+    ];
+    const referenceFields = await this.knex(
+      'field as relation_field',
+    )
+      .join(
+        'entity as source',
+        'source.id_entity',
+        'relation_field.id_entity',
+      )
+      .whereIn(
+        'relation_field.id_relation_entity',
+        targetEntityIds,
+      )
+      .where({
+        'relation_field.ui_type': 'relation',
+        'relation_field.relation_kind':
+          'reference',
+      })
+      .select(
+        'relation_field.id_relation_entity',
+        'relation_field.column_name',
+        'relation_field.name as field_name',
+        'source.id_entity as source_entity_id',
+        'source.table_name as source_table_name',
+        'source.label_plural as source_label_plural',
+        'source.name as source_name',
+      );
+
+    for (const relation of referenceFields) {
+      const targetIds = [
+        ...(idsByEntity.get(
+          relation.id_relation_entity,
+        ) ?? []),
+      ];
+      if (!targetIds.length) continue;
+      const references = await this.knex(
+        relation.source_table_name,
+      )
+        .whereIn(relation.column_name, targetIds)
+        .select('id');
+      const internalIds =
+        idsByEntity.get(
+          relation.source_entity_id,
+        ) ?? new Set<string>();
+      const blocker = references.find(
+        (reference) =>
+          !internalIds.has(reference.id),
+      );
+      if (blocker) {
+        throw new ConflictException(
+          `Agregatul nu poate fi sters deoarece exista o referinta externa in ${relation.source_label_plural ?? relation.source_name}, prin campul "${relation.field_name}" (id: ${blocker.id}).`,
+        );
+      }
     }
   }
 

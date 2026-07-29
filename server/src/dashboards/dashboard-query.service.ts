@@ -1,7 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Knex } from 'knex';
-import { AuthorizationService } from 'src/security/authorization.service';
-import { AuthenticatedUser, PermissionScope } from 'src/security/security.types';
+import { AuthenticatedUser } from 'src/security/security.types';
+import {
+  RecordAccessPolicy,
+  RecordAccessService,
+} from 'src/security/record-access.service';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import {
   DASHBOARD_LIMITS,
@@ -37,7 +40,7 @@ interface StoredFilter {
 export class DashboardQueryService {
   constructor(
     private readonly tenantContext: TenantContext,
-    private readonly authorization: AuthorizationService,
+    private readonly recordAccess: RecordAccessService,
     private readonly access: DashboardAccessService,
     private readonly dashboards: DashboardService,
   ) {}
@@ -87,16 +90,24 @@ export class DashboardQueryService {
     to: Date,
     timeZone: string,
   ) {
-    const scope = await this.authorization.require(user, widget.id_entity, 'read');
+    const entity =
+      await this.recordAccess.getEntity(
+        widget.id_entity,
+      );
+    const policy = await this.recordAccess.require(
+      user,
+      entity,
+      'read',
+    );
     const fields = await this.knex<QueryField>('field').where('id_entity', widget.id_entity);
     await this.attachRelationTables(fields);
     const fieldMap = new Map(fields.map((field) => [field.id_field, field]));
     const filters = this.parseFilters(widget.filters);
 
     if (widget.widget_type === 'kpi') {
-      return this.queryKpi(widget, fields, fieldMap, filters, scope, user, from, to);
+      return this.queryKpi(widget, fields, fieldMap, filters, policy, user, from, to);
     }
-    return this.queryChart(widget, fields, fieldMap, filters, scope, user, from, to, timeZone);
+    return this.queryChart(widget, fields, fieldMap, filters, policy, user, from, to, timeZone);
   }
 
   private async queryKpi(
@@ -104,12 +115,12 @@ export class DashboardQueryService {
     fields: QueryField[],
     fieldMap: Map<string, QueryField>,
     filters: StoredFilter[],
-    scope: PermissionScope,
+    policy: RecordAccessPolicy,
     user: AuthenticatedUser,
     from: Date,
     to: Date,
   ) {
-    const value = await this.aggregate(widget, fieldMap, filters, scope, user, from, to);
+    const value = await this.aggregate(widget, fieldMap, filters, policy, user, from, to);
     let previousValue: number | null = null;
     let changePercent: number | null = null;
     let isNew = false;
@@ -117,7 +128,7 @@ export class DashboardQueryService {
     if (widget.comparison_enabled && widget.date_source) {
       const duration = to.getTime() - from.getTime();
       const previousFrom = new Date(from.getTime() - duration);
-      previousValue = await this.aggregate(widget, fieldMap, filters, scope, user, previousFrom, from);
+      previousValue = await this.aggregate(widget, fieldMap, filters, policy, user, previousFrom, from);
       if (previousValue === 0) {
         isNew = value > 0;
         changePercent = value === 0 ? 0 : null;
@@ -143,12 +154,12 @@ export class DashboardQueryService {
     widget: any,
     fieldMap: Map<string, QueryField>,
     filters: StoredFilter[],
-    scope: PermissionScope,
+    policy: RecordAccessPolicy,
     user: AuthenticatedUser,
     from: Date,
     to: Date,
   ): Promise<number> {
-    const query = this.baseQuery(widget, fieldMap, filters, scope, user, from, to);
+    const query = this.baseQuery(widget, fieldMap, filters, policy, user, from, to);
     this.selectAggregate(query, widget.aggregation, this.valueColumn(widget, fieldMap));
     const row = await query.first().timeout(DASHBOARD_LIMITS.queryTimeoutMs, { cancel: true });
     return Number(row?.value ?? 0);
@@ -159,13 +170,13 @@ export class DashboardQueryService {
     fields: QueryField[],
     fieldMap: Map<string, QueryField>,
     filters: StoredFilter[],
-    scope: PermissionScope,
+    policy: RecordAccessPolicy,
     user: AuthenticatedUser,
     from: Date,
     to: Date,
     timeZone: string,
   ) {
-    const query = this.baseQuery(widget, fieldMap, filters, scope, user, from, to);
+    const query = this.baseQuery(widget, fieldMap, filters, policy, user, from, to);
     const groupField = widget.id_group_field ? fieldMap.get(widget.id_group_field) : undefined;
     const seriesField = widget.id_series_field ? fieldMap.get(widget.id_series_field) : undefined;
     const granularity = this.effectiveGranularity(widget.date_granularity, from, to);
@@ -252,13 +263,18 @@ export class DashboardQueryService {
     widget: any,
     fieldMap: Map<string, QueryField>,
     filters: StoredFilter[],
-    scope: PermissionScope,
+    policy: RecordAccessPolicy,
     user: AuthenticatedUser,
     from: Date,
     to: Date,
   ) {
     const query = this.knex(`${widget.table_name} as source`);
-    this.authorization.applyScope(query, 'source', scope, user.profileId);
+    this.recordAccess.applyScope(
+      query,
+      'source',
+      policy,
+      user.profileId,
+    );
     const dateColumn = this.dateColumn(widget, fieldMap);
     if (dateColumn) query.where(`source.${dateColumn}`, '>=', from).where(`source.${dateColumn}`, '<', to);
     this.applyFilters(query, filters, fieldMap);

@@ -21,6 +21,7 @@ export interface Field {
   is_readonly: boolean
   validation_rules: Record<string, any> | null
   id_relation_entity: string | null
+  relation_kind: 'reference' | 'composition' | null
   relation_display_field: string | null
   relation_entity_slug: string | null
   id_ui_tab: string
@@ -49,8 +50,48 @@ export interface UiTab {
   slug: string
   rank: number
   is_system: boolean
+  content_type: 'fields' | 'related_collection'
+  related_collection: RelatedCollectionDefinition | null
   date_created: string
   date_updated: string
+}
+
+export interface RelatedCollectionCardField {
+  id_field: string
+  name: string
+  slug: string
+  column_name: string
+  ui_type: Field['ui_type']
+  rank: number
+}
+
+export interface RelatedCollectionDefinition {
+  id_related_collection: string
+  relation_field_id: string
+  relation_field_slug: string
+  relation_column_name: string
+  relation_kind: 'reference' | 'composition'
+  child_entity_id: string
+  child_entity_slug: string
+  child_entity_name: string
+  child_label_singular: string | null
+  child_label_plural: string | null
+  default_view: 'table' | 'cards'
+  allow_table: boolean
+  allow_cards: boolean
+  card_title_field_id: string | null
+  card_title_field_slug: string | null
+  card_title_column_name: string | null
+  card_fields: RelatedCollectionCardField[]
+  page_size: number
+  default_sort: string
+  allow_create: boolean
+  allow_update: boolean
+  allow_delete: boolean
+  quick_add_mode: 'none' | 'multi_file'
+  id_quick_add_file_field: string | null
+  quick_add_file_field_slug: string | null
+  capabilities: Pick<EntityCapabilities, 'read' | 'create' | 'update' | 'delete'>
 }
 
 export interface EntitySchema {

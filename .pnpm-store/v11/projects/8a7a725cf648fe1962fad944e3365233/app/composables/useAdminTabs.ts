@@ -1,4 +1,9 @@
-import type { AdminTab, CreateTabPayload, UpdateTabPayload } from '~/types/admin'
+import type {
+  AdminTab,
+  CreateTabPayload,
+  RelatedCollectionRelationOption,
+  UpdateTabPayload
+} from '~/types/admin'
 
 interface ApiResponse<T> {
   mesaj: string
@@ -47,6 +52,18 @@ export function useAdminTabs(entityId: MaybeRef<string>, entitySlug?: MaybeRef<s
       error.value = err?.data?.message || err.message || 'Eroare la incarcarea tab-ului'
       console.error('[useAdminTabs] fetchTab:', err)
       return null
+    }
+  }
+
+  async function fetchRelationOptions(): Promise<RelatedCollectionRelationOption[]> {
+    try {
+      const response = await apiFetch<ApiResponse<RelatedCollectionRelationOption[]>>(
+        `${basePath()}/options/relations`
+      )
+      return response.data
+    } catch (err: any) {
+      error.value = err?.data?.message || err.message || 'Eroare la incarcarea relatiilor'
+      return []
     }
   }
 
@@ -137,6 +154,7 @@ export function useAdminTabs(entityId: MaybeRef<string>, entitySlug?: MaybeRef<s
     error,
     fetchTabs,
     fetchTab,
+    fetchRelationOptions,
     createTab,
     updateTab,
     deleteTab,

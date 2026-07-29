@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import type { Field } from '~/types/schema'
-import type { StoredFileInfo } from '~/composables/useFiles'
+import type { RelatedRecordContext, StoredFileInfo } from '~/composables/useFiles'
 import { MIME_BY_FILE_EXTENSION } from '~/utils/fileTypes'
 
 const props = defineProps<{
   field: Field
   modelValue: string | null
   recordId?: string
+  relatedContext?: RelatedRecordContext
   disabled?: boolean
 }>()
 
@@ -73,6 +74,13 @@ async function uploadFile(selected: File) {
     const session = await createUploadSession({
       fieldId: props.field.id_field,
       recordId: props.recordId,
+      relatedContext: props.relatedContext
+        ? {
+            parentSlug: props.relatedContext.parentSlug,
+            parentId: props.relatedContext.parentId,
+            collectionSlug: props.relatedContext.collectionSlug
+          }
+        : undefined,
       fileName: selected.name,
       mimeType,
       sizeBytes: selected.size,

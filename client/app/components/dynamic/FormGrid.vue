@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Field } from '~/types/schema'
+import type { RelatedRecordContext } from '~/composables/useFiles'
 import type { PlacedField } from '~/utils/formLayout'
 import { computeFieldLayout } from '~/utils/formLayout'
 
@@ -8,6 +9,7 @@ const props = defineProps<{
   formState: Record<string, any>
   autofocusFirst?: boolean
   recordId?: string
+  relatedContext?: RelatedRecordContext
 }>()
 
 const emit = defineEmits<{
@@ -65,6 +67,7 @@ function updateField(slug: string, value: any) {
         :model-value="formState[placedField.field.slug]"
         :autofocus="autofocusFirst && idx === 0"
         :record-id="recordId"
+        :related-context="relatedContext"
         @update:model-value="updateField(placedField.field.slug, $event)"
       />
     </div>
@@ -85,6 +88,7 @@ function updateField(slug: string, value: any) {
           :model-value="formState[placedField.field.slug]"
           :autofocus="autofocusFirst && idx === 0"
           :record-id="recordId"
+          :related-context="relatedContext"
           @update:model-value="updateField(placedField.field.slug, $event)"
         />
       </div>

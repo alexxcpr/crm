@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AuthorizationService } from 'src/security/authorization.service';
+import { RecordAccessService } from 'src/security/record-access.service';
 import { AccessControlService } from 'src/security/access-control.service';
 import { AuthenticatedUser } from 'src/security/security.types';
 import { TenantContext } from 'src/tenant/tenant-context.service';
@@ -13,7 +13,7 @@ import { CreateWorkflowNotificationDto, ListNotificationsQueryDto } from './dto'
 export class NotificationsService {
   constructor(
     private readonly tenantContext: TenantContext,
-    private readonly authorization: AuthorizationService,
+    private readonly recordAccess: RecordAccessService,
     private readonly access: AccessControlService,
   ) {}
 
@@ -126,13 +126,19 @@ export class NotificationsService {
     let targetEntity: Record<string, any> | null = null;
 
     if (dto.targetEntitySlug && dto.targetRecordId) {
-      const resolvedTarget = await this.authorization.getEntity(dto.targetEntitySlug);
+      const resolvedTarget =
+        await this.recordAccess.getEntity(
+          dto.targetEntitySlug,
+        );
       targetEntity = resolvedTarget;
-      const scope = await this.authorization.require(recipient, resolvedTarget.id_entity, 'read');
-      const recordQuery = this.knex(resolvedTarget.table_name).where('id', dto.targetRecordId);
-      this.authorization.applyScope(recordQuery, resolvedTarget.table_name, scope, recipient.profileId);
-      const record = await recordQuery.first('id');
-      if (!record) {
+      try {
+        await this.recordAccess.assertRecord(
+          recipient,
+          resolvedTarget,
+          dto.targetRecordId,
+          'read',
+        );
+      } catch {
         throw new NotFoundException('Recordul destinatie nu exista sau destinatarul nu are acces la el.');
       }
     }

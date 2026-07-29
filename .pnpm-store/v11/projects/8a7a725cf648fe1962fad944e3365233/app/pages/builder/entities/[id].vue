@@ -1,8 +1,8 @@
 <script setup lang="ts">
-definePageMeta({ middleware: ['capability'], requiredCapability: 'builder.manage' })
-
 import type { Field, UiTab } from '~/types/schema'
 import type { AdminEntity, AdminTab } from '~/types/admin'
+
+definePageMeta({ middleware: ['capability'], requiredCapability: 'builder.manage' })
 
 const route = useRoute()
 const router = useRouter()
@@ -198,6 +198,8 @@ const tabOptions = computed<UiTab[]>(() =>
     slug: t.slug,
     rank: t.rank,
     is_system: t.is_system,
+    content_type: t.content_type,
+    related_collection: null,
     date_created: t.date_created,
     date_updated: t.date_updated
   }))

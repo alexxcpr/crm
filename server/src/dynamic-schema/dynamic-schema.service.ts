@@ -90,13 +90,14 @@ export class DynamicSchemaService {
 
     if (field.ui_type === 'relation' && field.id_relation_entity) {
       await this.addForeignKeyAsync(tableName, field);
+      await this.createRelationIndex(tableName, columnName);
     }
 
     if (field.ui_type === 'file') {
       await this.addFileForeignKey(tableName, columnName);
     }
 
-    if (field.is_filterable) {
+    if (field.is_filterable && field.ui_type !== 'relation') {
        // Index automat pe campuri filterable
       await this.createIndex(tableName, columnName);
     }
@@ -216,6 +217,37 @@ export class DynamicSchemaService {
     await this.knex.schema.alterTable(tableName, (table) => {
       table.foreign(field.column_name).references('id').inTable(targetEntity.table_name);
     });
+  }
+
+  private async createRelationIndex(
+    tableName: string,
+    columnName: string,
+  ): Promise<void> {
+    const rawName = `idx_${tableName}_${columnName}_relation`;
+    const indexName =
+      rawName.length <= 63
+        ? rawName
+        : `${rawName.slice(0, 54)}_${this.simpleHash(rawName)}`;
+    await this.knex.raw(
+      'CREATE INDEX IF NOT EXISTS ?? ON ?? (??)',
+      [indexName, tableName, columnName],
+    );
+  }
+
+  private simpleHash(value: string): string {
+    let hash = 0;
+    for (
+      let index = 0;
+      index < value.length;
+      index++
+    ) {
+      hash =
+        (hash * 31 + value.charCodeAt(index)) >>>
+        0;
+    }
+    return hash
+      .toString(16)
+      .padStart(8, '0');
   }
 
   private async addFileForeignKey(tableName: string, columnName: string): Promise<void> {

@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import type { RelatedRecordContext } from '~/composables/useFiles'
+
 const props = defineProps<{
   entitySlug: string
   entityLabel: string
   open: boolean
+  relatedContext?: RelatedRecordContext
 }>()
 
 const emit = defineEmits<{
@@ -113,6 +116,7 @@ watch(modalOpen, (val) => {
         v-if="modalOpen"
         ref="formComp"
         :entity-slug="entitySlug"
+        :related-context="relatedContext"
         @created="onCreated"
         @cancel="onCancelRequested"
       />

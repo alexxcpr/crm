@@ -34,6 +34,7 @@ const {
   formFields,
   groups,
   tabs,
+  relatedTabs,
   loading: schemaLoading,
   error: schemaError,
   schema,
@@ -161,11 +162,19 @@ function getFieldsByGroup(groupSlug: string): Field[] {
 
 // ─── Tab-uri (doar daca > 1 grup) ───
 const tabItems = computed<TabsItem[]>(() =>
-  groups.value.map(g => ({
-    label: formatGroupLabel(g),
-    value: g,
-    slot: g
-  }))
+  [
+    ...groups.value.map(g => ({
+      label: formatGroupLabel(g),
+      value: g,
+      slot: g
+    })),
+    ...relatedTabs.value.map(tab => ({
+      label: tab.name,
+      value: tab.slug,
+      slot: tab.slug,
+      disabled: !isEditMode.value
+    }))
+  ]
 )
 
 const tabLabelMap = computed(() => {
@@ -580,15 +589,15 @@ onUnmounted(() => {
     :state="formState"
     :schema="zodSchema"
     :loading-auto="false"
-    class="flex flex-col flex-1"
+    class="flex min-w-0 w-full flex-1 flex-col"
     @submit="onSubmit"
     @error="onFormError"
   >
-    <div class="flex gap-6 flex-1 pt-6">
+    <div class="flex min-w-0 w-full flex-1 gap-6 pt-6">
       <!-- Left: form fields + actions -->
-      <div class="flex-1 min-w-0 space-y-6">
+      <div class="min-w-0 max-w-full flex-1 space-y-6">
         <!-- Single group: render directly -->
-        <template v-if="groups.length <= 1">
+        <template v-if="groups.length <= 1 && relatedTabs.length === 0">
           <DynamicFormGrid
             :fields="getFieldsByGroup(groups[0] ?? 'general')"
             :form-state="formState"
@@ -604,13 +613,13 @@ onUnmounted(() => {
           v-model="activeTab"
           :items="tabItems"
           orientation="vertical"
-          class="w-full"
+          class="min-w-0 max-w-full"
           :ui="{
-            root: 'flex flex-col md:flex-row items-start gap-6',
+            root: 'flex min-w-0 max-w-full flex-col items-start gap-6 md:flex-row',
             list: 'w-full md:w-52 shrink-0 max-w-full max-h-[20vh] md:max-h-[70vh] overflow-x-auto md:overflow-x-hidden md:overflow-y-auto rounded-xl border border-primary/20 bg-primary/5 p-1 md:p-1.5 gap-1 shadow-sm',
             indicator: 'hidden',
             trigger: 'relative min-w-48 shrink-0 md:w-full justify-center md:justify-start text-center md:text-left rounded-lg px-3 py-2 text-[13px] font-semibold text-muted transition-all hover:bg-white/80 hover:text-highlighted hover:shadow-xs dark:hover:bg-white/10 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-primary/30 before:content-[\'\'] before:hidden md:before:block before:absolute before:left-1 before:top-1/2 before:h-5 before:w-1 before:-translate-y-1/2 before:rounded-full before:bg-transparent data-[state=active]:before:bg-white/80',
-            content: 'w-full flex-1 min-w-0'
+            content: 'w-full max-w-full flex-1 min-w-0 overflow-hidden'
           }"
         >
           <template v-for="(group, idx) in groups" :key="group" #[group]>
@@ -624,13 +633,30 @@ onUnmounted(() => {
               />
             </div>
           </template>
+
+          <template v-for="relatedTab in relatedTabs" :key="relatedTab.id_ui_tab" #[relatedTab.slug]>
+            <DynamicRelatedCollection
+              v-if="isEditMode && recordId"
+              :parent-entity="entity"
+              :parent-id="recordId"
+              :tab="relatedTab"
+            />
+            <UAlert
+              v-else
+              color="neutral"
+              variant="subtle"
+              icon="i-lucide-lock"
+              title="Salveaza mai intai inregistrarea"
+              description="Colectia asociata devine disponibila imediat dupa creare."
+            />
+          </template>
         </UTabs>
       </div>
 
       <!-- Right: Entity Actions sidebar (doar pe desktop) -->
       <div
         v-if="isEditMode && visibleActions.length > 0"
-        class="hidden lg:block w-72 shrink-0"
+        class="hidden w-72 shrink-0 2xl:block"
       >
         <div class="sticky top-2 rounded-2xl border border-primary/20 bg-primary/5 p-3 shadow-sm">
           <div class="mb-3 flex items-center gap-2">
@@ -774,7 +800,7 @@ onUnmounted(() => {
             color="primary"
             variant="soft"
             :size="isMobile ? 'sm' : 'md'"
-            class="lg:hidden"
+            class="2xl:hidden"
             @click="showActionsSlideover = true"
           />
 

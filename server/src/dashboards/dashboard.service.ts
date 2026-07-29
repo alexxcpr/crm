@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Knex } from 'knex';
-import { AuthorizationService } from 'src/security/authorization.service';
+import { RecordAccessService } from 'src/security/record-access.service';
 import { AuthenticatedUser } from 'src/security/security.types';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import {
@@ -34,7 +34,7 @@ interface DashboardFieldRow {
 export class DashboardService {
   constructor(
     private readonly tenantContext: TenantContext,
-    private readonly authorization: AuthorizationService,
+    private readonly recordAccess: RecordAccessService,
     private readonly access: DashboardAccessService,
   ) {}
 
@@ -164,7 +164,18 @@ export class DashboardService {
       .where({ 'block.id_ui_dashboard': id, 'block.is_active': true, 'widget.is_active': true })
       .select('widget.id_entity');
     for (const widget of widgets) {
-      if (await this.authorization.getScope(user, widget.id_entity, 'read')) return true;
+      const entity =
+        await this.recordAccess.getEntity(
+          widget.id_entity,
+        );
+      if (
+        await this.recordAccess.getPolicy(
+          user,
+          entity,
+          'read',
+        )
+      )
+        return true;
     }
     return false;
   }
@@ -383,7 +394,18 @@ export class DashboardService {
     for (const block of structure.blocks) {
       const widgets: any[] = [];
       for (const widget of block.widgets) {
-        if (await this.authorization.getScope(user, widget.id_entity, 'read')) widgets.push(widget);
+        const entity =
+          await this.recordAccess.getEntity(
+            widget.id_entity,
+          );
+        if (
+          await this.recordAccess.getPolicy(
+            user,
+            entity,
+            'read',
+          )
+        )
+          widgets.push(widget);
       }
       if (widgets.length) blocks.push({ ...block, widgets });
     }

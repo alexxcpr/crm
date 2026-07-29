@@ -46,6 +46,16 @@ export class AdminTabsController {
     return returnValidResponse('Ordinea tab-urilor a fost actualizata.', tabs);
   }
 
+  @Get('options/relations')
+  async relationOptions(@Param('entityId') entityId: string) {
+    const options =
+      await this.tabsService.findIncomingRelationOptions(entityId);
+    return returnValidResponse(
+      'Relatii disponibile pentru colectii.',
+      options,
+    );
+  }
+
   @Put(':tabId')
   async update(
     @Param('entityId') entityId: string,

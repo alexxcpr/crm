@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import type { Field } from '~/types/schema'
+import type { RelatedRecordContext } from '~/composables/useFiles'
 import type { Form, FormSubmitEvent } from '@nuxt/ui'
 import { buildZodSchema } from '~/utils/buildZodSchema'
 import { INLINE_CREATE_DEPTH_KEY } from '~/utils/inlineCreate'
 
 const props = defineProps<{
   entitySlug: string
+  relatedContext?: RelatedRecordContext
 }>()
 
 const emit = defineEmits<{
@@ -14,6 +16,7 @@ const emit = defineEmits<{
 }>()
 
 const toast = useToast()
+const { apiFetch } = useApi()
 
 // ─── Adâncime recursivitate ───
 const parentDepth = inject(INLINE_CREATE_DEPTH_KEY, 0)
@@ -36,12 +39,20 @@ const {
 
 const formState = reactive<Record<string, any>>({})
 const submitting = ref(false)
+const embeddedFormFields = computed(() =>
+  formFields.value.filter(field => field.slug !== props.relatedContext?.relationFieldSlug)
+)
+const embeddedGroups = computed(() =>
+  groups.value.filter(group =>
+    embeddedFormFields.value.some(field => field.tab_slug === group)
+  )
+)
 
 // ─── Form ref ───
 const formRef = ref<Form<any> | null>(null)
 const activeTab = ref('')
 
-watch(() => groups.value, (newGroups) => {
+watch(() => embeddedGroups.value, (newGroups) => {
   if (newGroups.length > 0 && !newGroups.includes(activeTab.value)) {
     activeTab.value = newGroups[0] || ''
   }
@@ -60,13 +71,13 @@ function captureInitialState() {
 
 // ─── Zod schema ───
 const zodSchema = computed(() => {
-  if (!formFields.value.length) return null
-  return buildZodSchema(formFields.value)
+  if (!embeddedFormFields.value.length) return null
+  return buildZodSchema(embeddedFormFields.value)
 })
 
 // ─── Grupare câmpuri ───
 function getFieldsByGroup(groupSlug: string): Field[] {
-  return formFields.value
+  return embeddedFormFields.value
     .filter((f: Field) => f.tab_slug === groupSlug)
     .sort((a, b) => a.rank - b.rank)
 }
@@ -87,7 +98,7 @@ function formatGroupLabel(groupSlug: string): string {
 
 // ─── Find group with errors ───
 function findGroupWithErrors(errorFields: string[]): string | null {
-  for (const group of groups.value) {
+  for (const group of embeddedGroups.value) {
     const groupFields = getFieldsByGroup(group).map(f => f.slug)
     const hasErrorInGroup = errorFields.some(fieldName =>
       groupFields.includes(fieldName)
@@ -115,7 +126,7 @@ function onFormError(event: { errors: Array<{ name?: string, message?: string }>
 
 // ─── Inițializare state ───
 function initFormState(record?: Record<string, any> | null) {
-  for (const field of formFields.value) {
+  for (const field of embeddedFormFields.value) {
     if (record && record[field.column_name] !== undefined) {
       formState[field.slug] = record[field.column_name]
     } else if (field.default_value != null) {
@@ -150,7 +161,19 @@ async function onSubmit(event: FormSubmitEvent<Record<string, unknown>>) {
 
   try {
     const payload = buildPayload(event.data)
-    const result = await create(payload)
+    let result: Record<string, any> | null
+    if (props.relatedContext) {
+      const response = await apiFetch<{ data: Record<string, any> }>(
+        `/v1/data/${props.relatedContext.parentSlug}/${props.relatedContext.parentId}/related/${props.relatedContext.collectionSlug}`,
+        {
+          method: 'POST',
+          body: payload
+        }
+      )
+      result = response.data
+    } else {
+      result = await create(payload)
+    }
 
     if (result) {
       toast.add({
@@ -165,6 +188,12 @@ async function onSubmit(event: FormSubmitEvent<Record<string, unknown>>) {
         color: 'error'
       })
     }
+  } catch (err: any) {
+    toast.add({
+      title: 'Eroare la salvare',
+      description: err?.data?.message || err?.message || 'Inregistrarea asociata nu a putut fi creata.',
+      color: 'error'
+    })
   } finally {
     submitting.value = false
   }
@@ -172,7 +201,7 @@ async function onSubmit(event: FormSubmitEvent<Record<string, unknown>>) {
 
 function buildPayload(validated: Record<string, unknown>): Record<string, any> {
   const payload: Record<string, any> = {}
-  for (const field of formFields.value) {
+  for (const field of embeddedFormFields.value) {
     const val = validated[field.slug]
     if (val !== undefined) {
       payload[field.slug] = val
@@ -236,11 +265,12 @@ defineExpose({
     @error="onFormError"
   >
     <!-- Un singur grup: direct -->
-    <template v-if="groups.length <= 1">
+    <template v-if="embeddedGroups.length <= 1">
       <DynamicFormGrid
-        :fields="getFieldsByGroup(groups[0] ?? 'general')"
+        :fields="getFieldsByGroup(embeddedGroups[0] ?? 'general')"
         :form-state="formState"
         :autofocus-first="true"
+        :related-context="relatedContext"
         @update-field="updateFormField"
       />
     </template>
@@ -249,7 +279,7 @@ defineExpose({
     <UTabs
       v-else
       v-model="activeTab"
-      :items="groups.map(g => ({ label: formatGroupLabel(g), value: g, slot: g }))"
+      :items="embeddedGroups.map(g => ({ label: formatGroupLabel(g), value: g, slot: g }))"
       class="w-full"
       :ui="{
         root: 'flex flex-col gap-4',
@@ -259,11 +289,12 @@ defineExpose({
         content: 'w-full'
       }"
     >
-      <template v-for="group in groups" :key="group" #[group]>
+      <template v-for="group in embeddedGroups" :key="group" #[group]>
         <DynamicFormGrid
           :fields="getFieldsByGroup(group)"
           :form-state="formState"
           :autofocus-first="true"
+          :related-context="relatedContext"
           @update-field="updateFormField"
         />
       </template>

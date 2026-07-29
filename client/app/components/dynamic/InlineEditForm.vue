@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Field } from '~/types/schema'
+import type { RelatedRecordContext } from '~/composables/useFiles'
 import type { Form, FormSubmitEvent } from '@nuxt/ui'
 import { buildZodSchema } from '~/utils/buildZodSchema'
 import { INLINE_CREATE_DEPTH_KEY } from '~/utils/inlineCreate'
@@ -7,6 +8,7 @@ import { INLINE_CREATE_DEPTH_KEY } from '~/utils/inlineCreate'
 const props = defineProps<{
   entitySlug: string
   recordId: string
+  relatedContext?: RelatedRecordContext
 }>()
 
 const emit = defineEmits<{
@@ -15,6 +17,7 @@ const emit = defineEmits<{
 }>()
 
 const toast = useToast()
+const { apiFetch } = useApi()
 
 const parentDepth = inject(INLINE_CREATE_DEPTH_KEY, 0)
 provide(INLINE_CREATE_DEPTH_KEY, parentDepth + 1)
@@ -42,6 +45,14 @@ const {
 
 const formState = reactive<Record<string, any>>({})
 const submitting = ref(false)
+const embeddedFormFields = computed(() =>
+  formFields.value.filter(field => field.slug !== props.relatedContext?.relationFieldSlug)
+)
+const embeddedGroups = computed(() =>
+  groups.value.filter(group =>
+    embeddedFormFields.value.some(field => field.tab_slug === group)
+  )
+)
 const initialLoading = ref(false)
 const formRef = ref<Form<any> | null>(null)
 const activeTab = ref('')
@@ -58,15 +69,15 @@ const loading = computed(() =>
   || initialLoading.value
 )
 
-watch(() => groups.value, (newGroups) => {
+watch(() => embeddedGroups.value, (newGroups) => {
   if (newGroups.length > 0 && !newGroups.includes(activeTab.value)) {
     activeTab.value = newGroups[0] || ''
   }
 }, { immediate: true })
 
 const zodSchema = computed(() => {
-  if (!formFields.value.length) return null
-  return buildZodSchema(formFields.value)
+  if (!embeddedFormFields.value.length) return null
+  return buildZodSchema(embeddedFormFields.value)
 })
 
 const tabLabelMap = computed(() => {
@@ -83,13 +94,13 @@ function formatGroupLabel(groupSlug: string): string {
 }
 
 function getFieldsByGroup(groupSlug: string): Field[] {
-  return formFields.value
+  return embeddedFormFields.value
     .filter((f: Field) => f.tab_slug === groupSlug)
     .sort((a, b) => a.rank - b.rank)
 }
 
 function findGroupWithErrors(errorFields: string[]): string | null {
-  for (const group of groups.value) {
+  for (const group of embeddedGroups.value) {
     const groupFields = getFieldsByGroup(group).map(f => f.slug)
     const hasErrorInGroup = errorFields.some(fieldName =>
       groupFields.includes(fieldName)
@@ -116,7 +127,7 @@ function onFormError(event: { errors: Array<{ name?: string, message?: string }>
 }
 
 function initFormState(record?: Record<string, any> | null) {
-  for (const field of formFields.value) {
+  for (const field of embeddedFormFields.value) {
     if (record && record[field.column_name] !== undefined) {
       formState[field.slug] = record[field.column_name]
     } else if (field.default_value != null) {
@@ -143,14 +154,14 @@ function captureInitialState() {
 }
 
 function applyRecordState(record: Record<string, any> | null) {
-  seedSelectedRelationOptions(formFields.value, record)
+  seedSelectedRelationOptions(embeddedFormFields.value, record)
   initFormState(record)
 }
 
 watch([() => schema.value, () => props.recordId], async ([sch]) => {
   if (!sch) return
 
-  prefetchRelationOptions(formFields.value).catch((err) => {
+  prefetchRelationOptions(embeddedFormFields.value).catch((err) => {
     console.error('[InlineEditForm] Eroare la preincarcarea relatiilor:', err)
   })
 
@@ -170,7 +181,19 @@ async function onSubmit(event: FormSubmitEvent<Record<string, unknown>>) {
 
   try {
     const payload = buildPayload(event.data)
-    const result = await update(props.recordId, payload)
+    let result: Record<string, any> | null
+    if (props.relatedContext) {
+      const response = await apiFetch<{ data: Record<string, any> }>(
+        `/v1/data/${props.relatedContext.parentSlug}/${props.relatedContext.parentId}/related/${props.relatedContext.collectionSlug}/${props.recordId}`,
+        {
+          method: 'PUT',
+          body: payload
+        }
+      )
+      result = response.data
+    } else {
+      result = await update(props.recordId, payload)
+    }
 
     if (result) {
       applyRecordState(result)
@@ -187,6 +210,12 @@ async function onSubmit(event: FormSubmitEvent<Record<string, unknown>>) {
         color: 'error'
       })
     }
+  } catch (err: any) {
+    toast.add({
+      title: 'Eroare la salvare',
+      description: err?.data?.message || err?.message || 'Inregistrarea asociata nu a putut fi actualizata.',
+      color: 'error'
+    })
   } finally {
     submitting.value = false
   }
@@ -194,7 +223,7 @@ async function onSubmit(event: FormSubmitEvent<Record<string, unknown>>) {
 
 function buildPayload(validated: Record<string, unknown>): Record<string, any> {
   const payload: Record<string, any> = {}
-  for (const field of formFields.value) {
+  for (const field of embeddedFormFields.value) {
     const val = validated[field.slug]
     if (val !== undefined) {
       payload[field.slug] = val
@@ -251,12 +280,13 @@ defineExpose({
     @submit="onSubmit"
     @error="onFormError"
   >
-    <template v-if="groups.length <= 1">
+    <template v-if="embeddedGroups.length <= 1">
       <DynamicFormGrid
-        :fields="getFieldsByGroup(groups[0] ?? 'general')"
+        :fields="getFieldsByGroup(embeddedGroups[0] ?? 'general')"
         :form-state="formState"
         :autofocus-first="false"
         :record-id="recordId"
+        :related-context="relatedContext"
         @update-field="updateFormField"
       />
     </template>
@@ -264,7 +294,7 @@ defineExpose({
     <UTabs
       v-else
       v-model="activeTab"
-      :items="groups.map(g => ({ label: formatGroupLabel(g), value: g, slot: g }))"
+      :items="embeddedGroups.map(g => ({ label: formatGroupLabel(g), value: g, slot: g }))"
       class="w-full"
       :ui="{
         root: 'flex flex-col gap-4',
@@ -274,12 +304,13 @@ defineExpose({
         content: 'w-full'
       }"
     >
-      <template v-for="group in groups" :key="group" #[group]>
+      <template v-for="group in embeddedGroups" :key="group" #[group]>
         <DynamicFormGrid
           :fields="getFieldsByGroup(group)"
           :form-state="formState"
           :autofocus-first="false"
           :record-id="recordId"
+          :related-context="relatedContext"
           @update-field="updateFormField"
         />
       </template>

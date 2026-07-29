@@ -68,6 +68,7 @@ export interface UiTab {
   slug: string;
   rank: number;
   is_system: boolean;
+  content_type: 'fields' | 'related_collection';
   date_created: Date;
   date_updated: Date;
 }
@@ -93,6 +94,7 @@ export interface Field {
   is_system: boolean;
   validation_rules: any;
   id_relation_entity: string | null;
+  relation_kind: 'reference' | 'composition' | null;
   relation_display_field: string | null;
   id_ui_tab: string;
   rank: number;

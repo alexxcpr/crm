@@ -9,6 +9,7 @@ const UI_TYPES = [
     'datepicker', 'datetimepicker', 'checkbox', 'relation',
     'email', 'phone', 'currency', 'file',
 ];
+const RELATION_KINDS = ['reference', 'composition'];
 
 export class CreateFieldDto {
     @IsString()
@@ -93,6 +94,10 @@ export class CreateFieldDto {
     @MaxLength(100)
     relation_display_field?: string;
 
+    @ValidateIf((o) => o.ui_type === 'relation')
+    @IsIn(RELATION_KINDS)
+    relation_kind?: 'reference' | 'composition';
+
     @IsOptional()
     @IsUUID()
     id_ui_tab?: string;
@@ -150,6 +155,10 @@ export class UpdateFieldDto {
     @IsString()
     @MaxLength(100)
     relation_display_field?: string;
+
+    @IsOptional()
+    @IsIn(RELATION_KINDS)
+    relation_kind?: 'reference' | 'composition';
 
     @IsOptional()
     @IsBoolean()

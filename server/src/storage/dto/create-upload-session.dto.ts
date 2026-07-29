@@ -7,7 +7,22 @@ import {
   IsUUID,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class RelatedUploadContextDto {
+  @IsString()
+  @IsNotEmpty()
+  parentSlug: string;
+
+  @IsUUID()
+  parentId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  collectionSlug: string;
+}
 
 export class CreateUploadSessionDto {
   @IsUUID()
@@ -16,6 +31,11 @@ export class CreateUploadSessionDto {
   @IsOptional()
   @IsUUID()
   recordId?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => RelatedUploadContextDto)
+  relatedContext?: RelatedUploadContextDto;
 
   @IsString()
   @IsNotEmpty()

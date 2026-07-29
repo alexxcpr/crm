@@ -11,7 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import type { Knex } from 'knex';
 import { Readable } from 'stream';
-import { AuthorizationService } from 'src/security/authorization.service';
+import { RecordAccessService } from 'src/security/record-access.service';
 import { AccessControlService } from 'src/security/access-control.service';
 import type { AuthenticatedUser } from 'src/security/security.types';
 import { TenantContext } from 'src/tenant/tenant-context.service';
@@ -42,7 +42,7 @@ export class FileStorageService {
   constructor(
     private readonly tenantContext: TenantContext,
     private readonly metaDb: MetaDbService,
-    private readonly authorization: AuthorizationService,
+    private readonly recordAccess: RecordAccessService,
     private readonly access: AccessControlService,
     private readonly config: ConfigService,
     private readonly quota: StorageQuotaService,
@@ -64,6 +64,7 @@ export class FileStorageService {
     await this.authorizeUploadTarget(
       entity,
       dto.recordId,
+      dto.relatedContext,
       actor,
     );
     const rules = this.parseRules(
@@ -313,8 +314,7 @@ export class FileStorageService {
                 id_entity: null,
                 id_field: null,
                 record_id: null,
-                id_owner_profile:
-                  actor.profileId,
+                id_owner_profile: actor.profileId,
                 current_version_id:
                   reservation.file_version_id,
                 current_version_number: 1,
@@ -338,8 +338,7 @@ export class FileStorageService {
                 dto.mimeType.toLowerCase(),
               size_bytes: dto.sizeBytes,
               status: 'pending',
-              id_creator_profile:
-                actor.profileId,
+              id_creator_profile: actor.profileId,
             });
             return createdFile;
           },
@@ -664,9 +663,7 @@ export class FileStorageService {
     });
   }
 
-  async requireOrganizationLogo(
-    fileId: string,
-  ) {
+  async requireOrganizationLogo(fileId: string) {
     const file = await this.requireFile(fileId);
     if (
       file.status !== 'active' ||
@@ -1645,35 +1642,102 @@ export class FileStorageService {
   private async authorizeUploadTarget(
     entity: any,
     recordId: string | undefined,
+    relatedContext:
+      | {
+          parentSlug: string;
+          parentId: string;
+          collectionSlug: string;
+        }
+      | undefined,
     actor: AuthenticatedUser,
   ): Promise<void> {
-    if (!recordId) {
-      await this.authorization.require(
+    if (recordId) {
+      await this.recordAccess.assertRecord(
         actor,
-        entity.id_entity,
+        entity,
+        recordId,
+        'update',
+      );
+      return;
+    }
+
+    const composition =
+      await this.recordAccess.compositionChain(
+        entity,
+      );
+    if (!composition.steps.length) {
+      await this.recordAccess.require(
+        actor,
+        entity,
         'create',
       );
       return;
     }
-    const scope =
-      await this.authorization.require(
-        actor,
-        entity.id_entity,
-        'update',
+    if (!relatedContext) {
+      throw new BadRequestException(
+        'Contextul parintelui este obligatoriu pentru uploadul unui copil composition nesalvat.',
       );
-    const query = this.knex(
-      entity.table_name,
-    ).where('id', recordId);
-    this.authorization.applyScope(
-      query,
-      entity.table_name,
-      scope,
-      actor.profileId,
+    }
+
+    const collection = await this.knex(
+      'related_collection_definition as collection',
+    )
+      .join(
+        'ui_tab as tab',
+        'tab.id_ui_tab',
+        'collection.id_ui_tab',
+      )
+      .join(
+        'entity as parent',
+        'parent.id_entity',
+        'tab.id_entity',
+      )
+      .join(
+        'field as relation_field',
+        'relation_field.id_field',
+        'collection.id_relation_field',
+      )
+      .where({
+        'parent.slug': relatedContext.parentSlug,
+        'tab.slug': relatedContext.collectionSlug,
+        'relation_field.id_entity':
+          entity.id_entity,
+      })
+      .select(
+        'parent.*',
+        'relation_field.id_field as relation_field_id',
+        'collection.allow_create as collection_allow_create',
+      )
+      .first();
+    if (!collection) {
+      throw new BadRequestException(
+        'Contextul colectiei asociate nu este valid.',
+      );
+    }
+    if (
+      composition.steps[0].relationField
+        .id_field !== collection.relation_field_id
+    ) {
+      throw new BadRequestException(
+        'Colectia nu reprezinta parintele composition al copilului.',
+      );
+    }
+    if (!collection.collection_allow_create) {
+      throw new ForbiddenException(
+        'Crearea este dezactivata pentru aceasta colectie.',
+      );
+    }
+    await this.recordAccess.require(
+      actor,
+      entity,
+      'create',
     );
-    if (!(await query.first()))
-      throw new NotFoundException(
-        'Inregistrarea nu exista sau nu poate fi modificata.',
-      );
+    await this.recordAccess.assertRecord(
+      actor,
+      collection,
+      relatedContext.parentId,
+      'update',
+    );
   }
 
   private async authorizeFileAccess(
@@ -1706,28 +1770,16 @@ export class FileStorageService {
       throw new NotFoundException(
         'Legatura fisierului nu mai exista.',
       );
-    const scope =
-      await this.authorization.require(
+    const { record } =
+      await this.recordAccess.assertRecord(
         actor,
-        entity.id_entity,
+        entity,
+        file.record_id,
         action,
       );
-    const query = this.knex(entity.table_name)
-      .where(
-        `${entity.table_name}.id`,
-        file.record_id,
-      )
-      .where(
-        `${entity.table_name}.${field.column_name}`,
-        file.id_file,
-      );
-    this.authorization.applyScope(
-      query,
-      entity.table_name,
-      scope,
-      actor.profileId,
-    );
-    if (!(await query.first()))
+    if (
+      record[field.column_name] !== file.id_file
+    )
       throw new ForbiddenException(
         'Nu ai acces la acest fisier.',
       );

@@ -64,10 +64,10 @@ const fieldCurrency = computed(() =>
     color="neutral"
     variant="link"
     icon="i-lucide-file-down"
-    class="max-w-56 px-0"
+    class="min-w-0 max-w-full px-0"
     @click.stop="download(String(value))"
   >
-    <span class="truncate">{{ displayValue || 'Descarca fisierul' }}</span>
+    <span class="block min-w-0 truncate">{{ displayValue || 'Descarca fisierul' }}</span>
   </UButton>
 
   <NuxtLink

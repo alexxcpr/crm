@@ -86,7 +86,13 @@ export function useEntitySchema(entitySlug: MaybeRef<string>) {
     return (schema.value?.tabs ?? []).sort((a, b) => a.rank - b.rank)
   })
 
-  const groups = computed(() => tabs.value.map(t => t.slug))
+  const fieldTabs = computed(() =>
+    tabs.value.filter(t => !t.content_type || t.content_type === 'fields')
+  )
+  const relatedTabs = computed(() =>
+    tabs.value.filter(t => t.content_type === 'related_collection')
+  )
+  const groups = computed(() => fieldTabs.value.map(t => t.slug))
   const capabilities = computed(() => schema.value?.capabilities ?? {
     read: null, create: null, update: null, delete: null, manage: null, change_ownership: null
   })
@@ -119,6 +125,8 @@ export function useEntitySchema(entitySlug: MaybeRef<string>) {
     formFields,
     filterFields,
     tabs,
+    fieldTabs,
+    relatedTabs,
     groups,
     capabilities,
     loading,
