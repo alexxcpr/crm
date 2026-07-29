@@ -28,6 +28,7 @@ interface BillingState {
   }
   features: {
     reportsDashboards: boolean
+    calendars: boolean
   }
   scheduledChanges: {
     id: string
@@ -43,6 +44,8 @@ interface BillingState {
 
 export function useAdminBilling() {
   const { apiFetch } = useApi()
+  const { fetchNavigation } = useNavigation()
+  const authData = useState<any>('auth:data')
   const billing = ref<BillingState | null>(null)
   const loading = ref(false)
   const saving = ref(false)
@@ -65,6 +68,7 @@ export function useAdminBilling() {
     profileSeats?: number
     extraStorageUnits?: number
     reportsDashboards?: boolean
+    calendars?: boolean
   }) {
     saving.value = true
     error.value = null
@@ -74,6 +78,8 @@ export function useAdminBilling() {
         body: payload
       })
       billing.value = response.data
+      authData.value = await apiFetch('/user/me')
+      await fetchNavigation()
       return true
     } catch (err: any) {
       error.value = err?.data?.message || err.message || 'Nu am putut actualiza abonamentul.'

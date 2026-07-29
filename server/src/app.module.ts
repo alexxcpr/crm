@@ -20,6 +20,7 @@ import { IntegrationsModule } from './integrations/integrations.module';
 import { StorageModule } from './storage/storage.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TenantSettingsModule } from './tenant-settings/tenant-settings.module';
+import { CalendarModule } from './calendars/calendar.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { TenantSettingsModule } from './tenant-settings/tenant-settings.module';
     SchemaModule,
     NavigationModule,
     DashboardModule,
+    CalendarModule,
     NotificationsModule,
     IntegrationsModule,
     StorageModule,

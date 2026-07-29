@@ -4,6 +4,7 @@ import { AuthenticatedUser } from 'src/security/security.types';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { MenuLinkType } from 'src/admin/dto/menu.dto';
 import { DashboardService } from 'src/dashboards/dashboard.service';
+import { CalendarService } from 'src/calendars/calendar.service';
 
 interface MenuItemRow {
   id_menu_item: string;
@@ -16,6 +17,7 @@ interface MenuItemRow {
   id_entity: string | null;
   record_id: string | null;
   id_ui_dashboard: string | null;
+  id_ui_calendar: string | null;
   is_active: boolean;
 }
 
@@ -35,6 +37,7 @@ export class NavigationMenuService {
     private readonly tenantContext: TenantContext,
     private readonly authorization: AuthorizationService,
     private readonly dashboards: DashboardService,
+    private readonly calendars: CalendarService,
   ) {}
 
   private get knex() { return this.tenantContext.knex; }
@@ -49,7 +52,7 @@ export class NavigationMenuService {
 
     for (const menu of menus) {
       const items = await this.knex<MenuItemRow>('menu_item')
-        .select('id_menu_item', 'id_menu', 'name', 'icon', 'rank', 'open_link', 'link_type', 'id_entity', 'record_id', 'id_ui_dashboard', 'is_active')
+        .select('id_menu_item', 'id_menu', 'name', 'icon', 'rank', 'open_link', 'link_type', 'id_entity', 'record_id', 'id_ui_dashboard', 'id_ui_calendar', 'is_active')
         .where('id_menu', menu.id_menu)
         .where('is_active', true)
         .orderBy('rank', 'asc');
@@ -80,6 +83,15 @@ export class NavigationMenuService {
   private async canSeeItem(user: AuthenticatedUser, item: MenuItemRow) {
     if (item.link_type === 'dashboard') {
       return Boolean(item.id_ui_dashboard && await this.dashboards.canViewDashboard(item.id_ui_dashboard, user));
+    }
+    if (item.link_type === 'calendar') {
+      return Boolean(
+        item.id_ui_calendar &&
+        await this.calendars.canViewCalendar(
+          item.id_ui_calendar,
+          user,
+        ),
+      );
     }
     if (item.link_type === 'external_url' || item.link_type === 'internal_route') return true;
     if (!item.id_entity) return false;

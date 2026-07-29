@@ -21,6 +21,7 @@ export class BillingController {
     profileSeats?: number;
     extraStorageUnits?: number;
     reportsDashboards?: boolean;
+    calendars?: boolean;
   }) {
     return returnValidResponse('Abonamentul a fost actualizat.', await this.billing.updateBilling(body));
   }

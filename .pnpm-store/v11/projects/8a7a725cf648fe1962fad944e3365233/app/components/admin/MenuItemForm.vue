@@ -2,6 +2,7 @@
 import { z } from 'zod'
 import type { AdminEntity, AdminMenuItem, MenuItemPayload, MenuLinkType } from '~/types/admin'
 import type { DashboardDefinition } from '~/types/dashboard'
+import type { CalendarDefinition } from '~/types/calendar'
 import type { FormSubmitEvent } from '@nuxt/ui'
 
 const props = defineProps<{
@@ -9,6 +10,7 @@ const props = defineProps<{
   item?: AdminMenuItem | null
   entities: AdminEntity[]
   dashboards: DashboardDefinition[]
+  calendars: CalendarDefinition[]
 }>()
 
 const emit = defineEmits<{
@@ -21,6 +23,7 @@ const linkTypes = [
   { label: 'Creare inregistrare', value: 'entity_create' },
   { label: 'Inregistrare existenta', value: 'entity_record' },
   { label: 'Dashboard', value: 'dashboard' },
+  { label: 'Calendar', value: 'calendar' },
   { label: 'Ruta interna', value: 'internal_route' },
   { label: 'URL extern', value: 'external_url' }
 ] satisfies { label: string, value: MenuLinkType }[]
@@ -30,10 +33,11 @@ const schema = z.object({
   icon: z.string().max(50).optional().or(z.literal('')),
   rank: z.number().int().min(0).default(0),
   open_link: z.string().min(1, 'Link-ul este obligatoriu').max(500),
-  link_type: z.enum(['entity_list', 'entity_create', 'entity_record', 'dashboard', 'internal_route', 'external_url']),
+  link_type: z.enum(['entity_list', 'entity_create', 'entity_record', 'dashboard', 'calendar', 'internal_route', 'external_url']),
   id_entity: z.string().uuid().optional().or(z.literal('')),
   record_id: z.string().uuid().optional().or(z.literal('')),
   id_ui_dashboard: z.string().uuid().optional().or(z.literal('')),
+  id_ui_calendar: z.string().uuid().optional().or(z.literal('')),
   is_active: z.boolean().default(true)
 })
 
@@ -50,6 +54,7 @@ const state = reactive<Schema>({
   id_entity: props.item?.id_entity ?? '',
   record_id: props.item?.record_id ?? '',
   id_ui_dashboard: props.item?.id_ui_dashboard ?? '',
+  id_ui_calendar: props.item?.id_ui_calendar ?? '',
   is_active: props.item?.is_active ?? true
 })
 
@@ -68,10 +73,16 @@ const selectedDashboard = computed(() => props.dashboards.find(dashboard => dash
 const dashboardOptions = computed(() => props.dashboards
   .filter(dashboard => dashboard.is_active)
   .map(dashboard => ({ label: dashboard.name, value: dashboard.id_ui_dashboard! })))
+const usesCalendar = computed(() => state.link_type === 'calendar')
+const selectedCalendar = computed(() => props.calendars.find(calendar => calendar.id_ui_calendar === state.id_ui_calendar))
+const calendarOptions = computed(() => props.calendars
+  .filter(calendar => calendar.is_active)
+  .map(calendar => ({ label: calendar.name, value: calendar.id_ui_calendar! })))
 
 const generatedLink = computed(() => {
   const slug = selectedEntity.value?.slug
   if (state.link_type === 'dashboard') return selectedDashboard.value ? `/dashboards/${selectedDashboard.value.slug}` : ''
+  if (state.link_type === 'calendar') return selectedCalendar.value ? `/calendars/${selectedCalendar.value.slug}` : ''
   if (!slug) return ''
   if (state.link_type === 'entity_list') return `/${slug}`
   if (state.link_type === 'entity_create') return `/${slug}/create`
@@ -96,6 +107,7 @@ watch(() => state.link_type, () => {
   }
 
   if (!usesDashboard.value) state.id_ui_dashboard = ''
+  if (!usesCalendar.value) state.id_ui_calendar = ''
 
   if (generatedLink.value && !linkManuallyEdited.value) {
     state.open_link = generatedLink.value
@@ -125,6 +137,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       id_entity: event.data.id_entity || undefined,
       record_id: event.data.record_id || undefined,
       id_ui_dashboard: event.data.id_ui_dashboard || undefined,
+      id_ui_calendar: event.data.id_ui_calendar || undefined,
       is_active: event.data.is_active
     }
 
@@ -189,6 +202,16 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         v-model="state.id_ui_dashboard"
         :items="dashboardOptions"
         placeholder="Selecteaza dashboard-ul"
+        value-key="value"
+        class="w-full"
+      />
+    </UFormField>
+
+    <UFormField v-if="usesCalendar" label="Calendar" name="id_ui_calendar" required>
+      <USelect
+        v-model="state.id_ui_calendar"
+        :items="calendarOptions"
+        placeholder="Selectează calendarul"
         value-key="value"
         class="w-full"
       />

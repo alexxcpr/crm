@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -49,6 +50,84 @@ export class DynamicDataService {
 
   private get knex() {
     return this.tenantContext.knex;
+  }
+
+  private async validateCalendarIntervals(
+    entityId: string,
+    candidate: Record<string, any>,
+    changedColumns?: Set<string>,
+  ) {
+    if (
+      !this.knex.schema?.hasTable ||
+      !await this.knex.schema.hasTable(
+        'ui_calendar_source',
+      )
+    ) {
+      return;
+    }
+    const mappings = await this.knex(
+      'ui_calendar_source as source',
+    )
+      .join(
+        'ui_calendar as calendar',
+        'calendar.id_ui_calendar',
+        'source.id_ui_calendar',
+      )
+      .join(
+        'field as start_field',
+        'start_field.id_field',
+        'source.id_start_field',
+      )
+      .join(
+        'field as end_field',
+        'end_field.id_field',
+        'source.id_end_field',
+      )
+      .where({
+        'source.id_entity': entityId,
+        'source.is_active': true,
+        'calendar.is_active': true,
+      })
+      .select(
+        'start_field.column_name as start_column',
+        'start_field.name as start_name',
+        'end_field.column_name as end_column',
+        'end_field.name as end_name',
+      );
+
+    for (const mapping of mappings) {
+      if (
+        changedColumns &&
+        !changedColumns.has(mapping.start_column) &&
+        !changedColumns.has(mapping.end_column)
+      ) {
+        continue;
+      }
+      const startValue =
+        candidate[mapping.start_column];
+      const endValue = candidate[mapping.end_column];
+      if (
+        startValue === null ||
+        startValue === undefined ||
+        startValue === '' ||
+        endValue === null ||
+        endValue === undefined ||
+        endValue === ''
+      ) {
+        continue;
+      }
+      const start = new Date(startValue);
+      const end = new Date(endValue);
+      if (
+        Number.isNaN(start.getTime()) ||
+        Number.isNaN(end.getTime()) ||
+        end <= start
+      ) {
+        throw new BadRequestException(
+          `Intervalul "${mapping.start_name} – ${mapping.end_name}" este invalid: data de final trebuie să fie strict după data de început.`,
+        );
+      }
+    }
   }
 
   private isForeignKeyViolation(
@@ -484,6 +563,10 @@ export class DynamicDataService {
         actor,
       );
     }
+    await this.validateCalendarIntervals(
+      entity.id_entity,
+      insertData,
+    );
     let record: Record<string, any>;
     await this.knex.transaction(async (trx) => {
       [record] = await trx(entity.table_name)
@@ -683,6 +766,11 @@ export class DynamicDataService {
         );
       }
     }
+    await this.validateCalendarIntervals(
+      entity.id_entity,
+      { ...existing, ...sanitized },
+      new Set(Object.keys(sanitized)),
+    );
     const filesToDelete: string[] = [];
     let record: Record<string, any>;
     await this.knex.transaction(async (trx) => {

@@ -1255,6 +1255,25 @@ export class TenantProvisioningService {
           updated_at: this.metaDb.knex.fn.now(),
         });
     }
+    if (input.features.calendars) {
+      await this.metaDb
+        .knex('tenant_feature_entitlements')
+        .insert({
+          tenant_id: tenant.id,
+          feature_key: 'calendars',
+          status: 'active',
+          active_from: this.metaDb.knex.fn.now(),
+          updated_at: this.metaDb.knex.fn.now(),
+        })
+        .onConflict(['tenant_id', 'feature_key'])
+        .merge({
+          status: 'active',
+          active_from: this.metaDb.knex.fn.now(),
+          active_until: null,
+          cancel_at_period_end: false,
+          updated_at: this.metaDb.knex.fn.now(),
+        });
+    }
   }
 
   private async markTenantProvisioningFailed(

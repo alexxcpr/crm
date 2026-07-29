@@ -13,6 +13,7 @@ const {
 const profileSeatsDraft = ref(5)
 const storageUnitsDraft = ref(0)
 const reportsDashboardsDraft = ref(false)
+const calendarsDraft = ref(false)
 
 const storagePrice = computed(() => billing.value?.storage.unitPriceEur ?? 1.5)
 const storageUnitGb = computed(() => billing.value?.storage.unitGb ?? 10)
@@ -32,13 +33,15 @@ watch(billing, (value) => {
   profileSeatsDraft.value = value.profileSeats.contracted
   storageUnitsDraft.value = value.storage.extraUnits
   reportsDashboardsDraft.value = value.features.reportsDashboards
+  calendarsDraft.value = value.features.calendars
 }, { immediate: true })
 
 async function saveBilling() {
   const ok = await updateBilling({
     profileSeats: profileSeatsDraft.value,
     extraStorageUnits: storageUnitsDraft.value,
-    reportsDashboards: reportsDashboardsDraft.value
+    reportsDashboards: reportsDashboardsDraft.value,
+    calendars: calendarsDraft.value
   })
 
   toast.add({
@@ -214,6 +217,18 @@ onMounted(fetchBilling)
           >
             <USwitch
               v-model="reportsDashboardsDraft"
+              :disabled="saving"
+              label="Activ"
+            />
+          </UPageCard>
+
+          <UPageCard
+            title="Calendare configurabile"
+            description="Activeaza calendarele multi-sursa. Add-on-ul se factureaza pentru fiecare profil activ."
+            variant="subtle"
+          >
+            <USwitch
+              v-model="calendarsDraft"
               :disabled="saving"
               label="Activ"
             />

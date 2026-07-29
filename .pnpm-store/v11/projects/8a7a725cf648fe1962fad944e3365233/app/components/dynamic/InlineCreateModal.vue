@@ -6,6 +6,7 @@ const props = defineProps<{
   entityLabel: string
   open: boolean
   relatedContext?: RelatedRecordContext
+  initialValues?: Record<string, any>
 }>()
 
 const emit = defineEmits<{
@@ -117,6 +118,7 @@ watch(modalOpen, (val) => {
         ref="formComp"
         :entity-slug="entitySlug"
         :related-context="relatedContext"
+        :initial-values="initialValues"
         @created="onCreated"
         @cancel="onCancelRequested"
       />

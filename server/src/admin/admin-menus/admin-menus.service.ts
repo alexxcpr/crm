@@ -193,6 +193,30 @@ export class AdminMenusService {
         throw new BadRequestException('Link-ul dashboard-ului nu corespunde dashboard-ului selectat.');
       }
     }
+
+    if (dto.link_type === 'calendar') {
+      if (!dto.id_ui_calendar) {
+        throw new BadRequestException(
+          'Calendarul este obligatoriu pentru acest tip de link.',
+        );
+      }
+      const calendar = await this.knex('ui_calendar')
+        .where({
+          id_ui_calendar: dto.id_ui_calendar,
+          is_active: true,
+        })
+        .first();
+      if (!calendar) {
+        throw new BadRequestException(
+          'Calendarul selectat nu există sau este inactiv.',
+        );
+      }
+      if (openLink !== `/calendars/${calendar.slug}`) {
+        throw new BadRequestException(
+          'Link-ul calendarului nu corespunde calendarului selectat.',
+        );
+      }
+    }
   }
 
   private validateExternalUrl(openLink: string) {
@@ -230,6 +254,7 @@ export class AdminMenusService {
       id_entity: dto.id_entity || null,
       record_id: dto.record_id || null,
       id_ui_dashboard: dto.id_ui_dashboard || null,
+      id_ui_calendar: dto.id_ui_calendar || null,
       is_active: dto.is_active ?? true,
     };
   }

@@ -3,7 +3,9 @@ import type { NavigationMenuItem } from '@nuxt/ui'
 
 definePageMeta({ middleware: ['capability'], requiredCapability: 'builder.manage' })
 
-const links = [[{
+const { hasFeature } = useFeatures()
+
+const links = computed(() => [[{
   label: 'Module',
   icon: 'i-lucide-boxes',
   to: '/builder/modules',
@@ -20,6 +22,11 @@ const links = [[{
   label: 'Dashboard-uri',
   icon: 'i-lucide-layout-dashboard',
   to: '/builder/dashboards'
+}, ...(hasFeature('calendars') ? [{
+  label: 'Calendare',
+  icon: 'i-lucide-calendar-days',
+  to: '/builder/calendars'
+}] : []), {
 }, {
   label: 'Workflow-uri',
   icon: 'i-lucide-workflow',
@@ -32,7 +39,7 @@ const links = [[{
   label: 'Domenii HTTP',
   icon: 'i-lucide-shield-check',
   to: '/builder/http-domains'
-}]] satisfies NavigationMenuItem[][]
+}]] satisfies NavigationMenuItem[][])
 </script>
 
 <template>

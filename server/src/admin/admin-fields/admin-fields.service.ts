@@ -674,6 +674,69 @@ export class AdminFieldsService {
       );
     }
 
+    if (
+      await this.knex.schema.hasTable(
+        'ui_calendar_source',
+      )
+    ) {
+      const calendarSources = await this.knex(
+        'ui_calendar_source as source',
+      )
+        .join(
+          'ui_calendar as calendar',
+          'calendar.id_ui_calendar',
+          'source.id_ui_calendar',
+        )
+        .leftJoin(
+          'ui_calendar_source_popover_field as popover',
+          'popover.id_ui_calendar_source',
+          'source.id_ui_calendar_source',
+        )
+        .where('source.id_entity', entityId)
+        .select(
+          'source.*',
+          'calendar.name as calendar_name',
+          this.knex.raw(
+            'array_remove(array_agg(popover.id_field), NULL) as popover_field_ids',
+          ),
+        )
+        .groupBy(
+          'source.id_ui_calendar_source',
+          'calendar.name',
+        );
+      const calendarUsage = calendarSources.find(
+        (source) => {
+          const titleSegments = this.parseJsonArray(
+            source.title_segments,
+          );
+          const filters = this.parseJsonArray(
+            source.filters,
+          );
+          return (
+            source.id_start_field === fieldId ||
+            source.id_end_field === fieldId ||
+            (source.popover_field_ids ?? []).includes(
+              fieldId,
+            ) ||
+            titleSegments.some(
+              (segment) =>
+                segment?.type === 'field' &&
+                segment?.id_field === fieldId,
+            ) ||
+            filters.some(
+              (filter) =>
+                filter?.id_field === fieldId,
+            )
+          );
+        },
+      );
+      if (calendarUsage) {
+        throw new BadRequestException(
+          `Campul "${field.name}" este folosit de sursa "${calendarUsage.name}" din calendarul "${calendarUsage.calendar_name}". Reconfigureaza calendarul inainte de stergere.`,
+        );
+      }
+    }
+
     await this.dynamicSchema.removeColumn(
       entity,
       field,
@@ -700,6 +763,17 @@ export class AdminFieldsService {
       );
     }
     return entity;
+  }
+
+  private parseJsonArray(value: unknown): any[] {
+    if (Array.isArray(value)) return value;
+    if (typeof value !== 'string') return [];
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
   }
 
   private async validateLayoutForCreate(

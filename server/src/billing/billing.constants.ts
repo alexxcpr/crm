@@ -10,6 +10,12 @@ export const BILLING_FEATURES = {
     description: 'Configurare rapoarte si dashboard-uri in UI.',
     unit: 'profile_seat',
   },
+  calendars: {
+    key: 'calendars',
+    label: 'Calendare configurabile',
+    description: 'Calendare multi-sursa configurabile din Builder.',
+    unit: 'profile_seat',
+  },
 } as const;
 
 export type BillingFeatureKey = typeof BILLING_FEATURES[keyof typeof BILLING_FEATURES]['key'];

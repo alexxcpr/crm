@@ -8,6 +8,7 @@ import { INLINE_CREATE_DEPTH_KEY } from '~/utils/inlineCreate'
 const props = defineProps<{
   entitySlug: string
   relatedContext?: RelatedRecordContext
+  initialValues?: Record<string, any>
 }>()
 
 const emit = defineEmits<{
@@ -127,7 +128,13 @@ function onFormError(event: { errors: Array<{ name?: string, message?: string }>
 // ─── Inițializare state ───
 function initFormState(record?: Record<string, any> | null) {
   for (const field of embeddedFormFields.value) {
-    if (record && record[field.column_name] !== undefined) {
+    const hasInitialSlug = Object.prototype.hasOwnProperty.call(props.initialValues ?? {}, field.slug)
+    const hasInitialColumn = Object.prototype.hasOwnProperty.call(props.initialValues ?? {}, field.column_name)
+    if (hasInitialSlug) {
+      formState[field.slug] = props.initialValues![field.slug]
+    } else if (hasInitialColumn) {
+      formState[field.slug] = props.initialValues![field.column_name]
+    } else if (record && record[field.column_name] !== undefined) {
       formState[field.slug] = record[field.column_name]
     } else if (field.default_value != null) {
       formState[field.slug] = castDefault(field)

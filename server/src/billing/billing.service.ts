@@ -31,6 +31,7 @@ interface BillingUpdateInput {
   profileSeats?: number;
   extraStorageUnits?: number;
   reportsDashboards?: boolean;
+  calendars?: boolean;
 }
 
 @Injectable()
@@ -59,6 +60,7 @@ export class BillingService {
     const storageQuotaGb = includedStorageGb + extraStorageUnits * STORAGE_UNIT_GB;
     const features = {
       reportsDashboards: this.isEntitlementActive(entitlements.reports_dashboards),
+      calendars: this.isEntitlementActive(entitlements.calendars),
     };
 
     return {
@@ -169,6 +171,30 @@ export class BillingService {
           });
       }
 
+      if (input.calendars !== undefined) {
+        const status = input.calendars || periodEnd ? 'active' : 'inactive';
+        await trx('tenant_feature_entitlements')
+          .insert({
+            tenant_id: tenant.id,
+            feature_key: BILLING_FEATURES.calendars.key,
+            status,
+            active_from: input.calendars ? trx.fn.now() : null,
+            active_until: input.calendars ? null : periodEnd,
+            current_period_end: periodEnd,
+            cancel_at_period_end: !input.calendars,
+            updated_at: trx.fn.now(),
+          })
+          .onConflict(['tenant_id', 'feature_key'])
+          .merge({
+            status,
+            active_from: input.calendars ? trx.fn.now() : null,
+            active_until: input.calendars ? null : periodEnd,
+            current_period_end: periodEnd,
+            cancel_at_period_end: !input.calendars,
+            updated_at: trx.fn.now(),
+          });
+      }
+
       for (const change of scheduled) {
         await trx('tenant_scheduled_billing_changes').insert({
           tenant_id: tenant.id,
@@ -193,6 +219,7 @@ export class BillingService {
         + Number(tenant.extra_storage_units || 0) * STORAGE_UNIT_GB,
       features: {
         reportsDashboards: this.isEntitlementActive(entitlements.reports_dashboards),
+        calendars: this.isEntitlementActive(entitlements.calendars),
       },
     };
   }
@@ -285,7 +312,8 @@ export class BillingService {
     const shouldSyncProfileSeats = input.profileSeats !== undefined && input.profileSeats > current.currentProfileSeats;
     const shouldSyncStorage = input.extraStorageUnits !== undefined && input.extraStorageUnits > current.currentStorageUnits;
     const shouldSyncReports = input.reportsDashboards === true;
-    if (!shouldSyncProfileSeats && !shouldSyncStorage && !shouldSyncReports) return;
+    const shouldSyncCalendars = input.calendars === true;
+    if (!shouldSyncProfileSeats && !shouldSyncStorage && !shouldSyncReports && !shouldSyncCalendars) return;
     if (!tenant.stripe_subscription_id) {
       if (!this.isProduction) return;
       throw new BadRequestException('Tenantul nu are un subscription Stripe asociat.');
@@ -305,11 +333,12 @@ export class BillingService {
       },
       body: JSON.stringify({
         subscriptionId: tenant.stripe_subscription_id,
-        profileSeats: shouldSyncProfileSeats || shouldSyncReports
+        profileSeats: shouldSyncProfileSeats || shouldSyncReports || shouldSyncCalendars
           ? (input.profileSeats ?? current.currentProfileSeats)
           : undefined,
         extraStorageUnits: shouldSyncStorage ? input.extraStorageUnits : undefined,
         reportsDashboards: shouldSyncReports ? input.reportsDashboards : undefined,
+        calendars: shouldSyncCalendars ? input.calendars : undefined,
       }),
     });
 

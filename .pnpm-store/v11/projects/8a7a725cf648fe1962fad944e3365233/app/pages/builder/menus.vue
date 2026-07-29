@@ -14,6 +14,7 @@ const {
 } = useAdminMenus()
 const { entities, fetchEntities } = useAdminEntities()
 const { dashboards, fetchDashboards } = useAdminDashboards()
+const { calendars, fetchCalendars } = useAdminCalendars()
 const { hasFeature } = useFeatures()
 const { fetchNavigation } = useNavigation()
 const toast = useToast()
@@ -25,7 +26,8 @@ const { savingRank: savingItemRank, persistRankOrder: persistItemRank } = useRan
 await Promise.all([
   fetchMenus(),
   fetchEntities(),
-  hasFeature('reportsDashboards') ? fetchDashboards() : Promise.resolve()
+  hasFeature('reportsDashboards') ? fetchDashboards() : Promise.resolve(),
+  hasFeature('calendars') ? fetchCalendars() : Promise.resolve()
 ])
 
 const selectedMenuId = ref(menus.value[0]?.id_menu ?? '')
@@ -234,6 +236,7 @@ const linkTypeLabels: Record<string, string> = {
   entity_create: 'Create',
   entity_record: 'Record',
   dashboard: 'Dashboard',
+  calendar: 'Calendar',
   internal_route: 'Intern',
   external_url: 'Extern'
 }
@@ -471,6 +474,7 @@ const linkTypeLabels: Record<string, string> = {
           :item="editingItem"
           :entities="entities"
           :dashboards="dashboards"
+          :calendars="calendars"
           @saved="onItemSaved"
           @cancel="showItemModal = false"
         />
