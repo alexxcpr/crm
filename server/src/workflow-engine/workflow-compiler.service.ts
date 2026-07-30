@@ -13,6 +13,7 @@ import type {
 interface CompileOptions {
   workflowId?: string;
   triggerEvents?: string[];
+  scheduleContext?: boolean;
 }
 
 const SYSTEM_SOURCE_FIELDS = new Map<
@@ -234,6 +235,12 @@ export class WorkflowCompilerService {
       triggerEvents,
       errors,
     );
+    if (options.scheduleContext) {
+      this.validateScheduleContext(
+        normalizedNodes,
+        errors,
+      );
+    }
     this.validateReferences(
       normalizedNodes,
       edges,
@@ -473,6 +480,46 @@ export class WorkflowCompilerService {
             message:
               'Before_* permite modificarea numai a recordului curent.',
             nodeId: node.id,
+          });
+        }
+      }
+    }
+  }
+
+  private validateScheduleContext(
+    nodes: WorkflowSourceNode[],
+    errors: WorkflowValidationIssue[],
+  ) {
+    for (const node of nodes) {
+      const parameters = node.parameters ?? {};
+      if (node.type === 'app_update_record') {
+        const source =
+          parameters.recordIdSource ?? {};
+        const hasExplicitRecord =
+          Boolean(parameters.recordId) ||
+          Boolean(source.value) ||
+          Boolean(source.sourceNodeId);
+        if (!hasExplicitRecord) {
+          errors.push({
+            code: 'schedule_record_context_required',
+            message:
+              'Nodul Actualizeaza Record are nevoie de un ID explicit pentru o rulare programata.',
+            nodeId: node.id,
+            field: 'recordIdSource',
+          });
+        }
+      }
+      if (node.type === 'app_get_related') {
+        const hasExplicitRecord =
+          Boolean(parameters.sourceNodeId) ||
+          Boolean(parameters.relationRecordId);
+        if (!hasExplicitRecord) {
+          errors.push({
+            code: 'schedule_record_context_required',
+            message:
+              'Nodul Citeste Relationat are nevoie de o sursa explicita pentru o rulare programata.',
+            nodeId: node.id,
+            field: 'sourceNodeId',
           });
         }
       }

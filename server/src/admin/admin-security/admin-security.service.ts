@@ -29,7 +29,7 @@ export class AdminSecurityService {
       actor,
       'access_levels.manage',
     );
-    const users = await this.knex('user').select('id', 'login_username', 'must_change_password', 'is_active', 'date_created').orderBy('date_created');
+    const users = await this.knex('user').where('is_system', false).select('id', 'login_username', 'must_change_password', 'is_active', 'date_created').orderBy('date_created');
     for (const user of users) {
       user.profiles = await this.profileQuery(
         includePlatformOwners,
@@ -100,6 +100,11 @@ export class AdminSecurityService {
     await this.assertProfileCapacity();
     const user = await this.knex('user').where('id', userId).first();
     if (!user) throw new NotFoundException('Userul nu exista.');
+    if (user.is_system) {
+      throw new ForbiddenException(
+        'Conturile de sistem nu pot fi administrate.',
+      );
+    }
     if (
       await this.knex('profile')
         .where({
@@ -152,6 +157,11 @@ export class AdminSecurityService {
   ) {
     const current = await this.knex('profile').where('id_profile', profileId).first();
     if (!current) throw new NotFoundException('Profilul nu exista.');
+    if (current.is_system) {
+      throw new ForbiddenException(
+        'Profilurile de sistem nu pot fi modificate.',
+      );
+    }
     await this.assertBusinessRoleIds(body.roleIds);
     const canManageAccess = this.access.has(
       actor,
@@ -222,6 +232,11 @@ export class AdminSecurityService {
       throw new NotFoundException(
         'Profilul nu exista.',
       );
+    if (current.is_system) {
+      throw new ForbiddenException(
+        'Profilurile de sistem nu pot fi modificate.',
+      );
+    }
     if (
       current.access_level === 'platform_owner'
     ) {
@@ -472,7 +487,8 @@ export class AdminSecurityService {
     const query = this.knex('profile')
       .select('profile.*', this.knex.raw("COALESCE(json_agg(json_build_object('id_role', role.id_role, 'name', role.name, 'slug', role.slug)) FILTER (WHERE role.id_role IS NOT NULL AND role.slug NOT IN ('admin', 'platform_owner', 'tenant_admin')), '[]') as roles"))
       .leftJoin('profile_role', 'profile.id_profile', 'profile_role.id_profile')
-      .leftJoin('role', 'profile_role.id_role', 'role.id_role');
+      .leftJoin('role', 'profile_role.id_role', 'role.id_role')
+      .where('profile.is_system', false);
     if (!includePlatformOwners) {
       query.whereNot(
         'profile.access_level',
@@ -527,6 +543,7 @@ export class AdminSecurityService {
     const [{ count: billableCount }] =
       await this.knex('profile')
         .where('is_active', true)
+        .where('is_system', false)
         .whereNot(
           'access_level',
           'platform_owner',
@@ -540,6 +557,7 @@ export class AdminSecurityService {
       .where({
         id_profile: profileId,
         access_level: 'tenant_admin',
+        is_system: false,
       })
       .first();
     if (!isAdmin) return;
@@ -547,6 +565,7 @@ export class AdminSecurityService {
       .where({
         is_active: true,
         access_level: 'tenant_admin',
+        is_system: false,
       })
       .whereNot('profile.id_profile', profileId)
       .countDistinct('profile.id_profile as count');
@@ -591,9 +610,13 @@ export class AdminSecurityService {
     if (
       await db('profile')
         .whereIn('id_profile', profileIds)
-        .whereIn(
-          'access_level',
-          forbiddenLevels,
+        .andWhere((query) =>
+          query
+            .where('is_system', true)
+            .orWhereIn(
+              'access_level',
+              forbiddenLevels,
+            ),
         )
         .first()
     ) {

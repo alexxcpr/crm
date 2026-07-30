@@ -32,6 +32,10 @@ const links = computed(() => [[{
   icon: 'i-lucide-workflow',
   to: '/builder/workflows'
 }, {
+  label: 'Programari',
+  icon: 'i-lucide-clock-3',
+  to: '/builder/schedules'
+}, {
   label: 'Actiuni',
   icon: 'i-lucide-zap',
   to: '/builder/actions'

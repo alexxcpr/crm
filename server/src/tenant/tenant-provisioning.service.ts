@@ -1118,6 +1118,7 @@ export class TenantProvisioningService {
           .where({
             access_level: 'tenant_admin',
             is_active: true,
+            is_system: false,
           })
           .count('* as count');
       const activeTenantAdmins = Number(

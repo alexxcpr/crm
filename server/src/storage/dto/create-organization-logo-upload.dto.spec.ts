@@ -14,7 +14,7 @@ describe('CreateOrganizationLogoUploadDto', () => {
       '946eca1f-e7c4-4b8b-b7f8-c7a277e6a489',
   };
 
-  it('accepta PNG, JPEG si WebP in limita de 2 MB', async () => {
+  it('accepta PNG, JPEG si WebP in limita de 10 MB', async () => {
     for (const mimeType of [
       'image/png',
       'image/jpeg',
@@ -31,7 +31,7 @@ describe('CreateOrganizationLogoUploadDto', () => {
     }
   });
 
-  it('respinge SVG si fisierele mai mari de 2 MB', async () => {
+  it('respinge SVG si fisierele mai mari de 10 MB', async () => {
     const svgErrors = await validate(
       plainToInstance(
         CreateOrganizationLogoUploadDto,

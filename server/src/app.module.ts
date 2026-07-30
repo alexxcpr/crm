@@ -21,6 +21,7 @@ import { StorageModule } from './storage/storage.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TenantSettingsModule } from './tenant-settings/tenant-settings.module';
 import { CalendarModule } from './calendars/calendar.module';
+import { WorkflowSchedulerModule } from './workflow-scheduler/workflow-scheduler.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { CalendarModule } from './calendars/calendar.module';
     AdminModule,
     BillingModule,
     ActionsModule,
+    WorkflowSchedulerModule,
     HealthModule,
   ],
 })

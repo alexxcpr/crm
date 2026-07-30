@@ -49,7 +49,14 @@ export class WorkflowNodeExecutorService {
       case 'start':
         return {
           ...(context.record ?? {}),
-          record: context.record ?? {},
+          record:
+            context.trigger === 'schedule'
+              ? (context.record ?? null)
+              : (context.record ?? {}),
+          schedule: context.schedule ?? null,
+          scheduledAt:
+            context.schedule?.scheduledFor ??
+            null,
           previousData:
             context.previousData ?? null,
           recordId:

@@ -35,6 +35,9 @@ export class WorkflowHistoryService {
         input.parentExecutionId ?? null,
       trigger_type: input.trigger,
       trigger_name: input.triggerName ?? null,
+      id_schedule: input.schedule?.id ?? null,
+      scheduled_for:
+        input.schedule?.scheduledFor ?? null,
       entity_slug: input.entitySlug ?? null,
       record_id: input.recordId ?? null,
       id_actor_user: input.actor.id,
@@ -73,6 +76,36 @@ export class WorkflowHistoryService {
         duration_ms: Date.now() - startedAt,
         date_finished: new Date(),
       });
+  }
+
+  async skipExecution(
+    workflowId: string,
+    revisionId: string,
+    input: WorkflowExecutionInput,
+    code: string,
+    message: string,
+  ): Promise<string> {
+    const executionId = randomUUID();
+    await this.knex('workflow_execution').insert({
+      id_execution: executionId,
+      id_workflow: workflowId,
+      id_revision: revisionId,
+      trigger_type: input.trigger,
+      trigger_name: input.triggerName ?? null,
+      id_schedule: input.schedule?.id ?? null,
+      scheduled_for:
+        input.schedule?.scheduledFor ?? null,
+      entity_slug: input.entitySlug ?? null,
+      record_id: input.recordId ?? null,
+      id_actor_user: input.actor.id,
+      id_actor_profile: input.actor.profileId,
+      status: 'skipped',
+      error_code: code.slice(0, 100),
+      error_message: message.slice(0, 10_000),
+      duration_ms: 0,
+      date_finished: new Date(),
+    });
+    return executionId;
   }
 
   async startNodeRun(input: {
@@ -138,17 +171,51 @@ export class WorkflowHistoryService {
     page = 1,
     limit = 25,
   ) {
+    return this.listFiltered(
+      { workflowId },
+      page,
+      limit,
+    );
+  }
+
+  async listBySchedule(
+    scheduleId: string,
+    page = 1,
+    limit = 25,
+  ) {
+    return this.listFiltered(
+      { scheduleId },
+      page,
+      limit,
+    );
+  }
+
+  private async listFiltered(
+    filter: {
+      workflowId?: string;
+      scheduleId?: string;
+    },
+    page: number,
+    limit: number,
+  ) {
     const safePage = Math.max(1, page);
     const safeLimit = Math.min(
       100,
       Math.max(1, limit),
     );
-    const base = this.knex(
-      'workflow_execution',
-    ).where(
-      'workflow_execution.id_workflow',
-      workflowId,
-    );
+    const base = this.knex('workflow_execution');
+    if (filter.workflowId) {
+      base.where(
+        'workflow_execution.id_workflow',
+        filter.workflowId,
+      );
+    }
+    if (filter.scheduleId) {
+      base.where(
+        'workflow_execution.id_schedule',
+        filter.scheduleId,
+      );
+    }
     const [countRow, data] = await Promise.all([
       base.clone().count('* as total').first(),
       base

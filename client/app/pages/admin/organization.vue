@@ -63,8 +63,8 @@ async function save() {
 async function selectLogo(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
   if (!file) return
-  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) {
-    toast.add({ title: 'Logo invalid', description: 'Foloseste PNG, JPEG sau WebP de maximum 2 MB.', color: 'error' })
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) {
+    toast.add({ title: 'Logo invalid', description: 'Foloseste PNG, JPEG sau WebP de maximum 10 MB.', color: 'error' })
     return
   }
 

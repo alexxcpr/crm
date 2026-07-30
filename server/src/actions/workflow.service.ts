@@ -187,6 +187,15 @@ export class WorkflowService {
         `Workflow-ul "${id}" nu a fost gasit.`,
       );
     }
+    if (
+      dto.status === 'paused' ||
+      dto.status === 'draft'
+    ) {
+      await this.assertNoLinkedSchedules(
+        [existing],
+        true,
+      );
+    }
     const changesGraph =
       dto.nodes !== undefined ||
       dto.connections !== undefined;
@@ -373,6 +382,9 @@ export class WorkflowService {
       );
     }
     await this.assertNoLinkedActions([existing]);
+    await this.assertNoLinkedSchedules([
+      existing,
+    ]);
     await this.knex(this.TABLE)
       .where('id_workflow', id)
       .del();
@@ -391,6 +403,7 @@ export class WorkflowService {
       this.TABLE,
     ).whereIn('id_workflow', ids);
     await this.assertNoLinkedActions(workflows);
+    await this.assertNoLinkedSchedules(workflows);
     const deletedCount = await this.knex(
       this.TABLE,
     )
@@ -420,6 +433,10 @@ export class WorkflowService {
         `Workflow-ul "${id}" nu a fost gasit.`,
       );
     }
+    await this.assertNoLinkedSchedules(
+      [existing],
+      true,
+    );
     await this.knex(this.TABLE)
       .where('id_workflow', id)
       .update({
@@ -458,6 +475,39 @@ export class WorkflowService {
       throw new ConflictException(
         errors.join(' '),
       );
+  }
+
+  private async assertNoLinkedSchedules(
+    workflows: Record<string, any>[],
+    activeOnly = false,
+  ) {
+    const errors: string[] = [];
+    for (const workflow of workflows) {
+      let query = this.knex('workflow_schedule')
+        .select('name')
+        .where(
+          'id_workflow',
+          workflow.id_workflow,
+        );
+      if (activeOnly) {
+        query = query.where('is_active', true);
+      }
+      const schedules = await query;
+      if (schedules.length) {
+        errors.push(
+          `Workflow-ul "${workflow.name}" are programari ${activeOnly ? 'active' : 'asociate'}: ${schedules
+            .map(
+              (schedule) => `"${schedule.name}"`,
+            )
+            .join(', ')}.`,
+        );
+      }
+    }
+    if (errors.length) {
+      throw new ConflictException(
+        `${errors.join(' ')} Pune programarile in pauza sau sterge-le mai intai.`,
+      );
+    }
   }
 
   private withRevision(

@@ -8,6 +8,7 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "lint": "eslint .",
+    "test": "node --experimental-strip-types --test test/workflow-schedule.spec.ts",
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {

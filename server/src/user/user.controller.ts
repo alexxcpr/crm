@@ -34,6 +34,7 @@ export class UserController {
   async activeProfiles() {
     return this.tenantContext.knex('profile')
       .where('is_active', true)
+      .where('is_system', false)
       .whereNot(
         'access_level',
         'platform_owner',

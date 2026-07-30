@@ -22,6 +22,7 @@ model User {
   hash         String
   must_change_password Boolean @default(false)
   is_active Boolean @default(true)
+  is_system Boolean @default(false)
   profiles Profile[]
   refreshTokens RefreshToken[]
 
@@ -288,6 +289,7 @@ model Profile {
   access_level String @default("user") @db.VarChar(30)
   is_default Boolean @default(false)
   is_active Boolean @default(true)
+  is_system Boolean @default(false)
   date_created DateTime @default(now())
   date_updated DateTime @updatedAt
   user User @relation(fields: [id_user], references: [id], onDelete: Cascade)

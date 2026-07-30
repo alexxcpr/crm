@@ -16,7 +16,7 @@ export const ORGANIZATION_LOGO_MIME_TYPES = [
 ] as const;
 
 export const ORGANIZATION_LOGO_MAX_BYTES =
-  2 * 1024 * 1024;
+  10 * 1024 * 1024;
 
 export class CreateOrganizationLogoUploadDto {
   @IsString()

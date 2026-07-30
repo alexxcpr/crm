@@ -46,6 +46,7 @@ import { WorkflowSnapshotService } from './workflow-snapshot.service';
     WorkflowCompilerService,
     WorkflowRuntimeService,
     WorkflowCallContextService,
+    WorkflowHistoryService,
   ],
 })
 export class WorkflowEngineModule {}

@@ -2,6 +2,7 @@ import type { AuthenticatedUser } from 'src/security/security.types';
 
 export type WorkflowTriggerType =
   | 'manual'
+  | 'schedule'
   | 'entity.before_insert'
   | 'entity.before_update'
   | 'entity.before_delete'
@@ -117,6 +118,12 @@ export interface WorkflowNodeDefinition {
 export interface WorkflowExecutionInput {
   trigger: WorkflowTriggerType;
   triggerName?: string;
+  schedule?: {
+    id: string;
+    name: string;
+    scheduledFor: string;
+    timezone: string;
+  };
   entitySlug?: string;
   entityId?: string;
   recordId?: string | null;

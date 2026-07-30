@@ -432,6 +432,7 @@ export class BillingService {
   private async activeProfileCount(): Promise<number> {
     const [{ count }] = await this.tenantContext.knex('profile')
       .where({ is_active: true })
+      .where('is_system', false)
       .whereNot(
         'access_level',
         'platform_owner',
