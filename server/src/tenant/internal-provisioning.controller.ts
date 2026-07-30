@@ -114,6 +114,11 @@ export class InternalProvisioningController {
       subscriptionStatus: dto.subscriptionStatus,
       billingStatus: dto.billingStatus,
       currentPeriodEnd: dto.currentPeriodEnd,
+      stripeEventId: dto.stripeEventId,
+      profileSeats: dto.profileSeats,
+      extraStorageUnits: dto.extraStorageUnits,
+      features: dto.features,
+      featureItems: dto.featureItems,
     });
 
     return {

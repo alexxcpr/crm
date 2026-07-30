@@ -2,6 +2,8 @@ export const BASE_INCLUDED_PROFILE_SEATS = 5;
 export const BASE_INCLUDED_STORAGE_GB = 10;
 export const STORAGE_UNIT_GB = 10;
 export const STORAGE_UNIT_PRICE_EUR = 1.5;
+export const REPORTS_PRICE_PER_PROFILE_EUR = 3;
+export const CALENDARS_PRICE_PER_PROFILE_EUR = 2;
 
 export const BILLING_FEATURES = {
   reportsDashboards: {

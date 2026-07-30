@@ -30,6 +30,16 @@ interface BillingState {
     reportsDashboards: boolean
     calendars: boolean
   }
+  featurePricing: {
+    reportsDashboards: {
+      unit: 'profile_seat'
+      unitPriceEur: number
+    }
+    calendars: {
+      unit: 'profile_seat'
+      unitPriceEur: number
+    }
+  }
   scheduledChanges: {
     id: string
     change_type: string

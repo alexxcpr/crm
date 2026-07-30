@@ -360,6 +360,11 @@ export class TenantProvisioningService {
     subscriptionStatus: string;
     billingStatus?: string;
     currentPeriodEnd?: string | null;
+    stripeEventId?: string;
+    profileSeats?: number;
+    extraStorageUnits?: number;
+    features?: Record<string, boolean>;
+    featureItems?: Record<string, string | null>;
   }): Promise<{ slug: string }> {
     const slug = this.parseSlug(input.slug);
     if (!slug)
@@ -386,12 +391,123 @@ export class TenantProvisioningService {
                 : null,
             updated_at: trx.fn.now(),
           })
-          .returning(['id']);
+          .returning([
+            'id',
+            'profile_seats',
+            'extra_storage_units',
+          ]);
 
         if (!tenant)
           throw new BadRequestException(
             'Tenantul nu exista.',
           );
+
+        if (input.stripeEventId) {
+          const insertedEvents = await trx(
+            'tenant_billing_events',
+          )
+            .insert({
+              tenant_id: tenant.id,
+              stripe_event_id:
+                input.stripeEventId,
+              event_type:
+                'subscription.billing_sync',
+              payload: {
+                subscriptionStatus:
+                  input.subscriptionStatus,
+                profileSeats:
+                  input.profileSeats,
+                extraStorageUnits:
+                  input.extraStorageUnits,
+                features: input.features,
+              },
+            })
+            .onConflict('stripe_event_id')
+            .ignore()
+            .returning('id');
+          if (insertedEvents.length === 0)
+            return;
+        }
+
+        const tenantPatch: Record<
+          string,
+          unknown
+        > = {};
+        const pendingChanges = await trx(
+          'tenant_scheduled_billing_changes',
+        )
+          .where({
+            tenant_id: tenant.id,
+            status: 'scheduled',
+          })
+          .where('effective_at', '>', trx.fn.now());
+        const hasPendingValue = (
+          changeType: string,
+          property: string,
+          value: number | undefined,
+        ) =>
+          pendingChanges.some((change) => {
+            const payload =
+              typeof change.payload === 'string'
+                ? JSON.parse(change.payload)
+                : change.payload;
+            return (
+              change.change_type === changeType &&
+              payload?.[property] === value
+            );
+          });
+        if (
+          Number.isInteger(input.profileSeats) &&
+          !(
+            Number(input.profileSeats) <
+              Number(tenant.profile_seats) &&
+            hasPendingValue(
+              'profile_seats',
+              'profileSeats',
+              input.profileSeats,
+            )
+          )
+        ) {
+          tenantPatch.profile_seats =
+            input.profileSeats;
+          tenantPatch.max_users =
+            input.profileSeats;
+        }
+        if (
+          Number.isInteger(
+            input.extraStorageUnits,
+          ) &&
+          !(
+            Number(input.extraStorageUnits) <
+              Number(
+                tenant.extra_storage_units,
+              ) &&
+            hasPendingValue(
+              'extra_storage_units',
+              'extraStorageUnits',
+              input.extraStorageUnits,
+            )
+          )
+        ) {
+          tenantPatch.extra_storage_units =
+            input.extraStorageUnits;
+        }
+        if (Object.keys(tenantPatch).length) {
+          await trx('tenants')
+            .where({ id: tenant.id })
+            .update({
+              ...tenantPatch,
+              updated_at: trx.fn.now(),
+            });
+        }
+
+        await this.syncBillingFeatures(
+          trx,
+          tenant.id,
+          input.features,
+          input.featureItems,
+          input.currentPeriodEnd,
+        );
         await this.applyDueScheduledBillingChanges(
           trx,
           tenant.id,
@@ -400,6 +516,97 @@ export class TenantProvisioningService {
     );
 
     return { slug };
+  }
+
+  private async syncBillingFeatures(
+    trx: Knex.Transaction,
+    tenantId: string,
+    features?: Record<string, boolean>,
+    featureItems?: Record<
+      string,
+      string | null
+    >,
+    currentPeriodEnd?: string | null,
+  ): Promise<void> {
+    if (!features) return;
+
+    const mappings = [
+      {
+        inputKey: 'reportsDashboards',
+        featureKey: 'reports_dashboards',
+      },
+      {
+        inputKey: 'calendars',
+        featureKey: 'calendars',
+      },
+    ] as const;
+
+    for (const mapping of mappings) {
+      const enabled = features[mapping.inputKey];
+      if (typeof enabled !== 'boolean') continue;
+
+      const current = await trx(
+        'tenant_feature_entitlements',
+      )
+        .where({
+          tenant_id: tenantId,
+          feature_key: mapping.featureKey,
+        })
+        .first();
+      const periodEnd = currentPeriodEnd
+        ? new Date(currentPeriodEnd)
+        : null;
+      const preserveScheduledAccess =
+        !enabled &&
+        current?.cancel_at_period_end === true &&
+        current?.active_until &&
+        new Date(current.active_until).getTime() >
+          Date.now();
+      const status =
+        enabled || preserveScheduledAccess
+          ? 'active'
+          : 'inactive';
+
+      await trx('tenant_feature_entitlements')
+        .insert({
+          tenant_id: tenantId,
+          feature_key: mapping.featureKey,
+          status,
+          stripe_subscription_item_id:
+            featureItems?.[mapping.inputKey] ??
+            null,
+          active_from: enabled
+            ? trx.fn.now()
+            : null,
+          active_until: preserveScheduledAccess
+            ? current.active_until
+            : null,
+          current_period_end: periodEnd,
+          cancel_at_period_end:
+            preserveScheduledAccess,
+          updated_at: trx.fn.now(),
+        })
+        .onConflict([
+          'tenant_id',
+          'feature_key',
+        ])
+        .merge({
+          status,
+          stripe_subscription_item_id:
+            featureItems?.[mapping.inputKey] ??
+            null,
+          active_from: enabled
+            ? trx.fn.now()
+            : current?.active_from ?? null,
+          active_until: preserveScheduledAccess
+            ? current.active_until
+            : null,
+          current_period_end: periodEnd,
+          cancel_at_period_end:
+            preserveScheduledAccess,
+          updated_at: trx.fn.now(),
+        });
+    }
   }
 
   private async applyDueScheduledBillingChanges(

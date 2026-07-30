@@ -18,6 +18,14 @@ const calendarsDraft = ref(false)
 const storagePrice = computed(() => billing.value?.storage.unitPriceEur ?? 1.5)
 const storageUnitGb = computed(() => billing.value?.storage.unitGb ?? 10)
 const extraStorageCost = computed(() => storageUnitsDraft.value * storagePrice.value)
+const reportsUnitPrice = computed(() => billing.value?.featurePricing.reportsDashboards.unitPriceEur ?? 3)
+const calendarsUnitPrice = computed(() => billing.value?.featurePricing.calendars.unitPriceEur ?? 2)
+const reportsCost = computed(() => reportsDashboardsDraft.value
+  ? profileSeatsDraft.value * reportsUnitPrice.value
+  : 0)
+const calendarsCost = computed(() => calendarsDraft.value
+  ? profileSeatsDraft.value * calendarsUnitPrice.value
+  : 0)
 const canDecreaseSeats = computed(() => {
   if (!billing.value) return true
   return profileSeatsDraft.value >= billing.value.profileSeats.active
@@ -37,12 +45,33 @@ watch(billing, (value) => {
 }, { immediate: true })
 
 async function saveBilling() {
-  const ok = await updateBilling({
-    profileSeats: profileSeatsDraft.value,
-    extraStorageUnits: storageUnitsDraft.value,
-    reportsDashboards: reportsDashboardsDraft.value,
-    calendars: calendarsDraft.value
-  })
+  if (!billing.value) return
+
+  const payload: Parameters<typeof updateBilling>[0] = {}
+  if (profileSeatsDraft.value !== billing.value.profileSeats.contracted) {
+    payload.profileSeats = profileSeatsDraft.value
+  }
+  if (storageUnitsDraft.value !== billing.value.storage.extraUnits) {
+    payload.extraStorageUnits = storageUnitsDraft.value
+  }
+  if (reportsDashboardsDraft.value !== billing.value.features.reportsDashboards) {
+    payload.reportsDashboards = reportsDashboardsDraft.value
+  }
+  if (calendarsDraft.value !== billing.value.features.calendars) {
+    payload.calendars = calendarsDraft.value
+  }
+
+  if (!Object.keys(payload).length) {
+    toast.add({
+      title: 'Nicio modificare',
+      description: 'Valorile abonamentului sunt deja actualizate.',
+      color: 'neutral',
+      icon: 'i-lucide-info'
+    })
+    return
+  }
+
+  const ok = await updateBilling(payload)
 
   toast.add({
     title: ok ? 'Abonament actualizat' : 'Actualizarea a esuat',
@@ -212,7 +241,7 @@ onMounted(fetchBilling)
 
           <UPageCard
             title="Rapoarte si dashboard-uri"
-            description="Activeaza configurarea rapoartelor si dashboard-urilor in UI pentru intreg tenantul."
+            :description="`${reportsUnitPrice.toFixed(2)} EUR / profil contractat / luna. Cost curent: ${reportsCost.toFixed(2)} EUR / luna.`"
             variant="subtle"
           >
             <USwitch
@@ -224,7 +253,7 @@ onMounted(fetchBilling)
 
           <UPageCard
             title="Calendare configurabile"
-            description="Activeaza calendarele multi-sursa. Add-on-ul se factureaza pentru fiecare profil activ."
+            :description="`${calendarsUnitPrice.toFixed(2)} EUR / profil contractat / luna. Cost curent: ${calendarsCost.toFixed(2)} EUR / luna.`"
             variant="subtle"
           >
             <USwitch

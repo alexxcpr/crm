@@ -6,6 +6,8 @@ import {
   BASE_INCLUDED_PROFILE_SEATS,
   BASE_INCLUDED_STORAGE_GB,
   BILLING_FEATURES,
+  CALENDARS_PRICE_PER_PROFILE_EUR,
+  REPORTS_PRICE_PER_PROFILE_EUR,
   STORAGE_UNIT_GB,
   STORAGE_UNIT_PRICE_EUR,
 } from './billing.constants';
@@ -32,6 +34,17 @@ interface BillingUpdateInput {
   extraStorageUnits?: number;
   reportsDashboards?: boolean;
   calendars?: boolean;
+}
+
+interface StripeSubscriptionUpdateResult {
+  success: boolean;
+  items?: Record<
+    string,
+    {
+      itemId: string | null;
+      quantity: number;
+    }
+  >;
 }
 
 @Injectable()
@@ -91,7 +104,23 @@ export class BillingService {
         percentage: storageUsage.percentage,
         overQuota: storageUsage.overQuota,
       },
-      features,
+      features: {
+        reportsDashboards:
+          features.reportsDashboards,
+        calendars: features.calendars,
+      },
+      featurePricing: {
+        reportsDashboards: {
+          unit: 'profile_seat',
+          unitPriceEur:
+            REPORTS_PRICE_PER_PROFILE_EUR,
+        },
+        calendars: {
+          unit: 'profile_seat',
+          unitPriceEur:
+            CALENDARS_PRICE_PER_PROFILE_EUR,
+        },
+      },
       entitlements,
       scheduledChanges,
       stripe: {
@@ -123,6 +152,9 @@ export class BillingService {
         patch.max_users = input.profileSeats;
       } else {
         scheduled.push({ change_type: 'profile_seats', payload: { profileSeats: input.profileSeats } });
+        patch.profile_seats =
+          currentProfileSeats;
+        patch.max_users = currentProfileSeats;
       }
     }
 
@@ -134,15 +166,44 @@ export class BillingService {
         patch.extra_storage_units = input.extraStorageUnits;
       } else {
         scheduled.push({ change_type: 'extra_storage_units', payload: { extraStorageUnits: input.extraStorageUnits } });
+        patch.extra_storage_units =
+          currentStorageUnits;
       }
     }
 
-    await this.syncImmediateStripeIncreases(tenant, input, {
+    const stripeUpdate =
+      await this.syncStripeSubscription(tenant, input, {
       currentProfileSeats,
       currentStorageUnits,
     });
 
     await this.metaDb.knex.transaction(async (trx) => {
+      const scheduledTypesToReplace = [
+        input.profileSeats !== undefined
+          ? 'profile_seats'
+          : null,
+        input.extraStorageUnits !== undefined
+          ? 'extra_storage_units'
+          : null,
+      ].filter(Boolean) as string[];
+      if (scheduledTypesToReplace.length) {
+        await trx(
+          'tenant_scheduled_billing_changes',
+        )
+          .where({
+            tenant_id: tenant.id,
+            status: 'scheduled',
+          })
+          .whereIn(
+            'change_type',
+            scheduledTypesToReplace,
+          )
+          .update({
+            status: 'superseded',
+            updated_at: trx.fn.now(),
+          });
+      }
+
       if (Object.keys(patch).length > 1) {
         await trx('tenants').where({ id: tenant.id }).update(patch);
       }
@@ -158,6 +219,10 @@ export class BillingService {
             active_until: input.reportsDashboards ? null : periodEnd,
             current_period_end: periodEnd,
             cancel_at_period_end: !input.reportsDashboards,
+            stripe_subscription_item_id:
+              stripeUpdate?.items
+                ?.reportsDashboards?.itemId ??
+              null,
             updated_at: trx.fn.now(),
           })
           .onConflict(['tenant_id', 'feature_key'])
@@ -167,6 +232,10 @@ export class BillingService {
             active_until: input.reportsDashboards ? null : periodEnd,
             current_period_end: periodEnd,
             cancel_at_period_end: !input.reportsDashboards,
+            stripe_subscription_item_id:
+              stripeUpdate?.items
+                ?.reportsDashboards?.itemId ??
+              null,
             updated_at: trx.fn.now(),
           });
       }
@@ -182,6 +251,9 @@ export class BillingService {
             active_until: input.calendars ? null : periodEnd,
             current_period_end: periodEnd,
             cancel_at_period_end: !input.calendars,
+            stripe_subscription_item_id:
+              stripeUpdate?.items?.calendars
+                ?.itemId ?? null,
             updated_at: trx.fn.now(),
           })
           .onConflict(['tenant_id', 'feature_key'])
@@ -191,6 +263,9 @@ export class BillingService {
             active_until: input.calendars ? null : periodEnd,
             current_period_end: periodEnd,
             cancel_at_period_end: !input.calendars,
+            stripe_subscription_item_id:
+              stripeUpdate?.items?.calendars
+                ?.itemId ?? null,
             updated_at: trx.fn.now(),
           });
       }
@@ -304,18 +379,24 @@ export class BillingService {
     return tenant;
   }
 
-  private async syncImmediateStripeIncreases(
+  private async syncStripeSubscription(
     tenant: TenantBillingRow,
     input: BillingUpdateInput,
     current: { currentProfileSeats: number; currentStorageUnits: number },
-  ): Promise<void> {
-    const shouldSyncProfileSeats = input.profileSeats !== undefined && input.profileSeats > current.currentProfileSeats;
-    const shouldSyncStorage = input.extraStorageUnits !== undefined && input.extraStorageUnits > current.currentStorageUnits;
-    const shouldSyncReports = input.reportsDashboards === true;
-    const shouldSyncCalendars = input.calendars === true;
-    if (!shouldSyncProfileSeats && !shouldSyncStorage && !shouldSyncReports && !shouldSyncCalendars) return;
+  ): Promise<StripeSubscriptionUpdateResult | null> {
+    const shouldSyncProfileSeats =
+      input.profileSeats !== undefined &&
+      input.profileSeats !==
+        current.currentProfileSeats;
+    const shouldSyncStorage =
+      input.extraStorageUnits !== undefined &&
+      input.extraStorageUnits !==
+        current.currentStorageUnits;
+    const shouldSyncReports = input.reportsDashboards !== undefined;
+    const shouldSyncCalendars = input.calendars !== undefined;
+    if (!shouldSyncProfileSeats && !shouldSyncStorage && !shouldSyncReports && !shouldSyncCalendars) return null;
     if (!tenant.stripe_subscription_id) {
-      if (!this.isProduction) return;
+      if (!this.isProduction) return null;
       throw new BadRequestException('Tenantul nu are un subscription Stripe asociat.');
     }
 
@@ -345,6 +426,7 @@ export class BillingService {
     if (!response.ok) {
       throw new ServiceUnavailableException('Nu am putut sincroniza modificarile cu Stripe.');
     }
+    return response.json() as Promise<StripeSubscriptionUpdateResult>;
   }
 
   private async activeProfileCount(): Promise<number> {

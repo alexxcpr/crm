@@ -1,4 +1,4 @@
-import { IsEmail, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, Length, Matches, Min, MinLength } from 'class-validator';
+import { IsDateString, IsEmail, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, Length, Matches, Min, MinLength } from 'class-validator';
 
 export class TenantAvailabilityQueryDto {
   @IsOptional()
@@ -101,5 +101,29 @@ export class SyncBillingStatusDto {
   billingStatus?: string;
 
   @IsOptional()
+  @IsDateString()
   currentPeriodEnd?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  stripeEventId?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  profileSeats?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  extraStorageUnits?: number;
+
+  @IsOptional()
+  @IsObject()
+  features?: Record<string, boolean>;
+
+  @IsOptional()
+  @IsObject()
+  featureItems?: Record<string, string | null>;
 }
