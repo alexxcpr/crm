@@ -1,0 +1,909 @@
+.moduvis-calendar-surface {
+  --fc-border-color: color-mix(in srgb, var(--ui-border) 84%, transparent);
+  --fc-page-bg-color: var(--ui-bg);
+  --fc-neutral-bg-color: color-mix(in srgb, var(--ui-bg-elevated) 78%, transparent);
+  --fc-neutral-text-color: var(--ui-text-muted);
+  --fc-list-event-hover-bg-color: color-mix(in srgb, var(--ui-primary) 7%, var(--ui-bg-elevated));
+  --fc-today-bg-color: color-mix(in srgb, var(--ui-primary) 7%, transparent);
+  --fc-now-indicator-color: var(--ui-primary);
+  color: var(--ui-text);
+}
+
+.moduvis-calendar-surface > div {
+  color: var(--ui-text);
+  font-size: 0.8125rem;
+}
+
+.moduvis-calendar-surface [role='grid'] {
+  overflow: hidden;
+  border: 1px solid var(--fc-border-color);
+  border-radius: 0.9rem;
+  background-color: var(--ui-bg);
+}
+
+.moduvis-calendar-surface [role='columnheader'][data-date] {
+  border-inline-start: 1px solid var(--fc-border-color);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ui-bg-elevated) 92%, transparent),
+      color-mix(in srgb, var(--ui-bg-elevated) 52%, transparent)
+    );
+}
+
+.moduvis-calendar-surface [role='columnheader'][data-date] > div {
+  padding: 0.72rem 0.35rem;
+  color: var(--ui-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 750;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.moduvis-calendar-surface [role='columnheader'][data-date][aria-current='date'] > div {
+  color: var(--ui-primary);
+  background-color: color-mix(in srgb, var(--ui-primary) 8%, transparent);
+}
+
+.moduvis-calendar-surface [role='gridcell'][data-date] {
+  border-inline-start: 1px solid var(--fc-border-color);
+  background-color: color-mix(in srgb, var(--ui-bg) 97%, transparent);
+  transition: background-color 150ms ease;
+}
+
+.moduvis-calendar-surface [role='gridcell'][data-date]:hover {
+  background-color: color-mix(in srgb, var(--ui-primary) 4%, var(--ui-bg));
+}
+
+.moduvis-calendar-surface [role='gridcell'][data-date][aria-current='date'] {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ui-primary) 8%, transparent),
+      color-mix(in srgb, var(--ui-primary) 2%, transparent)
+    );
+}
+
+.moduvis-calendar-surface [role='rowheader'] {
+  color: var(--ui-text-dimmed);
+  font-size: 0.675rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+.moduvis-calendar-surface [data-time] {
+  border-top: 1px solid color-mix(in srgb, var(--ui-border) 78%, transparent);
+}
+
+.moduvis-calendar-surface [data-time$='30:00'] {
+  border-top-style: dashed;
+  border-top-color: color-mix(in srgb, var(--ui-border) 42%, transparent);
+}
+
+.moduvis-calendar-surface .fc {
+  font-size: 0.8125rem;
+}
+
+.moduvis-calendar-surface .fc,
+.moduvis-calendar-surface .fc-scrollgrid,
+.moduvis-calendar-surface .fc-scrollgrid-section > td {
+  border: 0;
+}
+
+.moduvis-calendar-surface .fc a {
+  color: inherit;
+}
+
+.moduvis-calendar-surface .fc-header-toolbar {
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.moduvis-calendar-surface .fc-toolbar-title {
+  color: var(--ui-text-highlighted);
+  font-size: 1rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.moduvis-calendar-surface .fc-button-primary {
+  border-color: var(--ui-border) !important;
+  border-radius: 0.55rem !important;
+  background-color: var(--ui-bg-elevated) !important;
+  box-shadow: none !important;
+  color: var(--ui-text-highlighted) !important;
+  font-size: 0.7rem !important;
+  font-weight: 650 !important;
+  text-transform: capitalize;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease !important;
+}
+
+.moduvis-calendar-surface .fc-button-primary:hover,
+.moduvis-calendar-surface .fc-button-primary:focus-visible {
+  border-color: color-mix(in srgb, var(--ui-primary) 34%, var(--ui-border)) !important;
+  background-color: color-mix(in srgb, var(--ui-primary) 8%, var(--ui-bg-elevated)) !important;
+  color: var(--ui-primary) !important;
+}
+
+.moduvis-calendar-surface .fc-button-primary:disabled {
+  opacity: 0.45;
+}
+
+.moduvis-calendar-surface .fc-button-group {
+  gap: 0.2rem;
+}
+
+.moduvis-calendar-surface .fc-theme-standard td,
+.moduvis-calendar-surface .fc-theme-standard th {
+  border-color: var(--fc-border-color);
+}
+
+.moduvis-calendar-surface .fc-col-header {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ui-bg-elevated) 88%, transparent),
+      color-mix(in srgb, var(--ui-bg-elevated) 48%, transparent)
+    );
+}
+
+.moduvis-calendar-surface .fc-col-header-cell {
+  border-top: 1px solid var(--fc-border-color);
+  padding: 0.7rem 0.35rem;
+}
+
+.moduvis-calendar-surface .fc-col-header-cell:first-child {
+  border-left: 1px solid var(--fc-border-color);
+  border-top-left-radius: 0.75rem;
+}
+
+.moduvis-calendar-surface .fc-col-header-cell:last-child {
+  border-right: 1px solid var(--fc-border-color);
+  border-top-right-radius: 0.75rem;
+}
+
+.moduvis-calendar-surface .fc-col-header-cell-cushion {
+  color: var(--ui-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 750;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+}
+
+.moduvis-calendar-surface .fc-daygrid-day,
+.moduvis-calendar-surface .fc-timegrid-col {
+  background-color: color-mix(in srgb, var(--ui-bg) 96%, transparent);
+  transition: background-color 160ms ease;
+}
+
+.moduvis-calendar-surface .fc-daygrid-day:hover,
+.moduvis-calendar-surface .fc-timegrid-col:hover {
+  background-color: color-mix(in srgb, var(--ui-primary) 3.5%, var(--ui-bg));
+}
+
+.moduvis-calendar-surface .fc-day-other {
+  background-color: color-mix(in srgb, var(--ui-bg-elevated) 38%, transparent);
+}
+
+.moduvis-calendar-surface .fc-day-other .fc-daygrid-day-top,
+.moduvis-calendar-surface .fc-day-other .fc-daygrid-event {
+  opacity: 0.58;
+}
+
+.moduvis-calendar-surface .fc-day-today {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ui-primary) 10%, transparent),
+      color-mix(in srgb, var(--ui-primary) 2%, transparent)
+    ) !important;
+}
+
+.moduvis-calendar-surface .fc-daygrid-day-top {
+  padding: 0.45rem 0.5rem 0.25rem;
+}
+
+.moduvis-calendar-surface .fc-daygrid-day-number {
+  display: grid;
+  min-height: 1.7rem;
+  min-width: 1.7rem;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--ui-text-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.moduvis-calendar-surface .fc-daygrid-day:hover .fc-daygrid-day-number {
+  background-color: var(--ui-bg-elevated);
+  color: var(--ui-text-highlighted);
+  transform: translateY(-1px);
+}
+
+.moduvis-calendar-surface .fc-day-today .fc-daygrid-day-number {
+  background-color: var(--ui-primary);
+  color: white;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ui-primary) 16%, transparent);
+}
+
+.moduvis-calendar-surface .fc-timegrid-axis {
+  background-color: color-mix(in srgb, var(--ui-bg-elevated) 45%, transparent);
+}
+
+.moduvis-calendar-surface .fc-timegrid-slot {
+  height: 2.45rem;
+}
+
+.moduvis-calendar-surface .fc-timegrid-slot-minor {
+  border-top-style: dashed;
+  border-top-color: color-mix(in srgb, var(--ui-border) 52%, transparent);
+}
+
+.moduvis-calendar-surface .fc-timegrid-slot-label-cushion {
+  color: var(--ui-text-dimmed);
+  font-size: 0.675rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  padding-inline: 0.45rem 0.65rem;
+}
+
+.moduvis-calendar-surface .fc-timegrid-now-indicator-line {
+  border-width: 2px 0 0;
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--ui-primary) 55%, transparent));
+}
+
+.moduvis-calendar-surface .fc-timegrid-now-indicator-arrow {
+  border-width: 5px 0 5px 7px;
+}
+
+.moduvis-calendar-surface .moduvis-fc-event {
+  --calendar-event-color: var(--ui-primary);
+  cursor: pointer;
+  border: 0 !important;
+  border-radius: 0.5rem;
+  background: transparent !important;
+  box-shadow: none;
+  color: var(--ui-text-highlighted) !important;
+  transition:
+    filter 160ms ease,
+    opacity 160ms ease,
+    transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.moduvis-calendar-surface .fc-daygrid-event {
+  margin: 2px 0.22rem;
+}
+
+.moduvis-calendar-surface .fc-timegrid-event {
+  margin: 1px 2px;
+}
+
+.moduvis-calendar-surface .fc-event-main {
+  color: inherit !important;
+}
+
+.moduvis-calendar-surface .moduvis-fc-event:hover {
+  z-index: 8 !important;
+  filter: saturate(1.08);
+  transform: translateY(-1px) scale(1.012);
+}
+
+.moduvis-calendar-surface .moduvis-fc-event:focus-visible {
+  z-index: 9 !important;
+  outline: 3px solid color-mix(in srgb, var(--calendar-event-color) 38%, transparent);
+  outline-offset: 2px;
+}
+
+.moduvis-calendar-surface .moduvis-fc-event:has(.is-dragging),
+.moduvis-calendar-surface .moduvis-fc-event:has(.is-resizing) {
+  z-index: 20 !important;
+  cursor: grabbing;
+  filter: saturate(1.16);
+  opacity: 0.9;
+  transform: scale(1.025) rotate(-0.35deg);
+}
+
+.moduvis-calendar-surface .moduvis-fc-event:has(.moduvis-calendar-event--selection) {
+  z-index: 30 !important;
+  opacity: 0.78;
+  filter: saturate(1.12);
+  transform: scale(1.02);
+}
+
+.moduvis-calendar-surface .moduvis-fc-event.is-saving {
+  animation: calendar-event-saving 900ms ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.moduvis-calendar-event {
+  position: relative;
+  display: flex;
+  min-height: 1.65rem;
+  width: 100%;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--calendar-event-color) 44%, var(--ui-border));
+  border-radius: 0.5rem;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--calendar-event-color) 18%, var(--ui-bg)) 0%,
+      color-mix(in srgb, var(--calendar-event-color) 8%, var(--ui-bg-elevated)) 100%
+    );
+  box-shadow:
+    0 1px 1px color-mix(in srgb, var(--calendar-event-color) 8%, transparent),
+    0 2px 7px color-mix(in srgb, var(--ui-text) 7%, transparent);
+  color: var(--ui-text-highlighted);
+  isolation: isolate;
+  container-type: inline-size;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+.moduvis-calendar-event:hover,
+.moduvis-calendar-surface :focus-visible .moduvis-calendar-event {
+  border-color: color-mix(in srgb, var(--calendar-event-color) 76%, var(--ui-border));
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--calendar-event-color) 16%, transparent),
+    0 8px 20px color-mix(in srgb, var(--calendar-event-color) 20%, transparent);
+  filter: saturate(1.08);
+  transform: translateY(-1px) scale(1.012);
+}
+
+.moduvis-calendar-event__accent {
+  width: 0.27rem;
+  flex: none;
+  background-color: var(--calendar-event-color);
+  box-shadow: 2px 0 8px color-mix(in srgb, var(--calendar-event-color) 36%, transparent);
+}
+
+.moduvis-calendar-event__body {
+  min-width: 0;
+  flex: 1;
+  padding: 0.28rem 0.42rem;
+}
+
+.moduvis-calendar-event__primary {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.moduvis-calendar-event__time {
+  flex: none;
+  color: color-mix(in srgb, var(--calendar-event-color) 78%, var(--ui-text-highlighted));
+  font-size: 0.675rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+}
+
+.moduvis-calendar-event__title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ui-text-highlighted);
+  font-size: 0.72rem;
+  font-weight: 720;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.moduvis-calendar-event__meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.16rem;
+  color: var(--ui-text-muted);
+  font-size: 0.625rem;
+  line-height: 1.2;
+}
+
+.moduvis-calendar-event__dot {
+  height: 0.32rem;
+  width: 0.32rem;
+  flex: none;
+  border-radius: 999px;
+  background-color: var(--calendar-event-color);
+}
+
+.moduvis-calendar-event__source {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.moduvis-calendar-event__move {
+  width: 0;
+  flex: none;
+  align-self: center;
+  color: color-mix(in srgb, var(--calendar-event-color) 74%, var(--ui-text-muted));
+  opacity: 0;
+  transition:
+    opacity 150ms ease,
+    width 150ms ease;
+}
+
+.moduvis-calendar-event--selection {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--ui-primary) 68%, var(--ui-border));
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, var(--ui-primary) 16%, var(--ui-bg)) 0,
+      color-mix(in srgb, var(--ui-primary) 16%, var(--ui-bg)) 6px,
+      color-mix(in srgb, var(--ui-primary) 7%, var(--ui-bg)) 6px,
+      color-mix(in srgb, var(--ui-primary) 7%, var(--ui-bg)) 12px
+    );
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--ui-primary) 18%, transparent);
+}
+
+.moduvis-calendar-event:hover .moduvis-calendar-event__move,
+.moduvis-calendar-surface :focus-visible .moduvis-calendar-event__move,
+.moduvis-calendar-event.is-dragging .moduvis-calendar-event__move,
+.moduvis-calendar-event.is-resizing .moduvis-calendar-event__move,
+.moduvis-calendar-event.is-saving .moduvis-calendar-event__move {
+  width: 0.9rem;
+  margin-right: 0.25rem;
+  opacity: 0.9;
+}
+
+.moduvis-calendar-event.is-dragging,
+.moduvis-calendar-event.is-resizing {
+  z-index: 20;
+  border-color: color-mix(in srgb, var(--calendar-event-color) 88%, var(--ui-border));
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--calendar-event-color) 20%, transparent),
+    0 16px 32px color-mix(in srgb, var(--calendar-event-color) 28%, transparent);
+  filter: saturate(1.15);
+  opacity: 0.92;
+  transform: scale(1.025) rotate(-0.25deg);
+}
+
+.moduvis-calendar-event.is-saving {
+  animation: calendar-event-saving 900ms ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.moduvis-calendar-event__resize-cue {
+  position: absolute;
+  right: 28%;
+  bottom: 2px;
+  left: 28%;
+  height: 3px;
+  border-radius: 999px;
+  background-color: color-mix(in srgb, var(--calendar-event-color) 72%, var(--ui-text));
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.moduvis-calendar-event__resize-cue.is-horizontal {
+  top: 30%;
+  right: 2px;
+  bottom: 30%;
+  left: auto;
+  height: auto;
+  width: 3px;
+}
+
+.moduvis-calendar-event:hover .moduvis-calendar-event__resize-cue,
+.moduvis-calendar-surface :focus-visible .moduvis-calendar-event__resize-cue,
+.moduvis-calendar-event.is-resizing .moduvis-calendar-event__resize-cue {
+  opacity: 0.82;
+}
+
+.moduvis-calendar-event.is-all-day {
+  min-height: 1.6rem;
+}
+
+.moduvis-calendar-event.is-all-day .moduvis-calendar-event__body {
+  padding-block: 0.24rem;
+}
+
+.moduvis-calendar-event.is-all-day .moduvis-calendar-event__meta {
+  display: none;
+}
+
+.moduvis-calendar-event.is-time-grid {
+  height: 100%;
+  min-height: 100%;
+}
+
+.moduvis-calendar-event.is-time-grid .moduvis-calendar-event__primary {
+  display: block;
+}
+
+.moduvis-calendar-event.is-time-grid .moduvis-calendar-event__time,
+.moduvis-calendar-event.is-time-grid .moduvis-calendar-event__title {
+  display: block;
+}
+
+.moduvis-calendar-event.is-time-grid .moduvis-calendar-event__title {
+  margin-top: 0.1rem;
+  white-space: normal;
+}
+
+.moduvis-calendar-event.is-day-grid .moduvis-calendar-event__meta {
+  display: none;
+}
+
+.moduvis-calendar-event.is-day-grid .moduvis-calendar-event__primary {
+  display: flex;
+}
+
+.moduvis-calendar-event.is-day-grid .moduvis-calendar-event__title {
+  margin-top: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.moduvis-calendar-event.is-list {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.moduvis-calendar-event.is-list .moduvis-calendar-event__accent,
+.moduvis-calendar-event.is-list .moduvis-calendar-event__time,
+.moduvis-calendar-event.is-list .moduvis-calendar-event__resize-cue {
+  display: none;
+}
+
+.moduvis-calendar-event.is-list .moduvis-calendar-event__meta {
+  display: flex;
+}
+
+@container (max-width: 7rem) {
+  .moduvis-calendar-event__meta,
+  .moduvis-calendar-event__move {
+    display: none !important;
+  }
+
+  .moduvis-calendar-event__body {
+    padding-inline: 0.3rem;
+  }
+
+  .moduvis-calendar-event__time,
+  .moduvis-calendar-event__title {
+    font-size: 0.625rem;
+  }
+}
+
+@container (max-width: 4.5rem) {
+  .moduvis-calendar-event__time {
+    display: none !important;
+  }
+
+  .moduvis-calendar-event__title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap !important;
+  }
+}
+
+.moduvis-calendar-surface .moduvis-fc-event {
+  position: relative;
+  overflow: visible !important;
+}
+
+.moduvis-calendar-surface .moduvis-event-resizer {
+  position: absolute;
+  z-index: 25;
+  border-radius: 999px;
+  opacity: 0.4;
+  transition:
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.moduvis-calendar-surface .moduvis-event-resizer::after {
+  position: absolute;
+  border-radius: 999px;
+  background-color: color-mix(in srgb, var(--fc-event-color) 78%, var(--ui-text));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ui-bg) 58%, transparent);
+  content: '';
+}
+
+.moduvis-calendar-surface .moduvis-fc-event.is-timed .moduvis-event-resizer {
+  right: 1px;
+  left: 1px;
+  height: 11px;
+  cursor: ns-resize !important;
+}
+
+.moduvis-calendar-surface .moduvis-fc-event.is-timed .moduvis-event-resizer--start {
+  top: -3px;
+}
+
+.moduvis-calendar-surface .moduvis-fc-event.is-timed .moduvis-event-resizer--end {
+  bottom: -3px;
+}
+
+.moduvis-calendar-surface .moduvis-fc-event.is-timed .moduvis-event-resizer::after {
+  right: 30%;
+  bottom: 3px;
+  left: 30%;
+  height: 3px;
+}
+
+.moduvis-calendar-surface .moduvis-fc-event.is-timed .moduvis-event-resizer--start::after {
+  top: 3px;
+  bottom: auto;
+}
+
+.moduvis-calendar-surface .moduvis-fc-event.is-all-day .moduvis-event-resizer {
+  top: 1px;
+  bottom: 1px;
+  width: 11px;
+  cursor: ew-resize !important;
+}
+
+.moduvis-calendar-surface .moduvis-fc-event.is-all-day .moduvis-event-resizer--start {
+  left: -3px;
+}
+
+.moduvis-calendar-surface .moduvis-fc-event.is-all-day .moduvis-event-resizer--end {
+  right: -3px;
+}
+
+.moduvis-calendar-surface .moduvis-fc-event.is-all-day .moduvis-event-resizer::after {
+  top: 28%;
+  bottom: 28%;
+  left: 3px;
+  width: 3px;
+}
+
+.moduvis-calendar-surface .moduvis-fc-event.is-all-day .moduvis-event-resizer--end::after {
+  right: 3px;
+  left: auto;
+}
+
+.moduvis-calendar-surface .moduvis-fc-event:hover .moduvis-event-resizer,
+.moduvis-calendar-surface .moduvis-fc-event:focus-visible .moduvis-event-resizer,
+.moduvis-calendar-surface .moduvis-fc-event:has(.is-resizing) .moduvis-event-resizer,
+.moduvis-calendar-surface .moduvis-event-resizer:hover {
+  background-color: color-mix(in srgb, var(--fc-event-color) 18%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--fc-event-color) 10%, transparent);
+  opacity: 1;
+}
+
+.moduvis-calendar-surface .moduvis-fc-event.is-timed .moduvis-event-resizer:hover {
+  transform: scaleY(1.15);
+}
+
+.moduvis-calendar-surface .moduvis-fc-event.is-all-day .moduvis-event-resizer:hover {
+  transform: scaleX(1.15);
+}
+
+.moduvis-calendar-surface .fc-highlight {
+  position: relative;
+  border: 2px dashed color-mix(in srgb, var(--ui-primary) 75%, transparent);
+  border-radius: 0.55rem;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, var(--ui-primary) 13%, transparent) 0,
+      color-mix(in srgb, var(--ui-primary) 13%, transparent) 6px,
+      color-mix(in srgb, var(--ui-primary) 5%, transparent) 6px,
+      color-mix(in srgb, var(--ui-primary) 5%, transparent) 12px
+    );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, white 32%, transparent);
+  opacity: 1;
+}
+
+.moduvis-calendar-surface .fc-daygrid-day-bg .fc-highlight::after,
+.moduvis-calendar-surface .fc-timegrid-col-bg .fc-highlight::after {
+  position: absolute;
+  top: 0.3rem;
+  left: 50%;
+  display: grid;
+  min-height: 1.45rem;
+  min-width: 1.45rem;
+  place-items: center;
+  border-radius: 999px;
+  background-color: var(--ui-primary);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ui-primary) 35%, transparent);
+  color: white;
+  content: '+';
+  font-size: 1rem;
+  font-weight: 700;
+  transform: translateX(-50%);
+}
+
+.moduvis-calendar-surface .fc-more-link {
+  display: inline-flex;
+  align-items: center;
+  margin: 0.15rem 0.3rem 0.25rem;
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 24%, var(--ui-border));
+  border-radius: 999px;
+  background-color: color-mix(in srgb, var(--ui-primary) 8%, var(--ui-bg-elevated));
+  color: var(--ui-primary);
+  font-size: 0.675rem;
+  font-weight: 750;
+  padding: 0.18rem 0.45rem;
+  transition:
+    background-color 150ms ease,
+    transform 150ms ease;
+}
+
+.moduvis-calendar-surface .fc-more-link:hover {
+  background-color: color-mix(in srgb, var(--ui-primary) 14%, var(--ui-bg-elevated));
+  transform: translateY(-1px);
+}
+
+.moduvis-calendar-surface .fc-more-popover {
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: 0.85rem;
+  background-color: color-mix(in srgb, var(--ui-bg) 96%, transparent);
+  box-shadow: 0 18px 45px color-mix(in srgb, black 20%, transparent);
+  backdrop-filter: blur(18px);
+}
+
+.moduvis-calendar-surface .fc-more-popover .fc-popover-header {
+  background-color: var(--ui-bg-elevated);
+  color: var(--ui-text-highlighted);
+  font-weight: 700;
+  padding: 0.65rem 0.8rem;
+}
+
+.moduvis-calendar-surface .fc-list {
+  overflow: hidden;
+  border: 1px solid var(--fc-border-color);
+  border-radius: 0.85rem;
+}
+
+.moduvis-calendar-surface .fc-list-day-cushion {
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--ui-primary) 9%, var(--ui-bg-elevated)),
+      var(--ui-bg-elevated)
+    );
+  color: var(--ui-text-highlighted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.025em;
+  padding: 0.65rem 0.8rem;
+}
+
+.moduvis-calendar-surface .fc-list-event {
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.moduvis-calendar-surface .fc-list-event:hover td {
+  background-color: var(--fc-list-event-hover-bg-color);
+}
+
+.moduvis-calendar-surface .fc-list-event-dot {
+  border-color: var(--fc-event-border-color);
+  border-width: 5px;
+}
+
+.moduvis-calendar-surface .fc-list-event-time {
+  color: var(--ui-text-muted);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+.moduvis-calendar-surface .fc-list-event-title {
+  padding-block: 0.45rem;
+}
+
+.moduvis-calendar-surface .fc-list-event .moduvis-calendar-event {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.moduvis-calendar-surface .fc-list-event .moduvis-calendar-event__accent,
+.moduvis-calendar-surface .fc-list-event .moduvis-calendar-event__time {
+  display: none;
+}
+
+.moduvis-calendar-surface .fc-list-event .moduvis-calendar-event__title {
+  font-size: 0.78rem;
+}
+
+.moduvis-calendar-surface .fc-list-event .moduvis-calendar-event__meta {
+  display: flex;
+}
+
+@keyframes calendar-event-saving {
+  from {
+    opacity: 0.58;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .moduvis-calendar-surface {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-color: color-mix(in srgb, var(--ui-border) 75%, transparent) transparent;
+    scrollbar-width: thin;
+  }
+
+  .moduvis-calendar-surface.is-week-view > div {
+    min-width: 48rem;
+  }
+
+  .moduvis-calendar-surface .fc {
+    font-size: 0.72rem;
+  }
+
+  .moduvis-calendar-surface .fc-col-header-cell {
+    padding-inline: 0.15rem;
+  }
+
+  .moduvis-calendar-surface .fc-col-header-cell-cushion {
+    font-size: 0.6rem;
+    letter-spacing: 0.025em;
+  }
+
+  .moduvis-calendar-surface .fc-daygrid-day-top {
+    padding: 0.3rem 0.2rem 0.15rem;
+  }
+
+  .moduvis-calendar-surface .fc-daygrid-day-number {
+    min-height: 1.45rem;
+    min-width: 1.45rem;
+    font-size: 0.675rem;
+  }
+
+  .moduvis-calendar-surface .fc-daygrid-event {
+    margin-inline: 1px;
+  }
+
+  .moduvis-calendar-event {
+    border-radius: 0.35rem;
+  }
+
+  .moduvis-calendar-event__accent {
+    width: 0.2rem;
+  }
+
+  .moduvis-calendar-event__body {
+    padding-inline: 0.25rem;
+  }
+
+  .moduvis-calendar-event__time {
+    display: none;
+  }
+
+  .moduvis-calendar-event__title {
+    font-size: 0.625rem;
+  }
+
+  .moduvis-calendar-event__move,
+  .moduvis-fc-event:hover .moduvis-calendar-event__move {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moduvis-calendar-surface *,
+  .moduvis-calendar-event {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

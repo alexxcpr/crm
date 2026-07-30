@@ -6,7 +6,8 @@ import listPlugin from '@fullcalendar/vue3/list'
 import timeGridPlugin from '@fullcalendar/vue3/timegrid'
 import type { CalendarOptions, DatesSetInfo, EventInput } from '@fullcalendar/vue3'
 import '@fullcalendar/vue3/skeleton.css'
-import type { CalendarDefinition, CalendarQueryResult } from '~/types/calendar'
+import '~/assets/css/moduvis-calendar.css'
+import type { CalendarDefinition, CalendarEvent, CalendarQueryResult } from '~/types/calendar'
 
 const props = defineProps<{
   calendar: CalendarDefinition
@@ -27,7 +28,10 @@ const events = computed<EventInput[]>(() => (result.value?.events ?? []).map(eve
   start: event.start,
   end: event.end,
   allDay: event.allDay,
-  color: event.color
+  backgroundColor: 'transparent',
+  borderColor: 'transparent',
+  textColor: 'inherit',
+  extendedProps: { calendarEvent: event }
 })))
 
 const options = computed<CalendarOptions>(() => ({
@@ -45,12 +49,22 @@ const options = computed<CalendarOptions>(() => ({
   height: 560,
   editable: false,
   selectable: false,
+  dayMaxEvents: 4,
+  eventMaxStack: 4,
+  slotEventOverlap: false,
+  eventOrder: 'start,-duration,title',
+  eventClass: 'moduvis-fc-event is-readonly',
+  moreLinkContent: args => `+${args.num} înregistrări`,
   events: events.value,
   datesSet: (info: DatesSetInfo) => {
     range.value = { start: info.start, end: info.end }
     schedule()
   }
 }))
+
+function slotCalendarEvent(eventApi: any): CalendarEvent | undefined {
+  return eventApi.extendedProps.calendarEvent as CalendarEvent | undefined
+}
 
 function schedule() {
   clearTimeout(timer)
@@ -92,7 +106,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="calendar-builder-preview relative rounded-xl border border-default bg-default p-3">
+  <div class="calendar-builder-preview moduvis-calendar-surface is-month-view relative">
     <UProgress
       v-if="loading"
       animation="carousel"
@@ -108,22 +122,26 @@ onBeforeUnmount(() => {
       :description="error"
       class="mb-3"
     />
-    <FullCalendar :options="options" />
+    <FullCalendar :options="options">
+      <template #eventContent="arg">
+        <CalendarEventContent
+          :event="slotCalendarEvent(arg.event)"
+          :time-text="arg.timeText"
+          :view-type="arg.view.type"
+          preview
+        />
+      </template>
+    </FullCalendar>
   </div>
 </template>
 
 <style>
 .calendar-builder-preview {
-  --fc-border-color: var(--ui-border);
-  --fc-page-bg-color: var(--ui-bg);
-  --fc-neutral-bg-color: var(--ui-bg-elevated);
-  --fc-today-bg-color: color-mix(in srgb, var(--ui-primary) 8%, transparent);
-  color: var(--ui-text);
-}
-.calendar-builder-preview .fc {
-  font-size: 0.78rem;
-}
-.calendar-builder-preview .fc a {
-  color: inherit;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: 1rem;
+  background-color: var(--ui-bg);
+  box-shadow: 0 10px 35px color-mix(in srgb, black 5%, transparent);
+  padding: 0.85rem;
 }
 </style>
