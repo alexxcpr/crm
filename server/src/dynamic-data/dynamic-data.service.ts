@@ -52,6 +52,26 @@ export class DynamicDataService {
     return this.tenantContext.knex;
   }
 
+  private async addOwnerDisplay(
+    record: Record<string, any>,
+  ): Promise<Record<string, any>> {
+    if (!record.id_profile) {
+      record.profile_display = null;
+      return record;
+    }
+
+    const owner = await this.knex('profile')
+      .where('id_profile', record.id_profile)
+      .select('display_name', 'username', 'email')
+      .first();
+    record.profile_display =
+      owner?.display_name ||
+      owner?.username ||
+      owner?.email ||
+      null;
+    return record;
+  }
+
   private async validateCalendarIntervals(
     entityId: string,
     candidate: Record<string, any>,
@@ -455,17 +475,7 @@ export class DynamicDataService {
       throw new NotFoundException(
         `Inregistrarea cu id "${id}" nu a fost gasita.`,
       );
-    if (record.id_profile) {
-      const owner = await this.knex('profile')
-        .where('id_profile', record.id_profile)
-        .first();
-      record.profile_display =
-        owner?.display_name ||
-        owner?.username ||
-        owner?.email ||
-        null;
-    }
-    return { data: record };
+    return { data: await this.addOwnerDisplay(record) };
   }
 
   async create(
@@ -595,7 +605,9 @@ export class DynamicDataService {
         data: record,
       },
     );
-    return { data: record };
+    return {
+      data: await this.addOwnerDisplay(record),
+    };
   }
 
   async update(
@@ -836,7 +848,9 @@ export class DynamicDataService {
           );
         });
     }
-    return { data: record };
+    return {
+      data: await this.addOwnerDisplay(record),
+    };
   }
 
   async remove(

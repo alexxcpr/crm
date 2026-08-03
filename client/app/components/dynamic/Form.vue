@@ -71,10 +71,26 @@ const systemData = reactive({
 })
 const originalProfileId = ref<string | null>(null)
 const activeProfiles = ref<ActiveProfile[]>([])
-const profileOptions = computed(() => activeProfiles.value.map(profile => ({
-  label: profile.display_name || profile.username || profile.email,
-  value: profile.id_profile
-})))
+const profileOptions = computed(() => {
+  const options = activeProfiles.value.map(profile => ({
+    label: profile.display_name || profile.username || profile.email,
+    value: profile.id_profile
+  }))
+  const currentProfileId = systemData.id_profile
+
+  if (
+    currentProfileId
+    && systemData.profile_display
+    && !options.some(option => option.value === currentProfileId)
+  ) {
+    options.unshift({
+      label: systemData.profile_display,
+      value: currentProfileId
+    })
+  }
+
+  return options
+})
 const submitting = ref(false)
 const submitIntent = ref<'save' | 'copy'>('save')
 const copyWindow = shallowRef<Window | null>(null)
@@ -327,6 +343,9 @@ async function onSubmit(event: FormSubmitEvent<Record<string, unknown>>) {
         }
         if (result.id_profile) {
           systemData.id_profile = result.id_profile
+        }
+        if (result.profile_display !== undefined) {
+          systemData.profile_display = result.profile_display
         }
       } else {
         seedEntityRecordHandoff(props.entity, result)
