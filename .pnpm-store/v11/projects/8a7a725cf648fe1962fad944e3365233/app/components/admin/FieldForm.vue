@@ -214,6 +214,8 @@ watch(() => state.ui_type, (uiType) => {
 const formSchema = z.object({
   name: z.string().min(1, 'Numele este obligatoriu').max(100),
   ui_type: z.string(),
+  id_relation_entity: z.string(),
+  relation_display_field: z.string().max(100, 'Campul de afisat poate avea maximum 100 de caractere'),
   file_allowed_mime_types: z.array(z.string()),
   slug: z.string()
     .min(2, 'Slug-ul trebuie sa aiba minim 2 caractere')
@@ -223,6 +225,22 @@ const formSchema = z.object({
   grid_col: z.coerce.number().int().min(1, 'Coloana grid trebuie sa fie intre 1 si 3').max(3, 'Coloana grid trebuie sa fie intre 1 si 3'),
   col_span: z.coerce.number().int().min(1, 'Col span trebuie sa fie intre 1 si 3').max(3, 'Col span trebuie sa fie intre 1 si 3')
 }).superRefine((data, context) => {
+  if (data.ui_type === 'relation' && !data.id_relation_entity) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Selecteaza entitatea tinta.',
+      path: ['id_relation_entity']
+    })
+  }
+
+  if (data.ui_type === 'relation' && !data.relation_display_field) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Selecteaza campul de afisat.',
+      path: ['relation_display_field']
+    })
+  }
+
   if (data.ui_type === 'file' && data.file_allowed_mime_types.length === 0) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
