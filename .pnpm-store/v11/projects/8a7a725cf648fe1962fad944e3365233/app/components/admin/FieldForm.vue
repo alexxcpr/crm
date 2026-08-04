@@ -169,6 +169,94 @@ const entityOptions = computed(() =>
 
 const relationFieldOptions = ref<{ label: string, value: string }[]>([])
 const loadingRelationFields = ref(false)
+const relationDefaultOptions = ref<{ label: string, value: string }[]>([])
+const loadingRelationDefaults = ref(false)
+const relationDefaultOpen = ref(false)
+let relationDefaultSearchTimer: ReturnType<typeof setTimeout> | undefined
+let relationDefaultRequestId = 0
+
+const selectedRelationEntity = computed(() =>
+  props.entities.find(entity => entity.id_entity === state.id_relation_entity) ?? null
+)
+
+const canSelectRelationDefault = computed(() =>
+  !!selectedRelationEntity.value && !!state.relation_display_field
+)
+
+function mergeRelationDefaultOption(option: { label: string, value: string }) {
+  const existingIndex = relationDefaultOptions.value.findIndex(item => item.value === option.value)
+  if (existingIndex === -1) {
+    relationDefaultOptions.value = [option, ...relationDefaultOptions.value]
+    return
+  }
+
+  const next = [...relationDefaultOptions.value]
+  next[existingIndex] = option
+  relationDefaultOptions.value = next
+}
+
+async function fetchSelectedRelationDefault(requestId: number) {
+  const targetEntity = selectedRelationEntity.value
+  const displayField = state.relation_display_field
+  const selectedValue = state.default_value
+  if (!targetEntity || !displayField || !selectedValue) return
+  if (relationDefaultOptions.value.some(item => item.value === selectedValue)) return
+
+  try {
+    const response = await apiFetch<{ data: Record<string, unknown> }>(
+      `/v1/data/${targetEntity.slug}/${selectedValue}`
+    )
+    if (requestId !== relationDefaultRequestId || !response.data?.id) return
+    mergeRelationDefaultOption({
+      label: String(response.data[displayField] ?? response.data.id),
+      value: String(response.data.id)
+    })
+  } catch {
+    // Valoarea existenta ramane in state; API-ul va valida la salvare.
+  }
+}
+
+async function fetchRelationDefaultOptions(search = '') {
+  const targetEntity = selectedRelationEntity.value
+  const displayField = state.relation_display_field
+  if (!targetEntity || !displayField) {
+    relationDefaultOptions.value = []
+    return
+  }
+
+  const requestId = ++relationDefaultRequestId
+  loadingRelationDefaults.value = true
+  try {
+    const query: Record<string, string> = { limit: '50' }
+    const normalizedSearch = search.trim()
+    if (normalizedSearch) {
+      query[`filter[${displayField}][contains]`] = normalizedSearch
+    }
+
+    const response = await apiFetch<{ data: Record<string, unknown>[] }>(
+      `/v1/data/${targetEntity.slug}`,
+      { query }
+    )
+    if (requestId !== relationDefaultRequestId) return
+
+    relationDefaultOptions.value = response.data
+      .filter(record => record.id)
+      .map(record => ({
+        label: String(record[displayField] ?? record.id),
+        value: String(record.id)
+      }))
+    await fetchSelectedRelationDefault(requestId)
+  } catch {
+    if (requestId === relationDefaultRequestId) relationDefaultOptions.value = []
+  } finally {
+    if (requestId === relationDefaultRequestId) loadingRelationDefaults.value = false
+  }
+}
+
+function onRelationDefaultSearch(search: string) {
+  if (relationDefaultSearchTimer) clearTimeout(relationDefaultSearchTimer)
+  relationDefaultSearchTimer = setTimeout(() => fetchRelationDefaultOptions(search), 300)
+}
 
 async function fetchRelationEntityFields(entityId: string) {
   if (!entityId) {
@@ -194,9 +282,26 @@ async function fetchRelationEntityFields(entityId: string) {
   }
 }
 
-watch(() => state.id_relation_entity, (entityId) => {
+watch(() => state.id_relation_entity, (entityId, previousEntityId) => {
+  if (previousEntityId && entityId !== previousEntityId) {
+    state.relation_display_field = ''
+    state.default_value = ''
+    relationDefaultOptions.value = []
+  }
   fetchRelationEntityFields(entityId ?? '')
 }, { immediate: true })
+
+watch(() => state.relation_display_field, (displayField, previousDisplayField) => {
+  if (previousDisplayField && displayField !== previousDisplayField) {
+    state.default_value = ''
+  }
+  relationDefaultOptions.value = []
+  if (displayField) fetchRelationDefaultOptions()
+}, { immediate: true })
+
+watch(relationDefaultOpen, (isOpen) => {
+  if (isOpen && canSelectRelationDefault.value) fetchRelationDefaultOptions()
+})
 
 watch(() => state.relation_kind, (relationKind) => {
   if (relationKind === 'composition') state.is_required = true
@@ -208,6 +313,10 @@ watch(() => state.ui_type, (uiType) => {
   state.is_filterable = false
   state.is_sortable = false
   state.default_value = ''
+})
+
+onUnmounted(() => {
+  if (relationDefaultSearchTimer) clearTimeout(relationDefaultSearchTimer)
 })
 
 // ─── Zod validation ───
@@ -528,7 +637,7 @@ async function onSubmit() {
         <UInput v-model="state.help_text" placeholder="Descriere afisata sub camp" class="w-full" />
       </UFormField>
 
-      <UFormField label="Valoare implicita" name="default_value">
+      <UFormField v-if="!showRelationFields" label="Valoare implicita" name="default_value">
         <UInput v-model="state.default_value" placeholder="Valoare default" class="w-full" />
       </UFormField>
     </div>
@@ -589,6 +698,26 @@ async function onSubmit() {
           :loading="loadingRelationFields"
           :disabled="!state.id_relation_entity"
           class="w-full"
+        />
+      </UFormField>
+
+      <UFormField
+        label="Valoare implicita"
+        name="default_value"
+        description="Inregistrarea selectata va fi completata automat la crearea unei inregistrari noi."
+      >
+        <USelectMenu
+          v-model:open="relationDefaultOpen"
+          v-model="state.default_value"
+          :items="relationDefaultOptions"
+          value-key="value"
+          :loading="loadingRelationDefaults"
+          :disabled="!canSelectRelationDefault"
+          :placeholder="canSelectRelationDefault ? 'Selecteaza valoarea implicita' : 'Selecteaza mai intai entitatea si campul de afisat'"
+          :search-input="{ placeholder: 'Cauta in catalog...' }"
+          clear
+          class="w-full"
+          @update:search-term="onRelationDefaultSearch"
         />
       </UFormField>
     </div>

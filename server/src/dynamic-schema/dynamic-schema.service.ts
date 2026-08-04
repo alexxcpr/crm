@@ -46,36 +46,21 @@ export class DynamicSchemaService {
       return;
     }
 
-    const needsNotNull = field.is_required && !field.default_value;
     const rowCount = await this.knex(tableName).count('* as cnt').first();
     const tableHasData = rowCount && Number(rowCount.cnt) > 0;
+    const deferNotNull = field.is_required && !field.default_value && tableHasData;
 
-    if (needsNotNull && tableHasData) {
+    if (deferNotNull) {
       await this.knex.schema.alterTable(tableName, (table) => {
         applyColumn(table, {
           columnName,
           dataType: field.data_type,
           isRequired: false,
-          isUnique: false,
+          isUnique: field.is_unique,
           defaultValue: null,
         });
       });
-
-      const fallback = this.getEmptyDefault(field.data_type);
-      await this.knex(tableName)
-        .whereNull(columnName)
-        .update({ [columnName]: fallback });
-
-      await this.knex.schema.alterTable(tableName, (table) => {
-        const col = this.rebuildColumnBuilder(table, field.data_type, columnName);
-        col.notNullable().alter();
-      });
-
-      if (field.is_unique) {
-        await this.knex.schema.alterTable(tableName, (table) => {
-          table.unique([columnName]);
-        });
-      }
+      await this.addDeferredRequiredConstraint(tableName, columnName);
     } else {
       await this.knex.schema.alterTable(tableName, (table) => {
         applyColumn(table, {
@@ -156,6 +141,7 @@ export class DynamicSchemaService {
         col.nullable().alter();
       }
     });
+    await this.dropDeferredRequiredConstraint(tableName, columnName);
 
     this.logger.log(
       `Coloana "${columnName}" din "${tableName}" a fost setata ca ${isRequired ? 'obligatorie' : 'optionala'}.`,
@@ -234,6 +220,35 @@ export class DynamicSchemaService {
     );
   }
 
+  private async addDeferredRequiredConstraint(
+    tableName: string,
+    columnName: string,
+  ): Promise<void> {
+    const constraintName = this.requiredConstraintName(tableName, columnName);
+    await this.knex.raw(
+      'ALTER TABLE ?? ADD CONSTRAINT ?? CHECK (?? IS NOT NULL) NOT VALID',
+      [tableName, constraintName, columnName],
+    );
+  }
+
+  private async dropDeferredRequiredConstraint(
+    tableName: string,
+    columnName: string,
+  ): Promise<void> {
+    const constraintName = this.requiredConstraintName(tableName, columnName);
+    await this.knex.raw(
+      'ALTER TABLE ?? DROP CONSTRAINT IF EXISTS ??',
+      [tableName, constraintName],
+    );
+  }
+
+  private requiredConstraintName(tableName: string, columnName: string): string {
+    const rawName = `chk_${tableName}_${columnName}_required`;
+    return rawName.length <= 63
+      ? rawName
+      : `${rawName.slice(0, 54)}_${this.simpleHash(rawName)}`;
+  }
+
   private simpleHash(value: string): string {
     let hash = 0;
     for (
@@ -257,19 +272,6 @@ export class DynamicSchemaService {
     await this.knex.schema.alterTable(tableName, (table) => {
       table.foreign(columnName).references('id_file').inTable('stored_file').onDelete('RESTRICT');
     });
-  }
-
-  private getEmptyDefault(dataType: string): any {
-    switch (dataType) {
-      case 'varchar':   return '';
-      case 'text':      return '';
-      case 'integer':   return 0;
-      case 'numeric':   return 0;
-      case 'boolean':   return false;
-      case 'datetime': return new Date().toISOString();
-      case 'uuid':      return '00000000-0000-0000-0000-000000000000';
-      default:          return '';
-    }
   }
 
   private rebuildColumnBuilder(

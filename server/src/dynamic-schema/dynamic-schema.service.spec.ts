@@ -121,6 +121,7 @@ describe('DynamicSchemaService', () => {
           uuid: jest.fn().mockReturnValue('gen_random_uuid()'),
           now: jest.fn().mockReturnValue('now()'),
         },
+        raw: jest.fn().mockResolvedValue(undefined),
       },
     );
 
@@ -362,6 +363,34 @@ describe('DynamicSchemaService', () => {
       expect(mockColumnBuilder.notNullable).toHaveBeenCalled();
     });
 
+    it('lasa null valorile istorice cand adauga un camp required fara default', async () => {
+      mockSchema.hasColumn.mockResolvedValue(false);
+      mockQueryBuilder.first.mockResolvedValueOnce({ cnt: 3 });
+      const field = mockField({
+        data_type: 'uuid',
+        ui_type: 'relation',
+        is_required: true,
+        is_unique: true,
+        is_filterable: false,
+      });
+
+      await service.addColumn(mockEntity(), field);
+
+      expect(mockColumnBuilder.nullable).toHaveBeenCalled();
+      expect(mockColumnBuilder.notNullable).not.toHaveBeenCalled();
+      expect(mockColumnBuilder.unique).toHaveBeenCalled();
+      expect(mockQueryBuilder.update).not.toHaveBeenCalled();
+      expect(mockSchema.alterTable).toHaveBeenCalledTimes(1);
+      expect(mockKnexInstance.raw).toHaveBeenCalledWith(
+        'ALTER TABLE ?? ADD CONSTRAINT ?? CHECK (?? IS NOT NULL) NOT VALID',
+        [
+          'ent_contacts',
+          'chk_ent_contacts_cf_industry_required',
+          'cf_industry',
+        ],
+      );
+    });
+
     it('seteaza nullable pe campuri optionale', async () => {
       mockSchema.hasColumn.mockResolvedValue(false);
       const field = mockField({ is_required: false, is_filterable: false });
@@ -516,6 +545,10 @@ describe('DynamicSchemaService', () => {
       expect(mockSchema.hasColumn).toHaveBeenCalledWith('ent_contacts', 'cf_industry');
       expect(mockColumnBuilder.nullable).toHaveBeenCalled();
       expect(mockColumnBuilder.alter).toHaveBeenCalled();
+      expect(mockKnexInstance.raw).toHaveBeenCalledWith(
+        'ALTER TABLE ?? DROP CONSTRAINT IF EXISTS ??',
+        ['ent_contacts', 'chk_ent_contacts_cf_industry_required'],
+      );
     });
 
     it('face coloana not nullable cand nu exista valori null', async () => {

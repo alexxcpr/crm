@@ -15,6 +15,7 @@ export class DynamicValidationService {
     tableName: string,
     mode: 'create' | 'update',
     recordId?: string,
+    existingRecord?: Record<string, any>,
   ): Promise<Record<string, any>> {
     const sanitized: Record<string, any> = {};
     const errors: string[] = [];
@@ -22,18 +23,26 @@ export class DynamicValidationService {
     for (const field of fields) {
       if (!field.visible_in_form) continue;
 
-      const value = Object.prototype.hasOwnProperty.call(body, field.slug)
+      const hasSlugValue = Object.prototype.hasOwnProperty.call(body, field.slug);
+      const hasColumnValue = Object.prototype.hasOwnProperty.call(body, field.column_name);
+      const hasValue = hasSlugValue || hasColumnValue;
+      const value = hasSlugValue
         ? body[field.slug]
         : body[field.column_name];
-      const isEmptyRequiredValue = value === undefined || value === null || value === '';
+      const effectiveValue = hasValue
+        ? value
+        : existingRecord?.[field.column_name];
+      const isEmptyRequiredValue =
+        effectiveValue === undefined || effectiveValue === null || effectiveValue === '';
 
-      // Required check (doar la create, sau la update daca e trimis explicit ca null)
-      if (field.is_required && (mode === 'create' || value !== undefined) && isEmptyRequiredValue) {
+      // La update validam valoarea efectiva, inclusiv cea deja existenta in record.
+      // Astfel, randurile istorice cu NULL trebuie completate la prima salvare.
+      if (field.is_required && isEmptyRequiredValue) {
         errors.push(`Campul "${field.name}" este obligatoriu.`);
         break;
       }
 
-      if (value === undefined) continue;
+      if (!hasValue) continue;
 
       const casted = this.castValue(value, field.data_type);
 

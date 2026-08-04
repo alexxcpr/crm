@@ -55,7 +55,7 @@ describe('DynamicValidationService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('permite update partial cand campul required lipseste din payload', async () => {
+  it('permite update partial cand valoarea required exista deja in record', async () => {
     await expect(
       service.validateAndSanitize(
         {},
@@ -63,7 +63,21 @@ describe('DynamicValidationService', () => {
         'ent_contacts',
         'update',
         'record-1',
+        { cf_numar: 10 },
       ),
     ).resolves.toEqual({});
+  });
+
+  it('respinge update-ul unui record istoric daca valoarea required este inca null', async () => {
+    await expect(
+      service.validateAndSanitize(
+        {},
+        [mockField()],
+        'ent_contacts',
+        'update',
+        'record-1',
+        { cf_numar: null },
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

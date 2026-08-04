@@ -634,6 +634,7 @@ export class DynamicDataService {
         entity.table_name,
         'update',
         id,
+        existing,
       );
     if (policy.composition.length) {
       const relationField =
