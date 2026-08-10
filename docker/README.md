@@ -34,6 +34,22 @@ wildcard prin DNS-01 Cloudflare.
 
 ## Migrații
 
+Din containerul de productie, scriptul selecteaza automat
+`dist/knexfile.js`:
+
+```bash
+cd /opt/moduvis/CRM/docker
+docker compose build backend
+docker compose run --rm backend npm run db:migrate:meta
+docker compose run --rm backend npm run db:migrate
+docker compose run --rm backend node dist/scripts/migrate-all-tenants.js
+```
+
+Ultima comanda aplica migrarile tenant pe toate bazele deja inregistrate in
+meta DB. Rebuild-ul backend este obligatoriu dupa adaugarea unei migrari.
+
+Pentru rulare direct pe host, din sursele TypeScript:
+
 Din folderul `server/`, ruleaza migrațiile. Ai nevoie de Node.js instalat pe VPS
 (sau fa port-forward la Postgres si ruleaza local).
 
