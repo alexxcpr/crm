@@ -12,7 +12,8 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import { ApiAuthGuard } from 'src/auth/api-auth.guard';
+import { IntegrationAccess, RequireIntegrationScope } from 'src/auth/integration-access.decorator';
 import { CapabilityGuard } from 'src/security/capability.guard';
 import { RequireCapability } from 'src/security/require-capability.decorator';
 import type { AuthenticatedUser } from 'src/security/security.types';
@@ -25,8 +26,9 @@ import {
 import { WorkflowScheduleService } from './workflow-schedule.service';
 
 @Controller('v1/admin/workflow-schedules')
-@UseGuards(AuthGuard('jwt'), CapabilityGuard)
+@UseGuards(ApiAuthGuard, CapabilityGuard)
 @RequireCapability('builder.manage')
+@IntegrationAccess('builder')
 export class WorkflowScheduleController {
   constructor(
     private readonly schedules: WorkflowScheduleService,
@@ -38,6 +40,7 @@ export class WorkflowScheduleController {
   }
 
   @Post('preview')
+  @RequireIntegrationScope('builder:read')
   async preview(
     @Body() dto: PreviewWorkflowScheduleDto,
   ) {
@@ -159,6 +162,7 @@ export class WorkflowScheduleController {
   }
 
   @Post(':id/run-now')
+  @RequireIntegrationScope('actions:execute')
   async runNow(
     @Param('id', ParseUUIDPipe) id: string,
   ) {

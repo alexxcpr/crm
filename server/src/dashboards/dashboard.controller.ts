@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import { ApiAuthGuard } from 'src/auth/api-auth.guard';
+import { IntegrationAccess, RequireIntegrationScope } from 'src/auth/integration-access.decorator';
 import { Request } from 'express';
 import { AuthenticatedUser } from 'src/security/security.types';
 import { returnValidResponse } from 'src/utils/crud.utils';
@@ -10,7 +11,8 @@ import { DashboardQueryDto } from './dto/dashboard.dto';
 interface RequestWithUser extends Request { user: AuthenticatedUser }
 
 @Controller('v1/dashboards')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(ApiAuthGuard)
+@IntegrationAccess('data')
 export class DashboardController {
   constructor(
     private readonly dashboards: DashboardService,
@@ -28,6 +30,7 @@ export class DashboardController {
   }
 
   @Post(':slug/query')
+  @RequireIntegrationScope('data:read')
   async query(
     @Param('slug') slug: string,
     @Body() dto: DashboardQueryDto,

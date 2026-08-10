@@ -9,7 +9,8 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import { ApiAuthGuard } from 'src/auth/api-auth.guard';
+import { IntegrationAccess, RequireIntegrationScope } from 'src/auth/integration-access.decorator';
 import type { Request } from 'express';
 import { ReorderDto } from 'src/admin/dto/reorder.dto';
 import { CapabilityGuard } from 'src/security/capability.guard';
@@ -28,8 +29,9 @@ interface RequestWithUser extends Request {
 }
 
 @Controller('v1/admin/calendars')
-@UseGuards(AuthGuard('jwt'), CapabilityGuard)
+@UseGuards(ApiAuthGuard, CapabilityGuard)
 @RequireCapability('builder.manage')
+@IntegrationAccess('builder')
 export class AdminCalendarController {
   constructor(
     private readonly calendars: CalendarService,
@@ -45,6 +47,7 @@ export class AdminCalendarController {
   }
 
   @Post('preview/query')
+  @RequireIntegrationScope('builder:read')
   async preview(
     @Body() dto: PreviewCalendarDto,
     @Req() req: RequestWithUser,

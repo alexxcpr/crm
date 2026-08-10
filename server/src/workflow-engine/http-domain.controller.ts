@@ -9,7 +9,8 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import { ApiAuthGuard } from 'src/auth/api-auth.guard';
+import { IntegrationAccess } from 'src/auth/integration-access.decorator';
 import { CapabilityGuard } from 'src/security/capability.guard';
 import { RequireCapability } from 'src/security/require-capability.decorator';
 import type { AuthenticatedUser } from 'src/security/security.types';
@@ -21,8 +22,9 @@ import {
 import { WorkflowHttpDomainService } from './http-domain.service';
 
 @Controller('v1/admin/workflow-http-domains')
-@UseGuards(AuthGuard('jwt'), CapabilityGuard)
+@UseGuards(ApiAuthGuard, CapabilityGuard)
 @RequireCapability('builder.manage')
+@IntegrationAccess('builder')
 export class WorkflowHttpDomainController {
   constructor(
     private readonly domains: WorkflowHttpDomainService,

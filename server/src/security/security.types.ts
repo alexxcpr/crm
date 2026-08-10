@@ -2,6 +2,7 @@ import type {
   AccessLevel,
   GlobalCapability,
 } from './access-control.types';
+import type { IntegrationScope } from 'src/auth/integration-token.types';
 
 export type PermissionAction = 'read' | 'create' | 'update' | 'delete' | 'manage' | 'change_ownership';
 export type PermissionScope = 'all' | 'owner';
@@ -29,4 +30,7 @@ export interface AuthenticatedUser {
   globalCapabilities: GlobalCapability[];
   tenant: string;
   dbName: string;
+  authType?: 'jwt' | 'integration_token';
+  integrationTokenId?: string;
+  integrationScopes?: IntegrationScope[];
 }

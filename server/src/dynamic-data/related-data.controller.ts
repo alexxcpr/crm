@@ -10,7 +10,8 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import { ApiAuthGuard } from 'src/auth/api-auth.guard';
+import { IntegrationAccess } from 'src/auth/integration-access.decorator';
 import type { Request } from 'express';
 import type { AuthenticatedUser } from 'src/security/security.types';
 import { returnValidResponse } from 'src/utils/crud.utils';
@@ -23,7 +24,8 @@ interface RequestWithUser extends Request {
 @Controller(
   'v1/data/:parentSlug/:parentId/related',
 )
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(ApiAuthGuard)
+@IntegrationAccess('data')
 export class RelatedDataController {
   constructor(
     private readonly related: RelatedDataService,

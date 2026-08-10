@@ -1,11 +1,13 @@
 import { Controller, Get, Param, Req, UseGuards } from '@nestjs/common';
 import { SchemaService } from './schema.service';
-import { AuthGuard } from '@nestjs/passport';
+import { ApiAuthGuard } from 'src/auth/api-auth.guard';
+import { IntegrationAccess } from 'src/auth/integration-access.decorator';
 import { Request } from 'express';
 import { AuthenticatedUser } from 'src/security/security.types';
 
 @Controller('v1/schema')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(ApiAuthGuard)
+@IntegrationAccess('data')
 export class SchemaController {
     constructor(private readonly schemaService: SchemaService) {}
 

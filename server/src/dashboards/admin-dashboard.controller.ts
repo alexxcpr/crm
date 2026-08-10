@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import { ApiAuthGuard } from 'src/auth/api-auth.guard';
+import { IntegrationAccess } from 'src/auth/integration-access.decorator';
 import { CapabilityGuard } from 'src/security/capability.guard';
 import { RequireCapability } from 'src/security/require-capability.decorator';
 import { returnValidResponse } from 'src/utils/crud.utils';
@@ -8,8 +9,9 @@ import { SaveDashboardDto } from './dto/dashboard.dto';
 import { ReorderDto } from 'src/admin/dto/reorder.dto';
 
 @Controller('v1/admin/dashboards')
-@UseGuards(AuthGuard('jwt'), CapabilityGuard)
+@UseGuards(ApiAuthGuard, CapabilityGuard)
 @RequireCapability('builder.manage')
+@IntegrationAccess('builder')
 export class AdminDashboardController {
   constructor(private readonly dashboards: DashboardService) {}
 

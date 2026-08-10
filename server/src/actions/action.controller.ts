@@ -6,7 +6,8 @@ import {
   UseGuards,
   Req,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import { ApiAuthGuard } from 'src/auth/api-auth.guard';
+import { IntegrationAccess, RequireIntegrationScope } from 'src/auth/integration-access.decorator';
 import { Request } from 'express';
 import { returnValidResponse } from 'src/utils/crud.utils';
 import { ActionService } from './action.service';
@@ -17,7 +18,8 @@ interface RequestWithUser extends Request {
 }
 
 @Controller('v1/actions')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(ApiAuthGuard)
+@IntegrationAccess('data')
 export class ActionController {
   constructor(
     private readonly actionService: ActionService,
@@ -35,6 +37,7 @@ export class ActionController {
   }
 
   @Post(':entitySlug/:actionSlug/execute')
+  @RequireIntegrationScope('actions:execute')
   async execute(
     @Param('entitySlug') entitySlug: string,
     @Param('actionSlug') actionSlug: string,

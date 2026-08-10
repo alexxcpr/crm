@@ -10,7 +10,8 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import { ApiAuthGuard } from 'src/auth/api-auth.guard';
+import { IntegrationAccess } from 'src/auth/integration-access.decorator';
 import { CapabilityGuard } from 'src/security/capability.guard';
 import { RequireCapability } from 'src/security/require-capability.decorator';
 import {
@@ -24,8 +25,9 @@ import { SmtpMailService } from './smtp-mail.service';
 import type { AuthenticatedUser } from 'src/security/security.types';
 
 @Controller('v1/admin/integrations')
-@UseGuards(AuthGuard('jwt'), CapabilityGuard)
+@UseGuards(ApiAuthGuard, CapabilityGuard)
 @RequireCapability('tenant.manage')
+@IntegrationAccess('integrations')
 export class AdminIntegrationsController {
   constructor(
     private readonly integrations: IntegrationsService,

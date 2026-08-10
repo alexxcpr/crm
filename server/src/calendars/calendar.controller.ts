@@ -8,7 +8,8 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import { ApiAuthGuard } from 'src/auth/api-auth.guard';
+import { IntegrationAccess, RequireIntegrationScope } from 'src/auth/integration-access.decorator';
 import type { Request } from 'express';
 import type { AuthenticatedUser } from 'src/security/security.types';
 import { returnValidResponse } from 'src/utils/crud.utils';
@@ -24,7 +25,8 @@ interface RequestWithUser extends Request {
 }
 
 @Controller('v1/calendars')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(ApiAuthGuard)
+@IntegrationAccess('data')
 export class CalendarController {
   constructor(
     private readonly calendars: CalendarService,
@@ -46,6 +48,7 @@ export class CalendarController {
   }
 
   @Post(':slug/query')
+  @RequireIntegrationScope('data:read')
   async query(
     @Param('slug') slug: string,
     @Body() dto: CalendarQueryDto,

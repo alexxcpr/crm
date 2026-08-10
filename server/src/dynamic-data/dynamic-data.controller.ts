@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Post, Put, Param, Delete, Query, UseGuards, Req } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import { ApiAuthGuard } from 'src/auth/api-auth.guard';
+import { IntegrationAccess } from 'src/auth/integration-access.decorator';
 import { Request } from 'express';
 import { returnValidResponse } from 'src/utils/crud.utils';
 import { DynamicDataService } from './dynamic-data.service';
@@ -8,7 +9,8 @@ import { AuthenticatedUser } from 'src/security/security.types';
 interface RequestWithUser extends Request { user: AuthenticatedUser }
 
 @Controller('v1/data')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(ApiAuthGuard)
+@IntegrationAccess('data')
 export class DynamicDataController {
     constructor(private readonly dataService: DynamicDataService) {}
 

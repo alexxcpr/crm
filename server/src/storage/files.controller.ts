@@ -8,7 +8,8 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import { ApiAuthGuard } from 'src/auth/api-auth.guard';
+import { IntegrationAccess } from 'src/auth/integration-access.decorator';
 import { Request } from 'express';
 import type { AuthenticatedUser } from 'src/security/security.types';
 import { returnValidResponse } from 'src/utils/crud.utils';
@@ -20,7 +21,8 @@ interface RequestWithUser extends Request {
 }
 
 @Controller('v1/files')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(ApiAuthGuard)
+@IntegrationAccess('files')
 export class FilesController {
   constructor(
     private readonly files: FileStorageService,
