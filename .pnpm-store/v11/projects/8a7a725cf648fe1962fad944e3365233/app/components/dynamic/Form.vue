@@ -422,6 +422,7 @@ function closeCopyWindow() {
 function buildPayload(validated: Record<string, unknown>): Record<string, any> {
   const payload: Record<string, any> = {}
   for (const field of formFields.value) {
+    if (field.sequence) continue
     const val = validated[field.slug]
     if (val !== undefined) {
       payload[field.slug] = val

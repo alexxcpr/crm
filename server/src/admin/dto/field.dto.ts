@@ -1,7 +1,8 @@
 import {
     IsBoolean, IsIn, IsInt, IsNotEmpty, IsOptional,
-    IsString, IsUUID, Matches, MaxLength, ValidateIf, IsObject, IsArray, Max, Min,
+    IsString, IsUUID, Matches, MaxLength, ValidateIf, IsObject, IsArray, Max, Min, ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 const DATA_TYPES = ['varchar', 'text', 'integer', 'numeric', 'boolean', 'datetime', 'uuid'];
 const UI_TYPES = [
@@ -10,6 +11,42 @@ const UI_TYPES = [
     'email', 'phone', 'currency', 'file',
 ];
 const RELATION_KINDS = ['reference', 'composition'];
+
+export class SequenceManifestDto {
+    @IsString()
+    @Matches(/^[a-z][a-z0-9_]{1,50}$/, {
+        message: 'Cheia secventei poate contine doar litere mici, cifre si _ si trebuie sa inceapa cu o litera.',
+    })
+    key: string;
+
+    @IsIn(['global', 'entity'])
+    scope: 'global' | 'entity';
+
+    @IsIn(['none', 'yearly'])
+    reset: 'none' | 'yearly';
+
+    @IsString()
+    @IsNotEmpty()
+    @MaxLength(255)
+    format: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(100)
+    prefix?: string;
+
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(18)
+    padding?: number;
+
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(Number.MAX_SAFE_INTEGER)
+    start_value?: number;
+}
 
 export class CreateFieldDto {
     @IsString()
@@ -82,6 +119,11 @@ export class CreateFieldDto {
     @IsOptional()
     @IsObject()
     validation_rules?: Record<string, any>;
+
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => SequenceManifestDto)
+    sequence?: SequenceManifestDto;
 
     @ValidateIf((o) => o.ui_type === 'relation')
     @IsUUID()
@@ -197,6 +239,11 @@ export class UpdateFieldDto {
     @IsOptional()
     @IsObject()
     validation_rules?: Record<string, any>;
+
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => SequenceManifestDto)
+    sequence?: SequenceManifestDto | null;
 
     @IsOptional()
     @IsUUID()

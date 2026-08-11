@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import {
@@ -21,6 +22,7 @@ import { EntityEvent } from 'src/events/entity-event.enum';
 import { FileStorageService } from 'src/storage/file-storage.service';
 import { RecordAccessService } from 'src/security/record-access.service';
 import { RelationDisplayFieldService } from 'src/relations/relation-display-field.service';
+import { SequenceService } from 'src/sequences/sequence.service';
 
 const DELETE_CONFLICT_REFERENCE_ID_LIMIT = 3;
 const DEFAULT_COMPOSITION_DELETE_MAX_DEPTH = 10;
@@ -48,6 +50,7 @@ export class DynamicDataService {
     private readonly recordAccess: RecordAccessService,
     private readonly files: FileStorageService,
     private readonly relationDisplayFields: RelationDisplayFieldService,
+    private readonly sequences: SequenceService,
   ) {}
 
   private get knex() {
@@ -199,7 +202,7 @@ export class DynamicDataService {
         relationEntity,
       ]),
     );
-    const fields = await this.relationDisplayFields.enrichFields(
+    const relationEnrichedFields = await this.relationDisplayFields.enrichFields(
       rawFields.map((field) => ({
         ...field,
         relation_entity: field.id_relation_entity
@@ -208,6 +211,9 @@ export class DynamicDataService {
             ) ?? null
           : null,
       })),
+    );
+    const fields = await this.sequences.enrichFields(
+      relationEnrichedFields,
     );
     return {
       entity,
@@ -611,6 +617,7 @@ export class DynamicDataService {
       entity,
       'create',
     );
+    this.sequences.assertNoOverrides(body, fields);
     const sanitized =
       await this.validation.validateAndSanitize(
         body,
@@ -664,59 +671,103 @@ export class DynamicDataService {
       insertData,
       actor,
     );
-    await this.entityEvents.emit(
-      EntityEvent.BeforeInsert,
-      eventCtx,
-    );
-    insertData.id_profile = actor.profileId;
-    if (composition.steps.length) {
-      const parentStep = composition.steps[0];
-      const parentId =
-        insertData[
-          parentStep.relationField.column_name
-        ];
-      if (!parentId) {
-        throw new ForbiddenException(
-          'Parintele composition este obligatoriu.',
+    let record: Record<string, any>;
+    try {
+      await this.knex.transaction(async (trx) => {
+        await this.tenantContext.runWithTransaction(
+          trx,
+          async () => {
+            const generated =
+              await this.sequences.allocateForRecord(
+                trx,
+                entity,
+                fields,
+                insertData,
+              );
+            await this.entityEvents.emit(
+              EntityEvent.BeforeInsert,
+              eventCtx,
+            );
+            this.sequences.assertGeneratedValuesUnchanged(
+              generated,
+              insertData,
+            );
+            const finalSanitized =
+              await this.validation.validateAndSanitize(
+                insertData,
+                fields,
+                entity.table_name,
+                'create',
+                undefined,
+              );
+            Object.assign(insertData, finalSanitized);
+            this.sequences.assertGeneratedValuesUnchanged(
+              generated,
+              insertData,
+            );
+            insertData.id_profile = actor.profileId;
+            if (composition.steps.length) {
+              const parentStep = composition.steps[0];
+              const parentId =
+                insertData[
+                  parentStep.relationField.column_name
+                ];
+              if (!parentId) {
+                throw new ForbiddenException(
+                  'Parintele composition este obligatoriu.',
+                );
+              }
+              await this.recordAccess.assertRecord(
+                actor,
+                parentStep.parentEntity,
+                String(parentId),
+                'update',
+              );
+            }
+            for (const field of fileFields) {
+              await this.files.validateFileForBinding(
+                field,
+                insertData[field.column_name] ?? null,
+                actor,
+              );
+            }
+            await this.validateCalendarIntervals(
+              entity.id_entity,
+              insertData,
+            );
+            [record] = await trx(entity.table_name)
+              .insert(insertData)
+              .returning('*');
+            for (const field of fileFields) {
+              const fileId = record[field.column_name];
+              if (fileId) {
+                await this.files.bindInTransaction(
+                  trx,
+                  fileId,
+                  entity.id_entity,
+                  field.id_field,
+                  record.id,
+                  actor,
+                );
+              }
+            }
+          },
+        );
+      });
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        ['40001', '40P01'].includes(
+          String((error as { code?: string }).code),
+        )
+      ) {
+        throw new ServiceUnavailableException(
+          'Tranzactia nu a putut fi finalizata. Reincercati intreaga operatie.',
         );
       }
-      await this.recordAccess.assertRecord(
-        actor,
-        parentStep.parentEntity,
-        String(parentId),
-        'update',
-      );
+      throw error;
     }
-    for (const field of fileFields) {
-      await this.files.validateFileForBinding(
-        field,
-        insertData[field.column_name] ?? null,
-        actor,
-      );
-    }
-    await this.validateCalendarIntervals(
-      entity.id_entity,
-      insertData,
-    );
-    let record: Record<string, any>;
-    await this.knex.transaction(async (trx) => {
-      [record] = await trx(entity.table_name)
-        .insert(insertData)
-        .returning('*');
-      for (const field of fileFields) {
-        const fileId = record[field.column_name];
-        if (fileId) {
-          await this.files.bindInTransaction(
-            trx,
-            fileId,
-            entity.id_entity,
-            field.id_field,
-            record.id,
-            actor,
-          );
-        }
-      }
-    });
     record = record!;
     await this.entityEvents.emit(
       EntityEvent.AfterInsert,
@@ -739,6 +790,7 @@ export class DynamicDataService {
   ) {
     const { entity, fields } =
       await this.resolveEntity(entitySlug);
+    this.sequences.assertNoOverrides(body, fields);
     const { record: existing, policy } =
       await this.recordAccess.assertRecord(
         actor,

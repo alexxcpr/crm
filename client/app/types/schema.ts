@@ -19,6 +19,7 @@ export interface Field {
   visible_in_form: boolean
   is_system: boolean
   is_readonly: boolean
+  sequence: SequenceManifest | null
   validation_rules: Record<string, any> | null
   id_relation_entity: string | null
   relation_kind: 'reference' | 'composition' | null
@@ -56,6 +57,16 @@ export interface UiTab {
   related_collection: RelatedCollectionDefinition | null
   date_created: string
   date_updated: string
+}
+
+export interface SequenceManifest {
+  key: string
+  scope: 'global' | 'entity'
+  reset: 'none' | 'yearly'
+  format: string
+  prefix: string
+  padding: number
+  start_value: number
 }
 
 export interface RelatedCollectionCardField {

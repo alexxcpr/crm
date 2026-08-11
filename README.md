@@ -86,3 +86,7 @@ Pentru rularea frontend-ului Nuxt, trebuie configurat fișierul `client/.env` cu
 
 - teste backend (jest):
     npm test -- --testPathPattern=dynamic-schema
+
+## Documentație tehnică
+
+- [Generator atomic de numere secvențiale](zdocumentation/Generator-Atomic-Numere-Secventiale.md)

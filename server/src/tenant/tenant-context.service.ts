@@ -16,6 +16,22 @@ export class TenantContext {
     return this.als.run(store, callback);
   }
 
+  runWithTransaction<T>(
+    transaction: Knex.Transaction,
+    callback: (...args: any[]) => T,
+  ): T {
+    const store = this.als.getStore();
+    if (!store) {
+      throw new Error(
+        'Tenant context not initialized — transaction cannot be propagated',
+      );
+    }
+    return this.als.run(
+      { ...store, knex: transaction },
+      callback,
+    );
+  }
+
   get knex(): Knex {
     const store = this.als.getStore();
     if (!store) throw new Error('Tenant context not initialized — request outside tenant scope');

@@ -3,6 +3,7 @@ import { TenantContext } from 'src/tenant/tenant-context.service';
 import { AuthenticatedUser } from 'src/security/security.types';
 import { RecordAccessService } from 'src/security/record-access.service';
 import { RelationDisplayFieldService } from 'src/relations/relation-display-field.service';
+import { SequenceService } from 'src/sequences/sequence.service';
 
 @Injectable()
 export class SchemaService {
@@ -10,6 +11,7 @@ export class SchemaService {
     private readonly tenantContext: TenantContext,
     private readonly recordAccess: RecordAccessService,
     private readonly relationDisplayFields: RelationDisplayFieldService,
+    private readonly sequences: SequenceService,
   ) {}
 
   private get knex() { return this.tenantContext.knex; }
@@ -35,9 +37,13 @@ export class SchemaService {
         { column: 'field.rank', order: 'asc' },
       ])
       .select('field.*');
-    const fields =
+    const relationEnrichedFields =
       await this.relationDisplayFields.enrichFields(
         rawFields,
+      );
+    const fields =
+      await this.sequences.enrichFields(
+        relationEnrichedFields,
       );
 
     // Fetch tabs for this entity
@@ -95,6 +101,9 @@ export class SchemaService {
         visible_in_form: f.visible_in_form,
         is_system: f.is_system,
         is_readonly: f.is_readonly,
+        sequence: this.sequences.publicManifest(
+          f.sequence,
+        ),
         validation_rules: f.validation_rules,
         id_relation_entity: f.id_relation_entity,
         relation_kind: f.relation_kind,

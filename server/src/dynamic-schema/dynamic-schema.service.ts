@@ -205,6 +205,21 @@ export class DynamicSchemaService {
     });
   }
 
+  async ensureUniqueIndex(
+    tableName: string,
+    columnName: string,
+  ): Promise<void> {
+    const rawName = `uq_${tableName}_${columnName}_sequence`;
+    const indexName =
+      rawName.length <= 63
+        ? rawName
+        : `${rawName.slice(0, 54)}_${this.simpleHash(rawName)}`;
+    await this.knex.raw(
+      'CREATE UNIQUE INDEX IF NOT EXISTS ?? ON ?? (??)',
+      [indexName, tableName, columnName],
+    );
+  }
+
   private async createRelationIndex(
     tableName: string,
     columnName: string,

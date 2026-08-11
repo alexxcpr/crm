@@ -199,6 +199,7 @@ model Field {
                                                          // Frontendul construieste schema Zod din aceste reguli; backend-ul le valideaza la INSERT/UPDATE
 
   id_relation_entity      String?                        // FK optional catre entity.id_entity - populat DOAR cand ui_type = "relation"
+  id_sequence_definition  String?
   relation_kind           String?   @db.VarChar(20)
                                                          // Indica entitatea tinta a relatiei (ex: id-ul entitatii "companies")
                                                          // null pentru orice alt tip de camp
@@ -221,6 +222,7 @@ model Field {
   // Relatie N:1 catre UiTab — tab-ul in care apare campul. Restrict: nu poti sterge un tab care are campuri.
 
   relation_entity         Entity?   @relation("RelationTarget", fields: [id_relation_entity], references: [id_entity], onDelete: SetNull)
+  sequence_definition     SequenceDefinition? @relation(fields: [id_sequence_definition], references: [id_sequence_definition], onDelete: SetNull)
   related_collection_relation RelatedCollectionDefinition[] @relation("RelatedCollectionRelationField")
   related_collection_card_title RelatedCollectionDefinition[] @relation("RelatedCollectionCardTitleField")
   related_collection_quick_file RelatedCollectionDefinition[] @relation("RelatedCollectionQuickFileField")
@@ -233,10 +235,43 @@ model Field {
   // Poti avea "name" in contacts SI "name" in companies, dar nu doua campuri "name" in contacts
 
   @@unique([id_entity, column_name])
+  @@index([id_sequence_definition])
   // Constraint compus: column_name unic PER entitate
   // Previne crearea a doua coloane SQL cu acelasi nume in aceeasi tabela
   
   @@map("field")
+}
+
+model SequenceDefinition {
+  id_sequence_definition String   @id @default(uuid())
+  key                    String   @unique @db.VarChar(100)
+  scope                  String   @db.VarChar(20)
+  reset                  String   @db.VarChar(20)
+  format                 String   @db.VarChar(255)
+  prefix                 String   @default("") @db.VarChar(100)
+  padding                Int      @default(1) @db.SmallInt
+  start_value            BigInt   @default(1)
+  date_created           DateTime @default(now())
+  date_updated           DateTime @updatedAt
+
+  fields                 Field[]
+  counters               SequenceCounter[]
+
+  @@map("sequence_definition")
+}
+
+model SequenceCounter {
+  id_sequence_definition String
+  scope_key              String   @db.VarChar(100)
+  period_key             String   @db.VarChar(20)
+  last_value             BigInt
+  date_created           DateTime @default(now())
+  date_updated           DateTime @updatedAt
+
+  definition SequenceDefinition @relation(fields: [id_sequence_definition], references: [id_sequence_definition], onDelete: Restrict)
+
+  @@id([id_sequence_definition, scope_key, period_key])
+  @@map("sequence_counter")
 }
 
 model RelatedCollectionDefinition {

@@ -79,6 +79,7 @@ export interface FieldPayload {
   visible_in_form?: boolean
   is_readonly?: boolean
   validation_rules?: Record<string, any>
+  sequence?: SequenceManifestPayload
   id_relation_entity?: string
   relation_kind?: 'reference' | 'composition'
   relation_display_field?: string
@@ -106,6 +107,7 @@ export interface UpdateFieldPayload {
   visible_in_form?: boolean
   is_readonly?: boolean
   validation_rules?: Record<string, any>
+  sequence?: SequenceManifestPayload | null
   id_ui_tab?: string
   rank?: number
   grid_col?: number
@@ -126,6 +128,16 @@ export interface AdminTab {
   date_created: string
   date_updated: string
   _count?: { fields: number }
+}
+
+export interface SequenceManifestPayload {
+  key: string
+  scope: 'global' | 'entity'
+  reset: 'none' | 'yearly'
+  format: string
+  prefix?: string
+  padding?: number
+  start_value?: number
 }
 
 export interface RelatedCollectionRelationOption {

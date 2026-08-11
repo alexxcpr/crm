@@ -92,8 +92,10 @@ export interface Field {
   visible_in_table: boolean;
   visible_in_form: boolean;
   is_system: boolean;
+  is_readonly: boolean;
   validation_rules: any;
   id_relation_entity: string | null;
+  id_sequence_definition: string | null;
   relation_kind: 'reference' | 'composition' | null;
   relation_display_field: string | null;
   id_ui_tab: string;
@@ -104,9 +106,24 @@ export interface Field {
   date_updated: Date;
 }
 
+export type SequenceScope = 'global' | 'entity';
+export type SequenceReset = 'none' | 'yearly';
+
+export interface SequenceDefinition {
+  id_sequence_definition: string;
+  key: string;
+  scope: SequenceScope;
+  reset: SequenceReset;
+  format: string;
+  prefix: string;
+  padding: number;
+  start_value: string | number;
+}
+
 export interface FieldWithRelation extends Field {
   relation_entity: Entity | null;
   relation_display_column: string | null;
+  sequence: SequenceDefinition | null;
 }
 
 export interface TenantInfo {

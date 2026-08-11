@@ -14,6 +14,7 @@ import { validateGroupFieldLayout } from './field-layout.util';
 import type { RankedItemDto } from '../dto/reorder.dto';
 import { reorderRanks } from '../rank-reorder.util';
 import { RelationDisplayFieldService } from 'src/relations/relation-display-field.service';
+import { SequenceService } from 'src/sequences/sequence.service';
 
 @Injectable()
 export class AdminFieldsService {
@@ -21,6 +22,7 @@ export class AdminFieldsService {
     private readonly tenantContext: TenantContext,
     private readonly dynamicSchema: DynamicSchemaService,
     private readonly relationDisplayFields: RelationDisplayFieldService,
+    private readonly sequences: SequenceService,
   ) {}
 
   private get knex() {
@@ -43,9 +45,13 @@ export class AdminFieldsService {
       ])
       .select('field.*');
 
-    const enrichedFields =
+    const relationEnrichedFields =
       await this.relationDisplayFields.enrichFields(
         fields,
+      );
+    const enrichedFields =
+      await this.sequences.enrichFields(
+        relationEnrichedFields,
       );
     const result: any[] = [];
     for (const f of enrichedFields) {
@@ -61,6 +67,9 @@ export class AdminFieldsService {
 
       result.push({
         ...f,
+        sequence: this.sequences.publicManifest(
+          f.sequence,
+        ),
         relation_entity: relationEntity,
       });
     }
@@ -98,12 +107,19 @@ export class AdminFieldsService {
             .first()
         : null;
 
-    const [enrichedField] =
+    const [relationEnrichedField] =
       await this.relationDisplayFields.enrichFields([
         field,
       ]);
+    const [enrichedField] =
+      await this.sequences.enrichFields([
+        relationEnrichedField,
+      ]);
     return {
       ...enrichedField,
+      sequence: this.sequences.publicManifest(
+        enrichedField.sequence,
+      ),
       relation_entity: relationEntity,
     };
   }
@@ -116,6 +132,7 @@ export class AdminFieldsService {
       await this.ensureEntityExists(entityId);
 
     this.validateFileConfiguration(dto);
+    this.validateSequenceFieldConfiguration(dto);
     if (
       dto.ui_type === 'file' &&
       dto.is_required
@@ -235,6 +252,13 @@ export class AdminFieldsService {
           0) + 1;
     }
 
+    const sequenceDefinition = dto.sequence
+      ? await this.sequences.resolveDefinition(
+          this.knex,
+          dto.sequence,
+        )
+      : null;
+
     const [field] = await this.knex('field')
       .insert({
         id_entity: entityId,
@@ -243,19 +267,24 @@ export class AdminFieldsService {
         column_name: columnName,
         data_type: dto.data_type,
         ui_type: dto.ui_type,
-        default_value: dto.default_value ?? null,
+        default_value: dto.sequence
+          ? null
+          : (dto.default_value ?? null),
         placeholder: dto.placeholder ?? null,
         help_text: dto.help_text ?? null,
         options: dto.options
           ? JSON.stringify(dto.options)
           : null,
-        is_required:
-          dto.ui_type === 'relation' &&
+        is_required: dto.sequence
+          ? false
+          : dto.ui_type === 'relation' &&
           dto.relation_kind === 'composition'
             ? true
             : (dto.is_required ?? false),
         is_unique:
-          dto.ui_type === 'file'
+          dto.sequence
+            ? true
+            : dto.ui_type === 'file'
             ? false
             : (dto.is_unique ?? false),
         is_filterable:
@@ -270,7 +299,9 @@ export class AdminFieldsService {
           dto.visible_in_table ?? true,
         visible_in_form:
           dto.visible_in_form ?? true,
-        is_readonly: dto.is_readonly ?? false,
+        is_readonly: dto.sequence
+          ? true
+          : (dto.is_readonly ?? false),
         is_system: false,
         validation_rules: dto.validation_rules
           ? JSON.stringify(dto.validation_rules)
@@ -279,6 +310,9 @@ export class AdminFieldsService {
           dto.ui_type === 'file'
             ? null
             : (dto.id_relation_entity ?? null),
+        id_sequence_definition:
+          sequenceDefinition?.id_sequence_definition ??
+          null,
         relation_kind:
           dto.ui_type === 'relation'
             ? (dto.relation_kind ?? 'reference')
@@ -306,11 +340,20 @@ export class AdminFieldsService {
       throw error;
     }
 
-    const [enrichedField] =
+    const [relationEnrichedField] =
       await this.relationDisplayFields.enrichFields([
         field,
       ]);
-    return enrichedField;
+    const [enrichedField] =
+      await this.sequences.enrichFields([
+        relationEnrichedField,
+      ]);
+    return {
+      ...enrichedField,
+      sequence: this.sequences.publicManifest(
+        enrichedField.sequence,
+      ),
+    };
   }
 
   async update(
@@ -331,6 +374,92 @@ export class AdminFieldsService {
     if (!field) {
       throw new NotFoundException(
         `Campul cu id "${fieldId}" nu exista in entitatea "${entityId}".`,
+      );
+    }
+
+    const currentSequenceId =
+      field.id_sequence_definition as string | null;
+    let nextSequenceId = currentSequenceId;
+    if (dto.sequence !== undefined) {
+      if (dto.sequence === null) {
+        await this.sequences.assertColumnContainsOnlyNulls(
+          this.knex,
+          entity.table_name,
+          field.column_name,
+        );
+        if (currentSequenceId) {
+          await this.sequences.assertDefinitionUnused(
+            this.knex,
+            currentSequenceId,
+          );
+        }
+        nextSequenceId = null;
+      } else {
+        this.validateSequenceFieldConfiguration({
+          ...dto,
+          data_type: field.data_type,
+          ui_type: dto.ui_type ?? field.ui_type,
+        });
+        const currentDefinition = currentSequenceId
+          ? await this.knex('sequence_definition')
+              .where(
+                'id_sequence_definition',
+                currentSequenceId,
+              )
+              .first()
+          : null;
+        const unchanged =
+          currentDefinition &&
+          this.sequences.manifestMatchesDefinition(
+            currentDefinition,
+            dto.sequence,
+          );
+        if (!unchanged) {
+          await this.sequences.assertColumnContainsOnlyNulls(
+            this.knex,
+            entity.table_name,
+            field.column_name,
+          );
+          if (currentSequenceId) {
+            await this.sequences.assertDefinitionUnused(
+              this.knex,
+              currentSequenceId,
+            );
+          }
+          const definition =
+            await this.sequences.resolveDefinition(
+              this.knex,
+              dto.sequence,
+              {
+                currentDefinitionId: currentSequenceId,
+                currentFieldId: field.id_field,
+              },
+            );
+          nextSequenceId =
+            definition.id_sequence_definition;
+          await this.dynamicSchema.ensureUniqueIndex(
+            entity.table_name,
+            field.column_name,
+          );
+        }
+      }
+    }
+    if (
+      currentSequenceId &&
+      dto.ui_type !== undefined &&
+      dto.ui_type !== 'text'
+    ) {
+      throw new BadRequestException(
+        'Un camp secvential trebuie sa foloseasca ui_type "text".',
+      );
+    }
+    if (
+      currentSequenceId &&
+      dto.default_value !== undefined &&
+      dto.default_value !== ''
+    ) {
+      throw new BadRequestException(
+        'Un camp secvential nu poate avea valoare implicita.',
       );
     }
 
@@ -514,7 +643,16 @@ export class AdminFieldsService {
           ? dto.default_value
           : field.default_value,
       date_updated: new Date(),
+      id_sequence_definition: nextSequenceId,
     };
+
+    if (nextSequenceId) {
+      updateData.ui_type = 'text';
+      updateData.default_value = null;
+      updateData.is_required = false;
+      updateData.is_unique = true;
+      updateData.is_readonly = true;
+    }
 
     if (dto.options !== undefined) {
       updateData.options = dto.options
@@ -549,11 +687,20 @@ export class AdminFieldsService {
       .update(updateData)
       .returning('*');
 
-    const [enrichedUpdated] =
+    const [relationEnrichedUpdated] =
       await this.relationDisplayFields.enrichFields([
         updated,
       ]);
-    return enrichedUpdated;
+    const [enrichedUpdated] =
+      await this.sequences.enrichFields([
+        relationEnrichedUpdated,
+      ]);
+    return {
+      ...enrichedUpdated,
+      sequence: this.sequences.publicManifest(
+        enrichedUpdated.sequence,
+      ),
+    };
   }
 
   async reorder(
@@ -805,6 +952,33 @@ export class AdminFieldsService {
       return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
+    }
+  }
+
+  private validateSequenceFieldConfiguration(dto: {
+    sequence?: unknown;
+    data_type?: string;
+    ui_type?: string;
+    default_value?: string;
+  }) {
+    if (!dto.sequence) return;
+    if (dto.data_type !== 'varchar') {
+      throw new BadRequestException(
+        'Un camp secvential trebuie sa foloseasca data_type "varchar".',
+      );
+    }
+    if (dto.ui_type !== 'text') {
+      throw new BadRequestException(
+        'Un camp secvential trebuie sa foloseasca ui_type "text".',
+      );
+    }
+    if (
+      dto.default_value !== undefined &&
+      dto.default_value !== ''
+    ) {
+      throw new BadRequestException(
+        'Un camp secvential nu poate avea valoare implicita.',
+      );
     }
   }
 

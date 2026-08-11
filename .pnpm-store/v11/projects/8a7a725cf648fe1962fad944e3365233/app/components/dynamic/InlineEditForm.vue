@@ -224,6 +224,7 @@ async function onSubmit(event: FormSubmitEvent<Record<string, unknown>>) {
 function buildPayload(validated: Record<string, unknown>): Record<string, any> {
   const payload: Record<string, any> = {}
   for (const field of embeddedFormFields.value) {
+    if (field.sequence) continue
     const val = validated[field.slug]
     if (val !== undefined) {
       payload[field.slug] = val

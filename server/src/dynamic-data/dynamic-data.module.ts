@@ -7,9 +7,10 @@ import { StorageModule } from 'src/storage/storage.module';
 import { RelatedDataController } from './related-data.controller';
 import { RelatedDataService } from './related-data.service';
 import { RelationsModule } from 'src/relations/relations.module';
+import { SequenceModule } from 'src/sequences/sequence.module';
 
 @Module({
-  imports: [StorageModule, RelationsModule],
+  imports: [StorageModule, RelationsModule, SequenceModule],
   controllers: [
     RelatedDataController,
     DynamicDataController,
