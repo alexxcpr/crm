@@ -37,6 +37,67 @@ function context() {
 }
 
 describe('WorkflowRuntimeService IR', () => {
+  it('returneaza pentru before doar recordul, fara wrapperul nodului frunza', async () => {
+    const executionContext = {
+      ...context(),
+      trigger: 'entity.before_insert',
+      record: { cf_template_code: 'TECH' },
+    };
+    const { service } = runtime(
+      jest.fn(({ context, node, token }) => {
+        if (node.type === 'start') {
+          return {
+            ...context.record,
+            record: context.record,
+            schedule: null,
+            entity: 'checklist_templates',
+          };
+        }
+        context.record.cf_version_key = 'TECH:3';
+        return {
+          ...token.current,
+          cf_version_key: 'TECH:3',
+        };
+      }),
+    );
+
+    const output = await (service as any).runIr(
+      {
+        irVersion: 1,
+        startNodeId: 'start',
+        nodes: [
+          {
+            id: 'start',
+            type: 'start',
+            version: 1,
+            config: {},
+          },
+          {
+            id: 'set-version-key',
+            type: 'set_data',
+            version: 1,
+            config: {},
+          },
+        ],
+        edges: [
+          {
+            source: 'start',
+            target: 'set-version-key',
+            order: 0,
+          },
+        ],
+        dependencies: {},
+      },
+      executionContext,
+    );
+
+    expect(output).toEqual({
+      cf_template_code: 'TECH',
+      cf_version_key: 'TECH:3',
+    });
+    expect(output).not.toHaveProperty('record');
+  });
+
   it('executa iesirile multiple secvential in ordinea salvata', async () => {
     const order: string[] = [];
     const { service } = runtime(

@@ -332,11 +332,11 @@ export class WorkflowRuntimeService {
       }
       return result;
     }, {});
+    // Pentru before_* contractul output-ului este starea recordului, nu
+    // wrapperul ultimului nod. ActionService o filtreaza apoi prin schema
+    // entitatii inainte de a o aplica payload-ului CRUD.
     return context.trigger.includes('.before_')
-      ? {
-          ...(context.record ?? {}),
-          ...leafOutput,
-        }
+      ? { ...(context.record ?? {}) }
       : leafOutput;
   }
 

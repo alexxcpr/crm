@@ -99,6 +99,76 @@ function executionInput(
 }
 
 describe('WorkflowNodeExecutorService', () => {
+  it('aplica din set_data doar asignarile, fara wrapperul START', async () => {
+    const { service } = createExecutor();
+    const record = {
+      cf_template_code: 'TECH',
+      cf_version: 3,
+    };
+    const startOutput: Record<string, any> = {
+      ...record,
+      record,
+      schedule: null,
+      previousData: null,
+      recordId: null,
+      entity: 'checklist_templates',
+    };
+    const input = {
+      context: {
+        executionId: 'execution-1',
+        workflowId: 'workflow-1',
+        revisionId: 'revision-1',
+        trigger: 'entity.before_insert',
+        entitySlug: 'checklist_templates',
+        entityId: 'entity-1',
+        recordId: null,
+        record,
+        actor: {},
+        deadlineAt: Date.now() + 60_000,
+        signal: new AbortController().signal,
+        nodeRunCount: 0,
+        outputs: new Map(),
+      },
+      node: {
+        id: 'set-version-key',
+        type: 'set_data',
+        version: 1,
+        config: {
+          assignments: [
+            {
+              key: 'cf_version_key',
+              tokens: [
+                {
+                  type: 'literal',
+                  value: 'TECH:3',
+                },
+              ],
+            },
+          ],
+        },
+      },
+      token: {
+        itemIndex: 0,
+        current: startOutput,
+        sourceNodeId: 'start',
+      },
+      runIndex: 0,
+    } as any;
+
+    const output = await service.execute(input);
+
+    expect(output.cf_version_key).toBe('TECH:3');
+    expect(record).toEqual({
+      cf_template_code: 'TECH',
+      cf_version: 3,
+      cf_version_key: 'TECH:3',
+    });
+    expect(record).not.toHaveProperty('record');
+    expect(() =>
+      JSON.stringify(record),
+    ).not.toThrow();
+  });
+
   it('aplica patch-ul before_update cand ID-ul din START este recordul curent', async () => {
     const { service, data, where } =
       createExecutor();

@@ -660,7 +660,10 @@ export class ActionService {
         ...payload.data,
       };
     }
-    return payload.data;
+    // Workflow-ul lucreaza pe o copie. Patch-ul validat este aplicat explicit
+    // in evaluateAutoTriggers, fara ca wrapperul/runtime context sa poata
+    // modifica prin referinta payload-ul care ajunge la Knex.
+    return { ...payload.data };
   }
 
   private async assertWorkflowCompatible(

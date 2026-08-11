@@ -83,6 +83,31 @@ describe('ActionService workflow output normalization', () => {
       result.previousData.cf_search_name,
     ).toBe('vechi');
   });
+
+  it('izoleaza recordul before-insert de payload-ul care ajunge la CRUD', () => {
+    const { service } = makeService([]);
+    const data = { cf_name: 'Comanda' };
+
+    const result = (
+      service as any
+    ).buildWorkflowInput(
+      { slug: 'calculeaza' },
+      {
+        entitySlug: 'orders',
+        entityId: 'entity-id',
+        recordId: null,
+        data,
+        actor: {
+          id: 'user-id',
+          profileId: 'profile-id',
+        },
+      },
+      EntityEvent.BeforeInsert,
+    );
+
+    expect(result.record).toEqual(data);
+    expect(result.record).not.toBe(data);
+  });
 });
 
 describe('ActionService auto triggers', () => {
@@ -156,6 +181,37 @@ describe('ActionService auto triggers', () => {
     );
 
     expect(eventPayload.data.cf_total).toBe(125);
+  });
+
+  it('nu permite unui wrapper circular din runtime sa contamineze payload-ul CRUD', async () => {
+    const runtime = {
+      execute: jest.fn(
+        (_workflowId, input) => {
+          input.record.total = 125;
+          input.record.record = input.record;
+          return {
+            executionId: 'execution',
+            status: 'completed',
+            output: input.record,
+          };
+        },
+      ),
+    };
+    const service = autoTriggerService(runtime);
+    const eventPayload = payload();
+
+    await (service as any).evaluateAutoTriggers(
+      EntityEvent.BeforeInsert,
+      eventPayload,
+    );
+
+    expect(eventPayload.data).toEqual({
+      cf_name: 'Comanda',
+      cf_total: 125,
+    });
+    expect(() =>
+      JSON.stringify(eventPayload.data),
+    ).not.toThrow();
   });
 
   it('nu transforma esecul after intr-un esec CRUD', async () => {

@@ -466,18 +466,23 @@ export class WorkflowNodeExecutorService {
     token: WorkflowExecutionToken,
   ) {
     const result = { ...token.current };
+    const patch: Record<string, any> = {};
     for (const assignment of config.assignments ??
       []) {
       if (!assignment?.key) continue;
-      result[assignment.key] =
+      patch[assignment.key] =
         this.evaluateFormula(
           assignment.tokens ?? [],
           context,
           token,
         );
     }
+    Object.assign(result, patch);
     if (context.trigger.includes('.before_')) {
-      Object.assign(context.record ?? {}, result);
+      // token.current poate fi output-ul START si contine wrapperul `record`,
+      // schedule si alte metadate. Doar asignarile declarate de set_data sunt
+      // modificari ale entitatii.
+      Object.assign(context.record ?? {}, patch);
     }
     return result;
   }
