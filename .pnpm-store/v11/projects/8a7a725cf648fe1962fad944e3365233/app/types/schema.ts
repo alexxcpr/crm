@@ -23,6 +23,8 @@ export interface Field {
   id_relation_entity: string | null
   relation_kind: 'reference' | 'composition' | null
   relation_display_field: string | null
+  /** Coloana SQL rezolvata de API; read-only, nu se trimite in payloadurile admin. */
+  relation_display_column: string | null
   relation_entity_slug: string | null
   id_ui_tab: string
   tab_slug: string | null

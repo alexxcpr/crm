@@ -92,6 +92,9 @@ export class CreateFieldDto {
     @IsString()
     @IsNotEmpty({ message: 'relation_display_field este obligatoriu pentru campuri de tip relation.' })
     @MaxLength(100)
+    @Matches(/^[a-z][a-z0-9_]{1,99}$/, {
+        message: 'relation_display_field poate contine doar litere mici, cifre si _ si trebuie sa inceapa cu o litera.',
+    })
     relation_display_field?: string;
 
     @ValidateIf((o) => o.ui_type === 'relation')
@@ -151,9 +154,12 @@ export class UpdateFieldDto {
     @IsUUID()
     id_relation_entity?: string;
 
-    @ValidateIf((o) => o.ui_type === 'relation')
+    @IsOptional()
     @IsString()
     @MaxLength(100)
+    @Matches(/^[a-z][a-z0-9_]{1,99}$/, {
+        message: 'relation_display_field poate contine doar litere mici, cifre si _ si trebuie sa inceapa cu o litera.',
+    })
     relation_display_field?: string;
 
     @IsOptional()

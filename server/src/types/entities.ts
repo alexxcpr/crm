@@ -106,6 +106,7 @@ export interface Field {
 
 export interface FieldWithRelation extends Field {
   relation_entity: Entity | null;
+  relation_display_column: string | null;
 }
 
 export interface TenantInfo {

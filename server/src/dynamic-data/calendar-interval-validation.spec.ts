@@ -30,6 +30,7 @@ describe('DynamicDataService calendar interval validation', () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
     );
   }
 

@@ -12,9 +12,10 @@ import { AdminSecurityController } from './admin-security/admin-security.control
 import { AdminSecurityService } from './admin-security/admin-security.service';
 import { AdminMenusController } from './admin-menus/admin-menus.controller';
 import { AdminMenusService } from './admin-menus/admin-menus.service';
+import { RelationsModule } from 'src/relations/relations.module';
 
 @Module({
-  imports: [DynamicSchemaModule],
+  imports: [DynamicSchemaModule, RelationsModule],
   controllers: [AdminModulesController, AdminEntitiesController, AdminFieldsController, AdminTabsController, AdminSecurityController, AdminMenusController],
   providers: [AdminModulesService, AdminEntitiesService, AdminFieldsService, AdminTabsService, AdminSecurityService, AdminMenusService],
   exports: [AdminModulesService, AdminEntitiesService, AdminFieldsService, AdminTabsService, AdminMenusService],

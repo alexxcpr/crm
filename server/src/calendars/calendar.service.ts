@@ -38,6 +38,7 @@ export interface CalendarFieldRow {
   options: unknown;
   id_relation_entity: string | null;
   relation_display_field: string | null;
+  relation_display_column?: string | null;
 }
 
 export interface CalendarSourceRow {

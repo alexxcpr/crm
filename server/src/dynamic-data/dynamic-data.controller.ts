@@ -23,6 +23,15 @@ export class DynamicDataController {
         return this.dataService.findAll(entitySlug, query, req.user);
     }
 
+    @Get(':entitySlug/relation-options')
+    findRelationOptions(
+        @Param('entitySlug') entitySlug: string,
+        @Query() query: Record<string, any>,
+        @Req() req: RequestWithUser,
+    ) {
+        return this.dataService.findRelationOptions(entitySlug, query, req.user);
+    }
+
     @Get(':entitySlug/:id')
     findOne(
         @Param('entitySlug') entitySlug: string,

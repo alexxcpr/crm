@@ -86,6 +86,7 @@ flowchart LR
       "validation_rules": null,
       "id_relation_entity": null,
       "relation_display_field": null,
+      "relation_display_column": null,
       "relation_entity_slug": null,
       "group_name": "general",
       "rank": 0

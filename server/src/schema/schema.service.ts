@@ -2,12 +2,14 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { AuthenticatedUser } from 'src/security/security.types';
 import { RecordAccessService } from 'src/security/record-access.service';
+import { RelationDisplayFieldService } from 'src/relations/relation-display-field.service';
 
 @Injectable()
 export class SchemaService {
   constructor(
     private readonly tenantContext: TenantContext,
     private readonly recordAccess: RecordAccessService,
+    private readonly relationDisplayFields: RelationDisplayFieldService,
   ) {}
 
   private get knex() { return this.tenantContext.knex; }
@@ -25,7 +27,7 @@ export class SchemaService {
         entity,
       );
 
-    const fields = await this.knex('field')
+    const rawFields = await this.knex('field')
       .leftJoin('ui_tab', 'field.id_ui_tab', 'ui_tab.id_ui_tab')
       .where('field.id_entity', entity.id_entity)
       .orderBy([
@@ -33,6 +35,10 @@ export class SchemaService {
         { column: 'field.rank', order: 'asc' },
       ])
       .select('field.*');
+    const fields =
+      await this.relationDisplayFields.enrichFields(
+        rawFields,
+      );
 
     // Fetch tabs for this entity
     const rawTabs = await this.knex('ui_tab')
@@ -93,6 +99,7 @@ export class SchemaService {
         id_relation_entity: f.id_relation_entity,
         relation_kind: f.relation_kind,
         relation_display_field: f.relation_display_field,
+        relation_display_column: f.relation_display_column,
         relation_entity_slug: relationEntitySlug,
         id_ui_tab: f.id_ui_tab,
         tab_slug: tabMap.get(f.id_ui_tab) ?? null,

@@ -7,12 +7,14 @@ import { CalendarAccessService } from './calendar-access.service';
 import { CalendarQueryService } from './calendar-query.service';
 import { CalendarController } from './calendar.controller';
 import { CalendarService } from './calendar.service';
+import { RelationsModule } from 'src/relations/relations.module';
 
 @Module({
   imports: [
     BillingModule,
     DynamicDataModule,
     TenantSettingsModule,
+    RelationsModule,
   ],
   controllers: [
     AdminCalendarController,

@@ -202,7 +202,7 @@ model Field {
   relation_kind           String?   @db.VarChar(20)
                                                          // Indica entitatea tinta a relatiei (ex: id-ul entitatii "companies")
                                                          // null pentru orice alt tip de camp
-  relation_display_field  String?   @db.VarChar(100)     // Slug-ul campului din entitatea tinta care se afiseaza ca label in dropdown
+  relation_display_field  String?   @db.VarChar(100)     // Slug-ul logic canonic al campului tinta; valorile legacy column_name sunt normalizate de API/migrare
                                                          // Ex: "name" - cand selectezi o companie, vezi numele ei, nu UUID-ul. Populat DOAR cand ui_type = "relation"
 
   id_ui_tab               String?                        // FK catre ui_tab — tab-ul in care apare campul in DynamicForm. Null doar daca tab-ul a fost sters fortat.

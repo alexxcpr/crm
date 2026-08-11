@@ -6,9 +6,10 @@ import { DynamicValidationService } from './dynamic-validation.service';
 import { StorageModule } from 'src/storage/storage.module';
 import { RelatedDataController } from './related-data.controller';
 import { RelatedDataService } from './related-data.service';
+import { RelationsModule } from 'src/relations/relations.module';
 
 @Module({
-  imports: [StorageModule],
+  imports: [StorageModule, RelationsModule],
   controllers: [
     RelatedDataController,
     DynamicDataController,

@@ -203,14 +203,19 @@ async function fetchSelectedRelationDefault(requestId: number) {
   if (relationDefaultOptions.value.some(item => item.value === selectedValue)) return
 
   try {
-    const response = await apiFetch<{ data: Record<string, unknown> }>(
-      `/v1/data/${targetEntity.slug}/${selectedValue}`
+    const response = await apiFetch<{ data: Array<{ label: string, value: string }> }>(
+      `/v1/data/${targetEntity.slug}/relation-options`,
+      {
+        query: {
+          displayField,
+          ids: selectedValue,
+          limit: '1'
+        }
+      }
     )
-    if (requestId !== relationDefaultRequestId || !response.data?.id) return
-    mergeRelationDefaultOption({
-      label: String(response.data[displayField] ?? response.data.id),
-      value: String(response.data.id)
-    })
+    const option = response.data[0]
+    if (requestId !== relationDefaultRequestId || !option) return
+    mergeRelationDefaultOption(option)
   } catch {
     // Valoarea existenta ramane in state; API-ul va valida la salvare.
   }
@@ -227,24 +232,22 @@ async function fetchRelationDefaultOptions(search = '') {
   const requestId = ++relationDefaultRequestId
   loadingRelationDefaults.value = true
   try {
-    const query: Record<string, string> = { limit: '50' }
+    const query: Record<string, string> = {
+      limit: '50',
+      displayField
+    }
     const normalizedSearch = search.trim()
     if (normalizedSearch) {
-      query[`filter[${displayField}][contains]`] = normalizedSearch
+      query.search = normalizedSearch
     }
 
-    const response = await apiFetch<{ data: Record<string, unknown>[] }>(
-      `/v1/data/${targetEntity.slug}`,
+    const response = await apiFetch<{ data: Array<{ label: string, value: string }> }>(
+      `/v1/data/${targetEntity.slug}/relation-options`,
       { query }
     )
     if (requestId !== relationDefaultRequestId) return
 
     relationDefaultOptions.value = response.data
-      .filter(record => record.id)
-      .map(record => ({
-        label: String(record[displayField] ?? record.id),
-        value: String(record.id)
-      }))
     await fetchSelectedRelationDefault(requestId)
   } catch {
     if (requestId === relationDefaultRequestId) relationDefaultOptions.value = []
@@ -272,8 +275,8 @@ async function fetchRelationEntityFields(entityId: string) {
   try {
     const schema = await apiFetch<{ fields: Field[] }>(`/v1/schema/${targetEntity.slug}`)
     relationFieldOptions.value = (schema.fields ?? []).map(f => ({
-      label: `${f.name} (${f.column_name})`,
-      value: f.column_name
+      label: `${f.name} (${f.slug} / ${f.column_name})`,
+      value: f.slug
     }))
   } catch {
     relationFieldOptions.value = []

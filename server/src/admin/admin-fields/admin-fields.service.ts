@@ -13,12 +13,14 @@ import {
 import { validateGroupFieldLayout } from './field-layout.util';
 import type { RankedItemDto } from '../dto/reorder.dto';
 import { reorderRanks } from '../rank-reorder.util';
+import { RelationDisplayFieldService } from 'src/relations/relation-display-field.service';
 
 @Injectable()
 export class AdminFieldsService {
   constructor(
     private readonly tenantContext: TenantContext,
     private readonly dynamicSchema: DynamicSchemaService,
+    private readonly relationDisplayFields: RelationDisplayFieldService,
   ) {}
 
   private get knex() {
@@ -41,8 +43,12 @@ export class AdminFieldsService {
       ])
       .select('field.*');
 
+    const enrichedFields =
+      await this.relationDisplayFields.enrichFields(
+        fields,
+      );
     const result: any[] = [];
-    for (const f of fields) {
+    for (const f of enrichedFields) {
       const relationEntity = f.id_relation_entity
         ? await this.knex('entity')
             .select('id_entity', 'slug', 'name')
@@ -92,8 +98,12 @@ export class AdminFieldsService {
             .first()
         : null;
 
+    const [enrichedField] =
+      await this.relationDisplayFields.enrichFields([
+        field,
+      ]);
     return {
-      ...field,
+      ...enrichedField,
       relation_entity: relationEntity,
     };
   }
@@ -133,6 +143,7 @@ export class AdminFieldsService {
       );
     }
 
+    let relationDisplaySlug: string | null = null;
     if (
       dto.ui_type === 'relation' &&
       dto.id_relation_entity
@@ -173,6 +184,13 @@ export class AdminFieldsService {
           'O relatie composition trebuie sa fie obligatorie.',
         );
       }
+      const resolvedDisplayField =
+        await this.relationDisplayFields.resolveForTarget(
+          dto.id_relation_entity,
+          dto.relation_display_field,
+          dto.name,
+        );
+      relationDisplaySlug = resolvedDisplayField.slug;
     }
 
     await this.validateLayoutForCreate(
@@ -268,8 +286,7 @@ export class AdminFieldsService {
         relation_display_field:
           dto.ui_type === 'file'
             ? null
-            : (dto.relation_display_field ??
-              null),
+            : relationDisplaySlug,
         id_ui_tab: idUiTab,
         rank: dto.rank ?? nextRank,
         grid_col: dto.grid_col ?? 1,
@@ -289,7 +306,11 @@ export class AdminFieldsService {
       throw error;
     }
 
-    return field;
+    const [enrichedField] =
+      await this.relationDisplayFields.enrichFields([
+        field,
+      ]);
+    return enrichedField;
   }
 
   async update(
@@ -360,6 +381,15 @@ export class AdminFieldsService {
         ? (dto.relation_kind ??
           field.relation_kind ??
           'reference')
+        : null;
+    const resolvedRelationDisplay =
+      field.ui_type === 'relation'
+        ? await this.relationDisplayFields.resolveForTarget(
+            field.id_relation_entity,
+            dto.relation_display_field ??
+              field.relation_display_field,
+            field.name,
+          )
         : null;
     if (
       field.ui_type === 'relation' &&
@@ -444,9 +474,7 @@ export class AdminFieldsService {
           : field.id_relation_entity,
       relation_kind: nextRelationKind,
       relation_display_field:
-        dto.relation_display_field !== undefined
-          ? dto.relation_display_field
-          : field.relation_display_field,
+        resolvedRelationDisplay?.slug ?? null,
       is_required:
         nextRelationKind === 'composition'
           ? true
@@ -521,7 +549,11 @@ export class AdminFieldsService {
       .update(updateData)
       .returning('*');
 
-    return updated;
+    const [enrichedUpdated] =
+      await this.relationDisplayFields.enrichFields([
+        updated,
+      ]);
+    return enrichedUpdated;
   }
 
   async reorder(

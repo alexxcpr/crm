@@ -20,6 +20,7 @@ import { EntityEventsService } from 'src/events/entity-events.service';
 import { EntityEvent } from 'src/events/entity-event.enum';
 import { FileStorageService } from 'src/storage/file-storage.service';
 import { RecordAccessService } from 'src/security/record-access.service';
+import { RelationDisplayFieldService } from 'src/relations/relation-display-field.service';
 
 const DELETE_CONFLICT_REFERENCE_ID_LIMIT = 3;
 const DEFAULT_COMPOSITION_DELETE_MAX_DEPTH = 10;
@@ -46,6 +47,7 @@ export class DynamicDataService {
     private readonly authorization: AuthorizationService,
     private readonly recordAccess: RecordAccessService,
     private readonly files: FileStorageService,
+    private readonly relationDisplayFields: RelationDisplayFieldService,
   ) {}
 
   private get knex() {
@@ -178,23 +180,39 @@ export class DynamicDataService {
     const rawFields = await this.knex('field')
       .where('id_entity', entity.id_entity)
       .orderBy('rank', 'asc');
-    const fields: FieldWithRelation[] = [];
-    for (const field of rawFields) {
-      const relationEntity =
-        field.id_relation_entity
-          ? await this.knex('entity')
-              .where(
-                'id_entity',
-                field.id_relation_entity,
-              )
-              .first()
-          : null;
-      fields.push({
+    const relationEntityIds = [
+      ...new Set(
+        rawFields
+          .map((field) => field.id_relation_entity)
+          .filter(Boolean) as string[],
+      ),
+    ];
+    const relationEntities = relationEntityIds.length
+      ? await this.knex('entity').whereIn(
+          'id_entity',
+          relationEntityIds,
+        )
+      : [];
+    const relationEntityMap = new Map(
+      relationEntities.map((relationEntity) => [
+        relationEntity.id_entity,
+        relationEntity,
+      ]),
+    );
+    const fields = await this.relationDisplayFields.enrichFields(
+      rawFields.map((field) => ({
         ...field,
-        relation_entity: relationEntity,
-      });
-    }
-    return { entity, fields };
+        relation_entity: field.id_relation_entity
+          ? relationEntityMap.get(
+              field.id_relation_entity,
+            ) ?? null
+          : null,
+      })),
+    );
+    return {
+      entity,
+      fields: fields as FieldWithRelation[],
+    };
   }
 
   private buildSelect(
@@ -241,9 +259,9 @@ export class DynamicDataService {
         `${tableName}.${field.column_name}`,
         `${alias}.id`,
       );
-      if (field.relation_display_field)
+      if (field.relation_display_column)
         selectColumns.push(
-          `${alias}.${field.relation_display_field} as ${field.column_name}_display`,
+          `${alias}.${field.relation_display_column} as ${field.column_name}_display`,
         );
     }
     for (const field of fields.filter(
@@ -436,6 +454,109 @@ export class DynamicDataService {
         ),
       },
     };
+  }
+
+  async findRelationOptions(
+    entitySlug: string,
+    query: Record<string, any>,
+    actor: AuthenticatedUser,
+  ) {
+    const entity =
+      await this.authorization.getEntity(entitySlug);
+    const policy = await this.recordAccess.require(
+      actor,
+      entity,
+      'read',
+    );
+    const displayField =
+      typeof query.displayField === 'string'
+        ? query.displayField.trim()
+        : '';
+    if (
+      !displayField ||
+      !/^[a-z][a-z0-9_]{1,99}$/.test(displayField)
+    ) {
+      throw new BadRequestException(
+        'Parametrul displayField trebuie sa fie un slug logic sau un column_name valid.',
+      );
+    }
+    const resolved =
+      await this.relationDisplayFields.resolveForTarget(
+        entity.id_entity,
+        displayField,
+      );
+    const parsedLimit = Number.parseInt(
+      String(query.limit ?? '50'),
+      10,
+    );
+    const limit = Number.isFinite(parsedLimit)
+      ? Math.min(50, Math.max(1, parsedLimit))
+      : 50;
+    const search =
+      typeof query.search === 'string'
+        ? query.search.trim().slice(0, 200)
+        : '';
+    const ids = this.parseRelationOptionIds(query.ids);
+    const tableName = entity.table_name;
+    const dataQuery = this.knex(tableName).select({
+      value: `${tableName}.id`,
+      label: `${tableName}.${resolved.column_name}`,
+    });
+    this.recordAccess.applyScope(
+      dataQuery,
+      tableName,
+      policy,
+      actor.profileId,
+    );
+    if (ids.length) {
+      dataQuery.whereIn(`${tableName}.id`, ids);
+    } else if (search) {
+      dataQuery.whereRaw(
+        'CAST(?? AS TEXT) ILIKE ?',
+        [
+          `${tableName}.${resolved.column_name}`,
+          `%${search}%`,
+        ],
+      );
+    }
+    dataQuery
+      .orderBy(
+        `${tableName}.${resolved.column_name}`,
+        'asc',
+      )
+      .orderBy(`${tableName}.id`, 'asc')
+      .limit(limit);
+    const rows = await dataQuery;
+    return {
+      data: rows.map((row) => ({
+        value: String(row.value),
+        label: String(row.label ?? row.value),
+      })),
+    };
+  }
+
+  private parseRelationOptionIds(value: unknown) {
+    if (value === null || value === undefined || value === '')
+      return [];
+    const raw = (Array.isArray(value) ? value : [value])
+      .flatMap((item) => String(item).split(','))
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const ids = [...new Set(raw)];
+    if (
+      ids.length > 50 ||
+      ids.some(
+        (id) =>
+          !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(
+            id,
+          ),
+      )
+    ) {
+      throw new BadRequestException(
+        'Parametrul ids trebuie sa contina maximum 50 de UUID-uri valide.',
+      );
+    }
+    return ids;
   }
 
   async findOne(

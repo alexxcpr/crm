@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { DashboardQueryService } from './dashboard-query.service';
 
 describe('DashboardQueryService limits', () => {
-  const service = new DashboardQueryService({} as any, {} as any, {} as any, {} as any);
+  const service = new DashboardQueryService({} as any, {} as any, {} as any, {} as any, {} as any);
 
   it.each([
     [30, 'day'],
@@ -49,5 +49,31 @@ describe('DashboardQueryService limits', () => {
     const result = (service as any).limitChartRows(rows, 'category', 2, true);
     expect(new Set(result.map((row: any) => row.series_key)).size).toBe(8);
     expect(new Set(result.map((row: any) => row.group_key))).toEqual(new Set(['a', 'b']));
+  });
+
+  it('grupeaza relatiile dupa coloana fizica rezolvata', () => {
+    const query = {
+      select: jest.fn().mockReturnThis(),
+      groupBy: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+    };
+    (service as any).addDimension(
+      query,
+      {
+        ui_type: 'relation',
+        column_name: 'cf_contract',
+        relation_table: 'ent_contracts',
+        relation_display_field: 'contract_number',
+        relation_display_column: 'cf_contract_number',
+      },
+      'group',
+    );
+    expect(query.select).toHaveBeenCalledWith({
+      group_label:
+        'group_relation.cf_contract_number',
+    });
+    expect(query.groupBy).toHaveBeenCalledWith(
+      'group_relation.cf_contract_number',
+    );
   });
 });

@@ -15,6 +15,7 @@ import {
 import { DashboardAccessService } from './dashboard-access.service';
 import { DashboardQueryDto } from './dto/dashboard.dto';
 import { DashboardService } from './dashboard.service';
+import { RelationDisplayFieldService } from 'src/relations/relation-display-field.service';
 
 interface QueryField {
   id_field: string;
@@ -27,6 +28,7 @@ interface QueryField {
   options: unknown;
   id_relation_entity: string | null;
   relation_display_field: string | null;
+  relation_display_column: string | null;
   relation_table?: string | null;
 }
 
@@ -43,6 +45,7 @@ export class DashboardQueryService {
     private readonly recordAccess: RecordAccessService,
     private readonly access: DashboardAccessService,
     private readonly dashboards: DashboardService,
+    private readonly relationDisplayFields: RelationDisplayFieldService,
   ) {}
 
   private get knex() { return this.tenantContext.knex; }
@@ -99,7 +102,8 @@ export class DashboardQueryService {
       entity,
       'read',
     );
-    const fields = await this.knex<QueryField>('field').where('id_entity', widget.id_entity);
+    let fields = await this.knex<QueryField>('field').where('id_entity', widget.id_entity);
+    fields = await this.relationDisplayFields.enrichFields(fields);
     await this.attachRelationTables(fields);
     const fieldMap = new Map(fields.map((field) => [field.id_field, field]));
     const filters = this.parseFilters(widget.filters);
@@ -309,11 +313,11 @@ export class DashboardQueryService {
     query.select({ [`${prefix}_key`]: sourceColumn });
     query.groupBy(sourceColumn);
 
-    if (field.ui_type === 'relation' && field.relation_table && field.relation_display_field) {
+    if (field.ui_type === 'relation' && field.relation_table && field.relation_display_column) {
       const alias = `${prefix}_relation`;
       query.leftJoin(`${field.relation_table} as ${alias}`, sourceColumn, `${alias}.id`);
-      query.select({ [`${prefix}_label`]: `${alias}.${field.relation_display_field}` });
-      query.groupBy(`${alias}.${field.relation_display_field}`);
+      query.select({ [`${prefix}_label`]: `${alias}.${field.relation_display_column}` });
+      query.groupBy(`${alias}.${field.relation_display_column}`);
     }
   }
 

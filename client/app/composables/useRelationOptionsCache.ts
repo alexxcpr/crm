@@ -54,6 +54,10 @@ export function useRelationOptionsCache() {
     return field.relation_display_field ?? 'name'
   }
 
+  function getDisplayColumn(field: Field): string {
+    return field.relation_display_column ?? getDisplayField(field)
+  }
+
   function normalizeSearch(search?: string): string {
     return (search ?? '').trim().toLowerCase()
   }
@@ -131,7 +135,7 @@ export function useRelationOptionsCache() {
     if (!record.id) return null
 
     return {
-      label: String(record[getDisplayField(field)] ?? record.id),
+      label: String(record[getDisplayColumn(field)] ?? record.id),
       value: String(record.id)
     }
   }
@@ -187,16 +191,22 @@ export function useRelationOptionsCache() {
     activeFetches.set(key, fetchId)
 
     const promise = (async () => {
-      const query: Record<string, string> = { limit: String(DEFAULT_LIMIT) }
+      const query: Record<string, string> = {
+        limit: String(DEFAULT_LIMIT),
+        displayField: getDisplayField(field)
+      }
       const normalizedSearch = normalizeSearch(search)
       if (normalizedSearch) {
-        query[`filter[${getDisplayField(field)}][contains]`] = search.trim()
+        query.search = search.trim()
       }
 
-      const response = await apiFetch<{ data: RelationRecord[] }>(`/v1/data/${field.relation_entity_slug}`, { query })
-      const items = response.data.map(record => ({
-        label: String(record[getDisplayField(field)] ?? record.id),
-        value: String(record.id)
+      const response = await apiFetch<{ data: RelationOption[] }>(
+        `/v1/data/${field.relation_entity_slug}/relation-options`,
+        { query }
+      )
+      const items = response.data.map(option => ({
+        label: String(option.label),
+        value: String(option.value)
       }))
 
       if (activeFetches.get(key) === fetchId) {

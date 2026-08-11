@@ -9,6 +9,7 @@ describe('CalendarQueryService interval and timezone rules', () => {
     {} as any,
     {} as any,
     {} as any,
+    {} as any,
   );
 
   it('acceptă intervalul semi-deschis de maximum 62 de zile', () => {
@@ -108,6 +109,66 @@ describe('CalendarQueryService interval and timezone rules', () => {
     expect(event.id).toBe('source:record-id');
   });
 
+  it('selecteaza labelul relatiei din coloana fizica rezolvata', async () => {
+    const entityQuery = {
+      whereIn: jest.fn().mockReturnThis(),
+      select: jest.fn().mockResolvedValue([
+        {
+          id_entity: 'contracts-entity',
+          table_name: 'ent_contracts',
+        },
+      ]),
+    };
+    const knex = jest.fn(() => entityQuery);
+    const relationResolver = {
+      enrichFields: jest.fn().mockImplementation(
+        async (fields) =>
+          fields.map((field: any) => ({
+            ...field,
+            relation_display_field: 'contract_number',
+            relation_display_column: 'cf_contract_number',
+          })),
+      ),
+    };
+    const relationService = new CalendarQueryService(
+      { knex } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      relationResolver as any,
+    );
+    const query = {
+      leftJoin: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+    };
+
+    await (relationService as any).addRelationDisplayJoins(
+      query,
+      {
+        title_segments: [
+          { type: 'field', id_field: 'contract' },
+        ],
+        popover_fields: [],
+        fields: [
+          {
+            id_field: 'contract',
+            ui_type: 'relation',
+            column_name: 'cf_contract',
+            id_relation_entity: 'contracts-entity',
+            relation_display_field: 'contract_number',
+          },
+        ],
+      },
+    );
+
+    expect(query.select).toHaveBeenCalledWith({
+      cf_contract_display:
+        'calendar_rel_cf_contract.cf_contract_number',
+    });
+  });
+
   it('mută intervalul prin fluxul CRUD normal', async () => {
     const dynamicData = {
       update: jest.fn().mockResolvedValue({
@@ -143,6 +204,7 @@ describe('CalendarQueryService interval and timezone rules', () => {
         { requireEnabled: jest.fn() } as any,
         calendars as any,
         dynamicData as any,
+        {} as any,
         {} as any,
       );
 
@@ -200,6 +262,7 @@ describe('CalendarQueryService interval and timezone rules', () => {
             }),
         } as any,
         { update: jest.fn() } as any,
+        {} as any,
         {} as any,
       );
 

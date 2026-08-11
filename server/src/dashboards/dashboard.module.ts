@@ -5,9 +5,10 @@ import { DashboardAccessService } from './dashboard-access.service';
 import { DashboardQueryService } from './dashboard-query.service';
 import { DashboardController } from './dashboard.controller';
 import { DashboardService } from './dashboard.service';
+import { RelationsModule } from 'src/relations/relations.module';
 
 @Module({
-  imports: [BillingModule],
+  imports: [BillingModule, RelationsModule],
   controllers: [AdminDashboardController, DashboardController],
   providers: [DashboardAccessService, DashboardService, DashboardQueryService],
   exports: [DashboardAccessService, DashboardService],

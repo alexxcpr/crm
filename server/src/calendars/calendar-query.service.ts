@@ -10,6 +10,7 @@ import { RecordAccessService } from 'src/security/record-access.service';
 import type { AuthenticatedUser } from 'src/security/security.types';
 import { TenantContext } from 'src/tenant/tenant-context.service';
 import { TenantSettingsService } from 'src/tenant-settings/tenant-settings.service';
+import { RelationDisplayFieldService } from 'src/relations/relation-display-field.service';
 import {
   CALENDAR_FILTER_OPERATORS,
   CALENDAR_LIMITS,
@@ -41,6 +42,7 @@ export class CalendarQueryService {
     private readonly calendars: CalendarService,
     private readonly dynamicData: DynamicDataService,
     private readonly tenantSettings: TenantSettingsService,
+    private readonly relationDisplayFields: RelationDisplayFieldService,
   ) {}
 
   private get knex() {
@@ -396,10 +398,14 @@ export class CalendarQueryService {
         field.relation_display_field,
     );
     if (!relationFields.length) return;
+    const resolvedRelationFields =
+      await this.relationDisplayFields.enrichFields(
+        relationFields,
+      );
     const entities = await this.knex('entity')
       .whereIn(
         'id_entity',
-        relationFields.map(
+        resolvedRelationFields.map(
           (field) => field.id_relation_entity!,
         ),
       )
@@ -410,7 +416,7 @@ export class CalendarQueryService {
         entity.table_name,
       ]),
     );
-    for (const field of relationFields) {
+    for (const field of resolvedRelationFields) {
       const table = tables.get(
         field.id_relation_entity!,
       );
@@ -422,7 +428,7 @@ export class CalendarQueryService {
         `${alias}.id`,
       );
       query.select({
-        [`${field.column_name}_display`]: `${alias}.${field.relation_display_field}`,
+        [`${field.column_name}_display`]: `${alias}.${field.relation_display_column}`,
       });
     }
   }
