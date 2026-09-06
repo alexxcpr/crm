@@ -61,4 +61,57 @@ export class AuthorizationService {
     const entries = await Promise.all(actions.map(async (action) => [action, await this.getScope(user, entityId, action)]));
     return Object.fromEntries(entries) as Record<PermissionAction, PermissionScope | null>;
   }
+
+  async capabilitiesForAllEntities(user: AuthenticatedUser) {
+    const actions: PermissionAction[] = ['read', 'create', 'update', 'delete', 'manage', 'change_ownership'];
+    const result: Record<string, Record<PermissionAction, PermissionScope | null>> = {};
+    const manageAll = !user.must_change_password && this.access.has(user, 'data.manage_all');
+    let rows: Array<{ entity_slug: string, action: PermissionAction | null, scope: PermissionScope | null }>;
+
+    if (user.must_change_password || manageAll) {
+      rows = await this.knex('entity').select('slug as entity_slug').then((entities) =>
+        entities.map((entity) => ({ entity_slug: entity.entity_slug, action: null, scope: null })),
+      );
+    } else {
+      const profilePermissions = this.knex('profile_role as pr')
+        .join('role_permission as rp', 'rp.id_role', 'pr.id_role')
+        .join('role as r', 'r.id_role', 'pr.id_role')
+        .where('pr.id_profile', user.profileId)
+        .whereNotIn('r.slug', ['admin', 'platform_owner', 'tenant_admin'])
+        .select('rp.id_entity', 'rp.action', 'rp.scope');
+      rows = await this.knex('entity as e')
+        .leftJoin(profilePermissions.as('permission'), 'permission.id_entity', 'e.id_entity')
+        .select(
+          'e.slug as entity_slug',
+          'permission.action',
+          'permission.scope',
+        );
+    }
+
+    for (const row of rows) {
+      result[row.entity_slug] ??= Object.fromEntries(
+        actions.map((action) => [action, manageAll ? 'all' : null]),
+      ) as Record<PermissionAction, PermissionScope | null>;
+    }
+
+    if (user.must_change_password || manageAll) return result;
+
+    const permissionRows = rows.filter(
+      (row): row is typeof row & { action: PermissionAction } => row.action !== null,
+    );
+
+    for (const entitySlug of Object.keys(result)) {
+      const entityRows = permissionRows.filter((row) => row.entity_slug === entitySlug);
+      for (const action of actions) {
+        const acceptedActions = action === 'change_ownership' ? [action] : [action, 'manage'];
+        const matches = entityRows.filter((row) => acceptedActions.includes(row.action));
+        if (!matches.length) continue;
+        result[entitySlug][action] = action === 'create' || action === 'change_ownership'
+          ? 'all'
+          : matches.some((row) => row.scope === 'all') ? 'all' : 'owner';
+      }
+    }
+
+    return result;
+  }
 }

@@ -416,15 +416,20 @@ export function useWorkflowDataRegistry(
             definition.configFields.find((field) =>
               field.sourceModes?.includes("node_output"),
             );
-          const sourceNodeId = String(
-            data.parameters?.[sourceField?.key ?? ""]?.sourceNodeId ?? "",
-          );
-          const source = sources.find(
-            (candidate) =>
-              candidate.nodeId === sourceNodeId
-              && candidate.cardinality !== "list",
-          );
-          if (!source) continue;
+          let cardinality: DataSource["cardinality"] = "single";
+
+          if (sourceField) {
+            const sourceNodeId = String(
+              data.parameters?.[sourceField.key]?.sourceNodeId ?? "",
+            );
+            const source = sources.find(
+              (candidate) =>
+                candidate.nodeId === sourceNodeId
+                && candidate.cardinality !== "list",
+            );
+            if (!source) continue;
+            cardinality = source.cardinality;
+          }
 
           sources.push({
             kind: "value",
@@ -441,7 +446,7 @@ export function useWorkflowDataRegistry(
                   ui_type: field.uiType ?? "text",
                 }) as Field,
             ),
-            cardinality: source.cardinality,
+            cardinality,
           });
           processed.add(node.id);
           changed = true;

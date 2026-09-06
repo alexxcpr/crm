@@ -28,7 +28,6 @@ services:
         NUXT_PUBLIC_DEFAULT_TENANT_SLUG: ${DEFAULT_TENANT_SLUG:-dev}
         NUXT_PUBLIC_APP_DOMAIN_BASE: ${DOMAIN_BASE}
         NUXT_AUTH_SECURE_COOKIE: ${NUXT_AUTH_SECURE_COOKIE:-false}
-        NUXT_AUTH_HTTP_ONLY: ${NUXT_AUTH_HTTP_ONLY:-false}
     container_name: moduvis-frontend
     restart: unless-stopped
     environment:
@@ -38,6 +37,7 @@ services:
       NUXT_PUBLIC_DEFAULT_TENANT_SLUG: ${DEFAULT_TENANT_SLUG:-dev}
       NUXT_PUBLIC_APP_DOMAIN_BASE: ${DOMAIN_BASE}
       NUXT_AUTH_ORIGIN: https://${DEFAULT_TENANT_SLUG:-dev}.${DOMAIN_BASE}
+      NUXT_AUTH_SECURE_COOKIE: ${NUXT_AUTH_SECURE_COOKIE:-true}
     depends_on:
       backend:
         condition: service_healthy

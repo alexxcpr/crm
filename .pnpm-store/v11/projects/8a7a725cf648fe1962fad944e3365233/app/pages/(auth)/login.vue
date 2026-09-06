@@ -80,7 +80,6 @@ const { branding } = useTenantBranding()
 
 // Importam metoda signIn din pachetul de auth
 const { signIn } = useAuth()
-const { apiFetch } = useApi()
 
 // State-ul formularului
 const loginUsername = ref('')
@@ -104,8 +103,6 @@ async function handleLogin() {
       }
     )
 
-    await nextTick()
-    useState<any>('auth:data').value = await apiFetch('/user/me')
     await navigateTo('/')
   } catch (error: any) {
     console.error('Eroare la login:', error)
@@ -118,10 +115,6 @@ async function handleLogin() {
 
 // Folosim guest middleware - daca userul e deja logat, si intra pe /login, il trimitem in dashboard
 definePageMeta({
-  layout: false,
-  auth: {
-    unauthenticatedOnly: true,
-    navigateAuthenticatedTo: '/dashboard'
-  }
+  layout: false
 })
 </script>

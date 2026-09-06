@@ -16,6 +16,9 @@ export interface RequestProfile {
   access_level: AccessLevel;
   is_default: boolean;
   is_active: boolean;
+  is_system?: boolean;
+  date_created?: Date;
+  date_updated?: Date;
 }
 
 export interface AuthenticatedUser {
@@ -23,6 +26,10 @@ export interface AuthenticatedUser {
   login_username: string;
   must_change_password: boolean;
   is_active: boolean;
+  is_system?: boolean;
+  date_created?: Date;
+  date_updated?: Date;
+  sessionExp?: number;
   profile: RequestProfile;
   profileId: string;
   roles: string[];

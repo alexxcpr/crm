@@ -17,6 +17,7 @@ interface NavigationMenu {
 }
 
 export function useNavigation() {
+  const nuxtApp = useNuxtApp() as ReturnType<typeof useNuxtApp> & { _navigationPromise?: Promise<void> }
   const { apiFetch } = useApi()
   const { data: session } = useAuth()
 
@@ -25,41 +26,47 @@ export function useNavigation() {
   const loading = useState('navigation-menu-loading', () => false)
 
   async function fetchNavigation() {
+    if (nuxtApp._navigationPromise) return nuxtApp._navigationPromise
     loading.value = true
-    try {
-      const response = await apiFetch<{ data: NavigationMenu[] }>('/v1/navigation/menu')
-      const menus = response.data
+    const promise = (async () => {
+      try {
+        const response = await apiFetch<{ data: NavigationMenu[] }>('/v1/navigation/menu')
+        const menus = response.data
 
-      const links: NavigationMenuItem[] = []
+        const links: NavigationMenuItem[] = []
 
-      for (const menu of menus) {
-        if (!menu.items?.length) continue
+        for (const menu of menus) {
+          if (!menu.items?.length) continue
 
-        links.push({
-          label: menu.name,
-          icon: menu.icon ?? 'i-lucide-folder',
-          type: 'trigger',
-          defaultOpen: true,
-          children: [...menu.items]
-            .sort((a, b) => a.rank - b.rank)
-            .map(item => ({
-              label: item.name,
-              icon: item.icon ?? 'i-lucide-database',
-              to: item.open_link,
-              target: item.is_external ? '_blank' : undefined,
-              external: item.is_external
-            }))
-        })
+          links.push({
+            label: menu.name,
+            icon: menu.icon ?? 'i-lucide-folder',
+            type: 'trigger',
+            defaultOpen: true,
+            children: [...menu.items]
+              .sort((a, b) => a.rank - b.rank)
+              .map(item => ({
+                label: item.name,
+                icon: item.icon ?? 'i-lucide-database',
+                to: item.open_link,
+                target: item.is_external ? '_blank' : undefined,
+                external: item.is_external
+              }))
+          })
+        }
+
+        entityLinks.value = links
+        navigationLoaded.value = true
+      } catch (err) {
+        console.error('[useNavigation] Eroare la incarcarea meniului:', err)
+        entityLinks.value = []
+      } finally {
+        loading.value = false
+        nuxtApp._navigationPromise = undefined
       }
-
-      entityLinks.value = links
-      navigationLoaded.value = true
-    } catch (err) {
-      console.error('[useNavigation] Eroare la incarcarea meniului:', err)
-      entityLinks.value = []
-    } finally {
-      loading.value = false
-    }
+    })()
+    nuxtApp._navigationPromise = promise
+    return promise
   }
 
   const { canManageTenant, canUseBuilder } = useAccess()

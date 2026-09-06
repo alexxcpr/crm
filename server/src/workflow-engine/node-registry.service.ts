@@ -406,6 +406,28 @@ export class NodeRegistryService {
         outputKind: 'record',
       },
       {
+        type: 'datetime_now',
+        version: 1,
+        label: 'Data si ora curenta',
+        icon: 'i-lucide-clock-3',
+        category: 'system',
+        color: '#0ea5e9',
+        description:
+          'Returneaza data si ora curenta a serverului.',
+        defaults: {},
+        configFields: [],
+        beforePolicy: 'all',
+        outputKind: 'value',
+        outputFields: [
+          {
+            key: 'datetime',
+            label: 'Data si ora curenta',
+            dataType: 'datetime',
+            uiType: 'datetimepicker',
+          },
+        ],
+      },
+      {
         type: 'app_get_record',
         version: 1,
         label: 'Citeste Inregistrari',

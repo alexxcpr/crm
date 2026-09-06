@@ -69,4 +69,64 @@ describe('AuthorizationService', () => {
     user.must_change_password = true;
     expect(await serviceWithRows([]).getScope(user, 'entity-1', 'read')).toBeNull();
   });
+
+  function bulkService(rows: Array<{ entity_slug: string, action: string | null, scope: 'all' | 'owner' | null }>) {
+    const permissionQuery: any = {
+      join: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      whereNotIn: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      as: jest.fn().mockReturnValue('permission-subquery'),
+    };
+    const entityQuery: any = {
+      leftJoin: jest.fn().mockReturnThis(),
+      select: jest.fn().mockResolvedValue(rows),
+    };
+    const knex: any = jest.fn((table: string) => table.startsWith('profile_role') ? permissionQuery : entityQuery);
+    return {
+      service: new AuthorizationService({ knex } as any, new AccessControlService()),
+      knex,
+    };
+  }
+
+  it('calculeaza toate capabilitatile entitatilor cu o singura interogare bulk', async () => {
+    const { service, knex } = bulkService([
+      { entity_slug: 'contacts', action: 'read', scope: 'owner' },
+      { entity_slug: 'contacts', action: 'manage', scope: 'all' },
+      { entity_slug: 'companies', action: null, scope: null },
+    ]);
+
+    const capabilities = await service.capabilitiesForAllEntities(actor());
+
+    expect(capabilities.contacts).toEqual({
+      read: 'all', create: 'all', update: 'all', delete: 'all', manage: 'all', change_ownership: null,
+    });
+    expect(capabilities.companies).toEqual({
+      read: null, create: null, update: null, delete: null, manage: null, change_ownership: null,
+    });
+    expect(knex).toHaveBeenCalledTimes(2); // subquery + o singura executie SQL pentru entitati
+  });
+
+  it('acorda all fara query-uri de permisiuni pentru tenant admin', async () => {
+    const { service, knex } = bulkService([
+      { entity_slug: 'contacts', action: null, scope: null },
+    ]);
+
+    const capabilities = await service.capabilitiesForAllEntities(actor('tenant_admin'));
+
+    expect(Object.values(capabilities.contacts)).toEqual(['all', 'all', 'all', 'all', 'all', 'all']);
+    expect(knex).toHaveBeenCalledTimes(1);
+  });
+
+  it('returneaza capabilitati nule pentru parola temporara', async () => {
+    const { service } = bulkService([
+      { entity_slug: 'contacts', action: null, scope: null },
+    ]);
+    const user = actor('tenant_admin');
+    user.must_change_password = true;
+
+    const capabilities = await service.capabilitiesForAllEntities(user);
+
+    expect(Object.values(capabilities.contacts)).toEqual([null, null, null, null, null, null]);
+  });
 });

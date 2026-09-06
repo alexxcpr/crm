@@ -47,6 +47,11 @@ export class AuthController {
     @Req() req: Request & { user: AuthenticatedUser },
     @Body() dto: SwitchProfileDto,
   ) {
-    return this.authService.switchProfile(req.user.id, dto.profileId, dto.refreshToken);
+    return this.authService.switchProfile(
+      req.user.id,
+      dto.profileId,
+      dto.refreshToken,
+      req.user.sessionExp,
+    );
   }
 }

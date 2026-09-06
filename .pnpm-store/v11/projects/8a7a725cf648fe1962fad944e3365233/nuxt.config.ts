@@ -3,12 +3,11 @@ export default defineNuxtConfig({
   modules: [
     '@nuxt/eslint',
     '@nuxt/ui',
-    '@vueuse/nuxt',
-    '@sidebase/nuxt-auth'
+    '@vueuse/nuxt'
   ],
 
   devtools: {
-    enabled: true
+    enabled: process.env.NODE_ENV !== 'production'
   },
 
   css: ['~/assets/css/main.css'],
@@ -16,7 +15,6 @@ export default defineNuxtConfig({
   runtimeConfig: {
     apiBaseInternal: process.env.NUXT_API_BASE_INTERNAL || 'http://localhost:4000/api',
     authSecureCookie: process.env.NUXT_AUTH_SECURE_COOKIE === 'true',
-    authHttpOnlyCookie: process.env.NUXT_AUTH_HTTP_ONLY === 'true',
     public: {
       apiBase: process.env.NUXT_PUBLIC_API_BASE || '/api',
       defaultTenantSlug: process.env.NUXT_PUBLIC_DEFAULT_TENANT_SLUG || 'dev',
@@ -26,51 +24,6 @@ export default defineNuxtConfig({
   },
 
   compatibilityDate: '2024-07-11',
-
-  auth: {
-    isEnabled: true,
-    baseURL: process.env.NUXT_PUBLIC_API_BASE || '/api',
-    globalAppMiddleware: true,
-    provider: {
-      type: 'local',
-      endpoints: {
-        signIn: { path: '/auth/signin', method: 'post' },
-        signOut: { path: '/auth/signout', method: 'post' },
-        signUp: { path: '/auth/signup', method: 'post' },
-        getSession: { path: '/user/me', method: 'get' }
-      },
-
-      token: {
-        signInResponseTokenPointer: '/accessToken',
-        type: 'Bearer',
-        headerName: 'Authorization',
-        cookieName: 'auth.token',
-        maxAgeInSeconds: 1800,
-        sameSiteAttribute: 'lax',
-        secureCookieAttribute: process.env.NUXT_AUTH_SECURE_COOKIE === 'true',
-        httpOnlyCookieAttribute: process.env.NUXT_AUTH_HTTP_ONLY === 'true'
-      },
-      refresh: {
-        isEnabled: true,
-        endpoint: { path: '/auth/refresh', method: 'post' },
-        refreshOnlyToken: false,
-        token: {
-          signInResponseRefreshTokenPointer: '/refreshToken',
-          refreshRequestTokenPointer: '/refreshToken',
-          refreshResponseTokenPointer: '/accessToken',
-          cookieName: 'auth.refresh-token',
-          maxAgeInSeconds: 60 * 60 * 24, // 1 zi
-          sameSiteAttribute: 'lax',
-          secureCookieAttribute: process.env.NUXT_AUTH_SECURE_COOKIE === 'true',
-          httpOnlyCookieAttribute: process.env.NUXT_AUTH_HTTP_ONLY === 'true'
-        }
-      }
-    },
-    sessionRefresh: {
-      enablePeriodically: false,
-      enableOnWindowFocus: true
-    }
-  },
 
   eslint: {
     config: {

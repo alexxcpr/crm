@@ -10,8 +10,8 @@ export default defineEventHandler(async (event) => {
   const target = `${config.apiBaseInternal}${event.path.replace('/api', '')}`
 
   // Forward auth token from cookie as Authorization header.
-  // @sidebase/nuxt-auth stores the JWT in a cookie named "auth.token".
-  // During SSR the module forwards it, but depending on how Nitro
+  // The Nuxt BFF stores the JWT in a HttpOnly cookie named "auth.token".
+  // During SSR the BFF forwards it, but depending on how Nitro
   // creates the synthetic event for internal $fetch calls, the header
   // may not reach the backend. This ensures it always does.
   const headers: Record<string, string> = {}

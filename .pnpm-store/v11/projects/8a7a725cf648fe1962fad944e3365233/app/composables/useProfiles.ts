@@ -27,8 +27,7 @@ export interface ModuvisSession {
 }
 
 export function useProfiles() {
-  const { data } = useAuth()
-  const { apiFetch } = useApi()
+  const { data, replaceSession } = useAuth()
   const session = computed(() => data.value as ModuvisSession | null)
 
   function label(profile?: SessionProfile | null) {
@@ -36,18 +35,14 @@ export function useProfiles() {
   }
 
   async function switchProfile(profileId: string) {
-    const rawRefreshToken = useState<string | null>('auth:raw-refresh-token')
-    const response = await apiFetch<{ accessToken: string, refreshToken: string }>('/auth/switch-profile', {
+    const response = await $fetch<import('./useAuth').AuthSessionEnvelope>('/_auth/switch-profile', {
       method: 'POST',
-      body: { profileId, refreshToken: rawRefreshToken.value }
+      credentials: 'include',
+      body: { profileId }
     })
-    useState<string | null>('auth:raw-token').value = response.accessToken
-    rawRefreshToken.value = response.refreshToken
-    const fresh = await apiFetch<ModuvisSession>('/user/me')
     clearEntitySchemaCache()
-    useState<ModuvisSession | null>('auth:data').value = fresh
     clearNuxtState(key => key.startsWith('schema-'))
-    return fresh
+    return replaceSession(response, 'profile-changed')
   }
 
   return { session, label, switchProfile }

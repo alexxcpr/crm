@@ -99,6 +99,28 @@ function executionInput(
 }
 
 describe('WorkflowNodeExecutorService', () => {
+  it('returneaza timpul curent al serverului in format ISO', async () => {
+    const { service } = createExecutor();
+    const input = executionInput('record-1');
+    input.node = {
+      id: 'now',
+      type: 'datetime_now',
+      version: 1,
+      config: {},
+    };
+    const before = Date.now();
+
+    const output = await service.execute(input);
+
+    const after = Date.now();
+    const timestamp = Date.parse(output.datetime);
+    expect(output).toEqual({
+      datetime: new Date(timestamp).toISOString(),
+    });
+    expect(timestamp).toBeGreaterThanOrEqual(before);
+    expect(timestamp).toBeLessThanOrEqual(after);
+  });
+
   it('aplica din set_data doar asignarile, fara wrapperul START', async () => {
     const { service } = createExecutor();
     const record = {

@@ -70,6 +70,8 @@ export class WorkflowNodeExecutorService {
         };
       case 'system_get_current_profile':
         return { ...context.actor.profile };
+      case 'datetime_now':
+        return { datetime: new Date().toISOString() };
       case 'app_get_record':
         return this.getRecords(
           context,

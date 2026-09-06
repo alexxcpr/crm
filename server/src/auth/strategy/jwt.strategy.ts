@@ -23,8 +23,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
   async validate(payload: JwtPayload) {
     if (!payload.profileId) throw new UnauthorizedException('Sesiune veche. Autentifica-te din nou.');
-    return this.authenticatedUsers.load(payload.sub, payload.profileId, {
+    const user = await this.authenticatedUsers.load(payload.sub, payload.profileId, {
       type: 'jwt',
     });
+    return { ...user, sessionExp: payload.sessionExp ?? payload.exp };
   }
 }

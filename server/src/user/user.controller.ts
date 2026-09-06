@@ -19,14 +19,14 @@ export class UserController {
   @Get('me')
   async getSession(@Req() req: Request & { user: AuthenticatedUser }) {
     const user = req.user;
-    const profiles = await this.tenantContext.knex('profile')
-      .where({ id_user: user.id, is_active: true })
-      .select('id_profile', 'username', 'email', 'display_name', 'is_default')
-      .orderBy([{ column: 'is_default', order: 'desc' }, { column: 'display_name', order: 'asc' }]);
-    const entities = await this.tenantContext.knex('entity').select('id_entity', 'slug');
-    const capabilities: Record<string, unknown> = {};
-    for (const entity of entities) capabilities[entity.slug] = await this.authorization.capabilities(user, entity.id_entity);
-    const billing = await this.billing.getTenantFeatures(this.tenantContext.slug);
+    const [profiles, capabilities, billing] = await Promise.all([
+      this.tenantContext.knex('profile')
+        .where({ id_user: user.id, is_active: true })
+        .select('id_profile', 'username', 'email', 'display_name', 'is_default')
+        .orderBy([{ column: 'is_default', order: 'desc' }, { column: 'display_name', order: 'asc' }]),
+      this.authorization.capabilitiesForAllEntities(user),
+      this.billing.getTenantFeatures(this.tenantContext.slug),
+    ]);
     return { ...user, profiles, capabilities, billing, features: billing?.features ?? {} };
   }
 

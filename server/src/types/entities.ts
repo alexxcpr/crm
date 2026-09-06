@@ -145,4 +145,6 @@ export interface JwtPayload {
   profileId: string;
   tenant: string;
   dbName: string;
+  sessionExp?: number;
+  exp?: number;
 }

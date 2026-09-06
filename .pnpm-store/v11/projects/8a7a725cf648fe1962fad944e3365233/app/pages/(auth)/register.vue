@@ -132,10 +132,6 @@ async function handleRegister() {
 
 // Folosim guest middleware - daca userul e deja logat, si intra pe /register, il trimitem in dashboard
 definePageMeta({
-  layout: false,
-  auth: {
-    unauthenticatedOnly: true,
-    navigateAuthenticatedTo: '/dashboard'
-  }
+  layout: false
 })
 </script>
