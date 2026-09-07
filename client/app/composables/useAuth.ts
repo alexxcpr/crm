@@ -20,8 +20,17 @@ interface AuthRuntimeState {
 }
 
 function responseStatus(error: unknown): number {
-  const candidate = error as { statusCode?: number, status?: number, response?: { status?: number } }
-  return candidate?.statusCode ?? candidate?.status ?? candidate?.response?.status ?? 500
+  const candidate = error as {
+    statusCode?: number
+    status?: number
+    response?: { status?: number }
+    data?: { statusCode?: number }
+  }
+  return candidate?.statusCode
+    ?? candidate?.status
+    ?? candidate?.response?.status
+    ?? candidate?.data?.statusCode
+    ?? 500
 }
 
 export function useAuth() {
@@ -44,11 +53,13 @@ export function useAuth() {
   }
 
   function clearLocalSession(): void {
-    data.value = null
-    accessExpiresAt.value = null
-    sessionExpiresAt.value = null
-    clearEntitySchemaCache()
-    clearNuxtState(key => key.startsWith('schema-') || key.startsWith('navigation-menu-'))
+    nuxtApp.runWithContext(() => {
+      data.value = null
+      accessExpiresAt.value = null
+      sessionExpiresAt.value = null
+      clearEntitySchemaCache()
+      clearNuxtState(key => key.startsWith('schema-') || key.startsWith('navigation-menu-'))
+    })
   }
 
   async function authFetch<T>(path: string, options: Record<string, unknown> = {}): Promise<T> {
@@ -57,20 +68,20 @@ export function useAuth() {
     }
 
     const event = useRequestEvent()
-    const response = await $fetch.raw<T>(path, {
+    const requestFetch = useRequestFetch()
+    const { appendResponseHeader } = await import('h3')
+    return requestFetch<T>(path, {
       credentials: 'include',
-      headers: useRequestHeaders(['cookie', 'host', 'x-forwarded-host', 'x-tenant']),
-      ...options
-    } as any)
-    if (event) {
-      const { appendResponseHeader } = await import('h3')
-      for (const cookie of response.headers.getSetCookie()) {
-        appendResponseHeader(event, 'set-cookie', cookie)
-        const match = /^auth\.token=([^;]*)/.exec(cookie)
-        if (match?.[1]) event.context.moduvisAccessToken = decodeURIComponent(match[1])
+      ...options,
+      onResponse({ response }: { response: Response }) {
+        if (!event) return
+        for (const cookie of response.headers.getSetCookie()) {
+          appendResponseHeader(event, 'set-cookie', cookie)
+          const match = /^auth\.token=([^;]*)/.exec(cookie)
+          if (match?.[1]) event.context.moduvisAccessToken = decodeURIComponent(match[1])
+        }
       }
-    }
-    return response._data as T
+    } as any)
   }
 
   async function getSession(options: { force?: boolean } = {}): Promise<ModuvisSession | null> {

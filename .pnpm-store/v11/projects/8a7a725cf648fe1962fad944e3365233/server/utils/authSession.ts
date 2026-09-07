@@ -25,8 +25,17 @@ function jwtClaims(token: string): JwtClaims {
 }
 
 export function authErrorStatus(error: unknown): number {
-  const candidate = error as { statusCode?: number, status?: number, response?: { status?: number } }
-  return candidate?.statusCode ?? candidate?.status ?? candidate?.response?.status ?? 500
+  const candidate = error as {
+    statusCode?: number
+    status?: number
+    response?: { status?: number }
+    data?: { statusCode?: number }
+  }
+  return candidate?.statusCode
+    ?? candidate?.status
+    ?? candidate?.response?.status
+    ?? candidate?.data?.statusCode
+    ?? 500
 }
 
 function tenantSlug(event: H3Event): string {
