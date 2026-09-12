@@ -427,6 +427,7 @@ function getModuleName(moduleId: string | null): string {
       >
         <template #body>
           <AdminFieldForm
+            v-if="showFieldSlideover"
             :entity-id="entityId"
             :entity-slug="entitySlug"
             :field="editingField"

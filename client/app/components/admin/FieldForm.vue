@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import { z } from 'zod'
 import type { Field, UiTab } from '~/types/schema'
-import type { AdminEntity, FieldPayload, UpdateFieldPayload } from '~/types/admin'
+import type { AdminEntity, FieldPayload, SequenceManifestPayload, UpdateFieldPayload } from '~/types/admin'
 import { DEFAULT_FILE_MIME_TYPES, FILE_TYPE_OPTIONS } from '~/utils/fileTypes'
+import {
+  renderSequencePreview,
+  suggestSequenceKey,
+  validateSequenceConfiguration,
+  type SequenceConfiguration
+} from '~/utils/sequenceManifest'
 
 const props = defineProps<{
   entityId: string
@@ -57,7 +63,18 @@ const allUiTypeOptions = [
   { label: 'Fisier', value: 'file' }
 ]
 
+const sequenceScopeOptions = [
+  { label: 'Entitate', value: 'entity' },
+  { label: 'Global', value: 'global' }
+]
+
+const sequenceResetOptions = [
+  { label: 'Fara resetare', value: 'none' },
+  { label: 'Anual', value: 'yearly' }
+]
+
 // ─── Form State ───
+const initialSequence = props.field?.sequence
 const state = reactive({
   name: props.field?.name ?? '',
   slug: props.field?.slug ?? '',
@@ -77,6 +94,14 @@ const state = reactive({
   visible_in_table: props.field?.visible_in_table ?? true,
   visible_in_form: props.field?.visible_in_form ?? true,
   is_readonly: props.field?.is_readonly ?? false,
+  sequence_enabled: !!initialSequence,
+  sequence_key: initialSequence?.key ?? '',
+  sequence_scope: initialSequence?.scope ?? 'entity' as SequenceConfiguration['scope'],
+  sequence_reset: initialSequence?.reset ?? 'none' as SequenceConfiguration['reset'],
+  sequence_format: initialSequence?.format ?? '{prefix}{number}',
+  sequence_prefix: initialSequence?.prefix ?? '',
+  sequence_padding: initialSequence?.padding ?? 1,
+  sequence_start_value: initialSequence?.start_value ?? 1,
   validation_min_length: (props.field?.validation_rules?.min_length as number) ?? undefined as number | undefined,
   validation_max_length: (props.field?.validation_rules?.max_length as number) ?? undefined as number | undefined,
   validation_min: (props.field?.validation_rules?.min as number) ?? undefined as number | undefined,
@@ -98,6 +123,7 @@ const state = reactive({
 
 // ─── Slug auto-gen ───
 const slugManuallyEdited = ref(isEdit.value)
+const sequenceKeyManuallyEdited = ref(!!initialSequence)
 
 watch(() => state.name, (name) => {
   if (!slugManuallyEdited.value && !isEdit.value) {
@@ -113,6 +139,16 @@ watch(() => state.name, (name) => {
       .substring(0, 50)
   }
 })
+
+watch(
+  [() => props.entitySlug, () => state.slug],
+  ([entitySlug, fieldSlug]) => {
+    if (!sequenceKeyManuallyEdited.value && !isEdit.value) {
+      state.sequence_key = suggestSequenceKey(entitySlug, fieldSlug)
+    }
+  },
+  { immediate: true }
+)
 
 // ─── Filtered ui_type options ───
 const filteredUiTypeOptions = computed(() => {
@@ -141,6 +177,9 @@ watch(() => state.id_ui_tab, (newTabId) => {
 const showRelationFields = computed(() => state.ui_type === 'relation')
 const showFileFields = computed(() => state.ui_type === 'file')
 const showCurrencyFields = computed(() => state.ui_type === 'currency')
+const canConfigureSequence = computed(() =>
+  state.data_type === 'varchar' && !showRelationFields.value && !showFileFields.value
+)
 
 const showStringValidation = computed(() =>
   ['varchar', 'text'].includes(state.data_type)
@@ -148,6 +187,25 @@ const showStringValidation = computed(() =>
 
 const showNumericValidation = computed(() =>
   ['integer', 'numeric'].includes(state.data_type)
+)
+
+function currentSequenceConfiguration(): SequenceConfiguration {
+  return {
+    key: state.sequence_key.trim(),
+    scope: state.sequence_scope,
+    reset: state.sequence_reset,
+    format: state.sequence_format,
+    prefix: state.sequence_prefix,
+    padding: Number(state.sequence_padding),
+    start_value: Number(state.sequence_start_value)
+  }
+}
+
+const sequencePreview = computed(() => renderSequencePreview(currentSequenceConfiguration()))
+const sequenceValidationIssues = computed(() =>
+  state.sequence_enabled
+    ? validateSequenceConfiguration(currentSequenceConfiguration())
+    : []
 )
 
 const tabOptions = computed(() =>
@@ -318,6 +376,23 @@ watch(() => state.ui_type, (uiType) => {
   state.default_value = ''
 })
 
+watch(() => state.sequence_enabled, (enabled) => {
+  if (!enabled) return
+
+  if (!state.sequence_key) {
+    state.sequence_key = suggestSequenceKey(props.entitySlug, state.slug)
+  }
+  state.ui_type = 'text'
+  state.default_value = ''
+  state.is_unique = true
+  state.is_readonly = true
+  state.is_required = false
+}, { immediate: true })
+
+watch(canConfigureSequence, (available) => {
+  if (!available) state.sequence_enabled = false
+})
+
 onUnmounted(() => {
   if (relationDefaultSearchTimer) clearTimeout(relationDefaultSearchTimer)
 })
@@ -329,6 +404,14 @@ const formSchema = z.object({
   id_relation_entity: z.string(),
   relation_display_field: z.string().max(100, 'Campul de afisat poate avea maximum 100 de caractere'),
   file_allowed_mime_types: z.array(z.string()),
+  sequence_enabled: z.boolean(),
+  sequence_key: z.string(),
+  sequence_scope: z.string(),
+  sequence_reset: z.string(),
+  sequence_format: z.string(),
+  sequence_prefix: z.string(),
+  sequence_padding: z.any(),
+  sequence_start_value: z.any(),
   slug: z.string()
     .min(2, 'Slug-ul trebuie sa aiba minim 2 caractere')
     .max(100)
@@ -359,6 +442,26 @@ const formSchema = z.object({
       message: 'Selecteaza cel putin un tip de fisier.',
       path: ['file_allowed_mime_types']
     })
+  }
+
+  if (data.sequence_enabled) {
+    const configuration: SequenceConfiguration = {
+      key: data.sequence_key,
+      scope: data.sequence_scope as SequenceConfiguration['scope'],
+      reset: data.sequence_reset as SequenceConfiguration['reset'],
+      format: data.sequence_format,
+      prefix: data.sequence_prefix,
+      padding: Number(data.sequence_padding),
+      start_value: Number(data.sequence_start_value)
+    }
+
+    for (const issue of validateSequenceConfiguration(configuration)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: issue.message,
+        path: [`sequence_${issue.field}`]
+      })
+    }
   }
 
   const endCol = data.grid_col + data.col_span - 1
@@ -407,6 +510,24 @@ function selectGridColumn(col: number) {
 // ─── Submit ───
 const submitting = ref(false)
 
+function sequenceManifest(): SequenceManifestPayload {
+  const configuration = currentSequenceConfiguration()
+  return {
+    key: configuration.key,
+    scope: configuration.scope,
+    reset: configuration.reset,
+    format: configuration.format,
+    prefix: configuration.prefix,
+    padding: configuration.padding,
+    start_value: configuration.start_value
+  }
+}
+
+function sequenceUpdateValue(): SequenceManifestPayload | null | undefined {
+  if (state.sequence_enabled) return sequenceManifest()
+  return initialSequence ? null : undefined
+}
+
 async function onSubmit() {
   submitting.value = true
 
@@ -441,12 +562,13 @@ async function onSubmit() {
     let result: Field | null
 
     if (isEdit.value && props.field) {
+      const sequence = sequenceUpdateValue()
       const payload: UpdateFieldPayload = {
         name: state.name,
         ui_type: state.ui_type as Field['ui_type'],
         placeholder: state.placeholder || undefined,
         help_text: state.help_text || undefined,
-        default_value: state.default_value || undefined,
+        default_value: state.sequence_enabled ? undefined : state.default_value || undefined,
         options: undefined,
         id_relation_entity: showRelationFields.value ? state.id_relation_entity || undefined : undefined,
         relation_kind: showRelationFields.value ? state.relation_kind : undefined,
@@ -462,7 +584,8 @@ async function onSubmit() {
         id_ui_tab: state.id_ui_tab || undefined,
         rank: state.rank,
         grid_col: state.grid_col,
-        col_span: state.col_span
+        col_span: state.col_span,
+        ...(sequence !== undefined ? { sequence } : {})
       }
       result = await updateField(props.field.id_field, payload)
     } else {
@@ -473,7 +596,7 @@ async function onSubmit() {
         ui_type: state.ui_type as Field['ui_type'],
         placeholder: state.placeholder || undefined,
         help_text: state.help_text || undefined,
-        default_value: state.default_value || undefined,
+        default_value: state.sequence_enabled ? undefined : state.default_value || undefined,
         options: undefined,
         id_relation_entity: showRelationFields.value ? state.id_relation_entity || undefined : undefined,
         relation_kind: showRelationFields.value ? state.relation_kind : undefined,
@@ -489,7 +612,8 @@ async function onSubmit() {
         id_ui_tab: state.id_ui_tab || undefined,
         rank: state.rank,
         grid_col: state.grid_col,
-        col_span: state.col_span
+        col_span: state.col_span,
+        ...(state.sequence_enabled ? { sequence: sequenceManifest() } : {})
       }
       result = await createField(payload)
     }
@@ -558,6 +682,8 @@ async function onSubmit() {
             v-model="state.ui_type"
             :items="filteredUiTypeOptions"
             value-key="value"
+            :disabled="state.sequence_enabled"
+            :class="{ 'opacity-60': state.sequence_enabled }"
             class="w-full"
           />
         </UFormField>
@@ -624,6 +750,129 @@ async function onSubmit() {
       </UFormField>
     </div>
 
+    <div v-if="canConfigureSequence" class="space-y-4">
+      <USeparator />
+      <div class="flex items-center justify-between gap-4">
+        <div>
+          <h4 class="text-sm font-semibold text-muted uppercase tracking-wider">
+            Generare automată
+          </h4>
+          <p class="mt-1 text-xs text-muted">
+            Generează automat o valoare unică la crearea fiecărei înregistrări.
+          </p>
+        </div>
+        <USwitch v-model="state.sequence_enabled" label="Activează secvența" />
+      </div>
+
+      <UAlert
+        color="warning"
+        variant="subtle"
+        title="Secvențele folosite devin imuabile"
+        description="Activarea, modificarea sau dezactivarea este posibilă numai cât timp coloana nu conține valori și secvența nu a alocat numere. Backendul verifică definitiv condițiile la salvare."
+      />
+
+      <template v-if="state.sequence_enabled">
+        <UFormField
+          label="Cheie"
+          name="sequence_key"
+          description="Identificator tehnic editabil, unic pentru configurația secvenței."
+          required
+        >
+          <UInput
+            v-model="state.sequence_key"
+            placeholder="ex: store_configuration"
+            maxlength="51"
+            class="w-full"
+            @input="sequenceKeyManuallyEdited = true"
+          />
+        </UFormField>
+
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <UFormField label="Domeniu" name="sequence_scope" required>
+            <USelect
+              v-model="state.sequence_scope"
+              :items="sequenceScopeOptions"
+              value-key="value"
+              class="w-full"
+            />
+          </UFormField>
+
+          <UFormField label="Resetare" name="sequence_reset" required>
+            <USelect
+              v-model="state.sequence_reset"
+              :items="sequenceResetOptions"
+              value-key="value"
+              class="w-full"
+            />
+          </UFormField>
+        </div>
+
+        <UFormField
+          label="Format"
+          name="sequence_format"
+          description="Tokenuri acceptate: {prefix}, {number}, {day}, {month}, {year}. {number} este obligatoriu exact o dată."
+          required
+        >
+          <UInput
+            v-model="state.sequence_format"
+            placeholder="{prefix}{number}"
+            maxlength="255"
+            class="w-full font-mono"
+          />
+        </UFormField>
+
+        <UFormField label="Prefix" name="sequence_prefix">
+          <UInput
+            v-model="state.sequence_prefix"
+            placeholder="ex: CFG-"
+            maxlength="100"
+            class="w-full"
+          />
+        </UFormField>
+
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <UFormField label="Padding" name="sequence_padding" required>
+            <UInput
+              v-model.number="state.sequence_padding"
+              type="number"
+              :min="1"
+              :max="18"
+              :step="1"
+              class="w-full"
+            />
+          </UFormField>
+
+          <UFormField label="Valoare inițială" name="sequence_start_value" required>
+            <UInput
+              v-model.number="state.sequence_start_value"
+              type="number"
+              :min="1"
+              :step="1"
+              class="w-full"
+            />
+          </UFormField>
+        </div>
+
+        <div class="rounded-lg border border-default bg-muted/30 p-4">
+          <p class="text-xs font-medium uppercase tracking-wider text-muted">
+            Preview
+          </p>
+          <code class="mt-2 block break-all text-base font-semibold text-highlighted">{{ sequencePreview }}</code>
+          <p class="mt-2 text-xs text-muted">
+            Data din preview este locală și orientativă. Generarea reală folosește fusul orar al tenantului.
+          </p>
+        </div>
+
+        <UAlert
+          v-if="sequenceValidationIssues.length"
+          color="error"
+          variant="subtle"
+          title="Configurație invalidă"
+          :description="sequenceValidationIssues[0]?.message"
+        />
+      </template>
+    </div>
+
     <USeparator />
 
     <!-- Section 2: UI Config -->
@@ -641,7 +890,13 @@ async function onSubmit() {
       </UFormField>
 
       <UFormField v-if="!showRelationFields" label="Valoare implicita" name="default_value">
-        <UInput v-model="state.default_value" placeholder="Valoare default" class="w-full" />
+        <UInput
+          v-model="state.default_value"
+          placeholder="Valoare default"
+          :disabled="state.sequence_enabled"
+          :class="{ 'opacity-60': state.sequence_enabled }"
+          class="w-full"
+        />
       </UFormField>
     </div>
 
@@ -735,11 +990,14 @@ async function onSubmit() {
 
       <div class="grid grid-cols-2 gap-x-6 gap-y-3">
         <UFormField label="Obligatoriu" name="is_required">
-          <USwitch v-model="state.is_required" :disabled="showRelationFields && state.relation_kind === 'composition'" />
+          <USwitch
+            v-model="state.is_required"
+            :disabled="state.sequence_enabled || (showRelationFields && state.relation_kind === 'composition')"
+          />
         </UFormField>
 
         <UFormField label="Unic" name="is_unique">
-          <USwitch v-model="state.is_unique" :disabled="showFileFields" />
+          <USwitch v-model="state.is_unique" :disabled="state.sequence_enabled || showFileFields" />
         </UFormField>
 
         <UFormField label="Filtrabil" name="is_filterable">
@@ -759,7 +1017,7 @@ async function onSubmit() {
         </UFormField>
 
         <UFormField label="Read-Only" name="is_readonly" description="Doar citire in formular.">
-          <USwitch v-model="state.is_readonly" />
+          <USwitch v-model="state.is_readonly" :disabled="state.sequence_enabled" />
         </UFormField>
       </div>
     </div>
