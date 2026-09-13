@@ -240,7 +240,17 @@ const currentProfileFields = [
 
 // These nodes preserve the workflow data context for downstream producers,
 // but must not be exposed themselves in data-source dropdowns.
-const transparentDataContextNodeTypes = new Set(["app_update_record"]);
+// `condition` unwraps its internal { matched, value } result before forwarding
+// the token, while `validate` forwards token.current unchanged.
+const transparentDataContextNodeTypes = new Set([
+  "app_update_record",
+  "condition",
+  "validate",
+]);
+
+export function isTransparentDataContextNodeType(nodeType: string): boolean {
+  return transparentDataContextNodeTypes.has(nodeType);
+}
 
 /**
  * Computes a data registry from the workflow node graph.
@@ -293,7 +303,7 @@ export function useWorkflowDataRegistry(
       const node = nodes.value.find((candidate) => candidate.id === nodeId);
       if (
         !node ||
-        !transparentDataContextNodeTypes.has(nodeData(node).nodeType ?? "")
+        !isTransparentDataContextNodeType(nodeData(node).nodeType ?? "")
       ) {
         return undefined;
       }
