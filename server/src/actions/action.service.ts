@@ -463,7 +463,9 @@ export class ActionService {
     );
   }
 
-  @OnEvent('entity.before_insert.*')
+  @OnEvent('entity.before_insert.*', {
+    suppressErrors: false,
+  })
   async onBeforeInsert(payload: unknown) {
     await this.evaluateAutoTriggers(
       EntityEvent.BeforeInsert,
@@ -471,7 +473,9 @@ export class ActionService {
     );
   }
 
-  @OnEvent('entity.before_update.*')
+  @OnEvent('entity.before_update.*', {
+    suppressErrors: false,
+  })
   async onBeforeUpdate(payload: unknown) {
     await this.evaluateAutoTriggers(
       EntityEvent.BeforeUpdate,
@@ -479,7 +483,9 @@ export class ActionService {
     );
   }
 
-  @OnEvent('entity.before_delete.*')
+  @OnEvent('entity.before_delete.*', {
+    suppressErrors: false,
+  })
   async onBeforeDelete(payload: unknown) {
     await this.evaluateAutoTriggers(
       EntityEvent.BeforeDelete,

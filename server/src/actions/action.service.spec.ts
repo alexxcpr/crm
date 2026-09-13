@@ -1,5 +1,27 @@
 import { ActionService } from './action.service';
 import { EntityEvent } from 'src/events/entity-event.enum';
+import { EVENT_LISTENER_METADATA } from '@nestjs/event-emitter/dist/constants';
+
+describe('ActionService before-event listeners', () => {
+  it.each([
+    ['onBeforeInsert', 'entity.before_insert.*'],
+    ['onBeforeUpdate', 'entity.before_update.*'],
+    ['onBeforeDelete', 'entity.before_delete.*'],
+  ] as const)(
+    'propaga erorile din %s catre operatia CRUD',
+    (methodName, event) => {
+      const metadata = Reflect.getMetadata(
+        EVENT_LISTENER_METADATA,
+        ActionService.prototype[methodName],
+      );
+
+      expect(metadata).toContainEqual({
+        event,
+        options: { suppressErrors: false },
+      });
+    },
+  );
+});
 
 function makeService(
   fields: Array<{
