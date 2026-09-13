@@ -1003,6 +1003,9 @@ export class WorkflowCompilerService {
         entity.id_entity,
       ]),
     );
+    const nodeById = new Map(
+      nodes.map((node) => [node.id, node]),
+    );
 
     for (const node of nodes) {
       const slugs = new Set<string>();
@@ -1068,8 +1071,10 @@ export class WorkflowCompilerService {
             parameters.sourceNodeId,
         );
         const sourceEntityId = entityBySlug.get(
-          String(
-            source?.parameters?.entity ?? '',
+          this.resolveSourceEntitySlug(
+            source,
+            nodeById,
+            edges,
           ),
         );
         const relationKey = String(
@@ -1211,50 +1216,6 @@ export class WorkflowCompilerService {
     const nodeById = new Map(
       nodes.map((node) => [node.id, node]),
     );
-    const sourceEntitySlugFor = (
-      source: WorkflowSourceNode | undefined,
-      visited = new Set<string>(),
-    ): string => {
-      if (!source || visited.has(source.id))
-        return '';
-      visited.add(source.id);
-
-      if (source.type === 'app_get_related') {
-        return String(
-          source.parameters
-            ?.relationEntitySlug ?? '',
-        );
-      }
-      if (source.parameters?.entity) {
-        return String(source.parameters.entity);
-      }
-      if (source.type === 'for_each') {
-        return sourceEntitySlugFor(
-          nodeById.get(
-            String(
-              source.parameters?.sourceNodeId ??
-                '',
-            ),
-          ),
-          visited,
-        );
-      }
-      if (
-        source.type === 'set_data' ||
-        source.type === 'app_update_record'
-      ) {
-        const incoming = edges.find(
-          (edge) => edge.target === source.id,
-        );
-        return sourceEntitySlugFor(
-          incoming
-            ? nodeById.get(incoming.source)
-            : undefined,
-          visited,
-        );
-      }
-      return '';
-    };
     const fieldsByEntity = new Map<
       string,
       Map<
@@ -1331,7 +1292,11 @@ export class WorkflowCompilerService {
             reference.sourceNodeId,
           );
           const sourceEntitySlug =
-            sourceEntitySlugFor(source);
+            this.resolveSourceEntitySlug(
+              source,
+              nodeById,
+              edges,
+            );
           const fieldKey = String(
             reference.sourceFieldSlug ??
               reference.fieldSlug ??
@@ -1395,6 +1360,57 @@ export class WorkflowCompilerService {
       };
       await visit(node.parameters ?? {});
     }
+  }
+
+  private resolveSourceEntitySlug(
+    source: WorkflowSourceNode | undefined,
+    nodeById: Map<string, WorkflowSourceNode>,
+    edges: Array<{
+      source: string;
+      target: string;
+    }> = [],
+    visited = new Set<string>(),
+  ): string {
+    if (!source || visited.has(source.id)) return '';
+    visited.add(source.id);
+
+    if (source.type === 'app_get_related') {
+      return String(
+        source.parameters?.relationEntitySlug ?? '',
+      );
+    }
+    if (source.parameters?.entity) {
+      return String(source.parameters.entity);
+    }
+    if (source.type === 'for_each') {
+      return this.resolveSourceEntitySlug(
+        nodeById.get(
+          String(
+            source.parameters?.sourceNodeId ?? '',
+          ),
+        ),
+        nodeById,
+        edges,
+        visited,
+      );
+    }
+    if (
+      source.type === 'set_data' ||
+      source.type === 'app_update_record'
+    ) {
+      const incoming = edges.find(
+        (edge) => edge.target === source.id,
+      );
+      return this.resolveSourceEntitySlug(
+        incoming
+          ? nodeById.get(incoming.source)
+          : undefined,
+        nodeById,
+        edges,
+        visited,
+      );
+    }
+    return '';
   }
 
   private async resolveFieldDependencies(

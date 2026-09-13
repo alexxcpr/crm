@@ -115,6 +115,85 @@ function compiler() {
   return service;
 }
 
+const relationEntities = [
+  {
+    id_entity: 'entity-product-variant',
+    slug: 'product_variant',
+  },
+  { id_entity: 'entity-product', slug: 'product' },
+  {
+    id_entity: 'entity-product-type',
+    slug: 'product_type',
+  },
+  {
+    id_entity: 'entity-size-scale',
+    slug: 'size_scale',
+  },
+];
+
+function relationDependencyCompiler(
+  fields: Record<string, Record<string, any>>,
+) {
+  const lookups: Array<{
+    entityId: string;
+    relationKey: string;
+  }> = [];
+  const entitySelect = jest
+    .fn()
+    .mockResolvedValue(relationEntities);
+  const knex = jest.fn((table: string) => {
+    if (table === 'entity') {
+      return { select: entitySelect };
+    }
+    if (table === 'field') {
+      let entityId = '';
+      let relationKey = '';
+      const query: Record<string, jest.Mock> = {};
+      query.where = jest.fn(
+        (_column: string, value: string) => {
+          entityId = value;
+          return query;
+        },
+      );
+      query.andWhere = jest.fn(
+        (callback: (builder: any) => void) => {
+          const builder: Record<string, jest.Mock> = {};
+          builder.where = jest.fn(
+            (_column: string, value: string) => {
+              relationKey = value;
+              return builder;
+            },
+          );
+          builder.orWhere = jest.fn(() => builder);
+          callback(builder);
+          return query;
+        },
+      );
+      query.first = jest.fn(async () => {
+        lookups.push({ entityId, relationKey });
+        return fields[`${entityId}:${relationKey}`];
+      });
+      return query;
+    }
+    throw new Error(`Tabel neasteptat in test: ${table}`);
+  });
+  const service = new WorkflowCompilerService(
+    { knex } as any,
+    {} as any,
+    {} as any,
+  );
+  jest
+    .spyOn(service as any, 'resolveFieldDependencies')
+    .mockResolvedValue(undefined);
+  jest
+    .spyOn(
+      service as any,
+      'resolveSourceFieldDependencies',
+    )
+    .mockResolvedValue(undefined);
+  return { service, lookups };
+}
+
 describe('WorkflowCompilerService', () => {
   it('rezolva entitatile fara o coloana is_active inexistenta', async () => {
     const entitySelect = jest
@@ -188,6 +267,173 @@ describe('WorkflowCompilerService', () => {
       'id_entity',
       'entity-1',
     );
+  });
+
+  it('rezolva campurile pentru relatii inlantuite', async () => {
+    const fields = {
+      'entity-product-variant:product': {
+        id_field: 'field-product',
+        column_name: 'cf_product',
+      },
+      'entity-product:product_type': {
+        id_field: 'field-product-type',
+        column_name: 'cf_product_type',
+      },
+      'entity-product-type:size_scale': {
+        id_field: 'field-size-scale',
+        column_name: 'cf_size_scale',
+      },
+    };
+    const { service, lookups } =
+      relationDependencyCompiler(fields);
+    const nodes: any[] = [
+      {
+        id: 'start',
+        type: 'start',
+        parameters: { entity: 'product_variant' },
+      },
+      {
+        id: 'read-product',
+        type: 'app_get_related',
+        parameters: {
+          sourceNodeId: 'start',
+          relationField: 'product',
+          relationEntitySlug: 'product',
+        },
+      },
+      {
+        id: 'read-product-type',
+        type: 'app_get_related',
+        parameters: {
+          sourceNodeId: 'read-product',
+          relationField: 'product_type',
+          relationEntitySlug: 'product_type',
+        },
+      },
+      {
+        id: 'read-size-scale',
+        type: 'app_get_related',
+        parameters: {
+          sourceNodeId: 'read-product-type',
+          relationField: 'size_scale',
+          relationEntitySlug: 'size_scale',
+        },
+      },
+    ];
+    const fieldIds = new Set<string>();
+    const errors: any[] = [];
+
+    await (service as any).resolveDependencies(
+      nodes,
+      new Set<string>(),
+      fieldIds,
+      new Set<string>(),
+      new Set<string>(),
+      errors,
+    );
+
+    expect(errors).toEqual([]);
+    expect(lookups).toEqual([
+      {
+        entityId: 'entity-product-variant',
+        relationKey: 'product',
+      },
+      {
+        entityId: 'entity-product',
+        relationKey: 'product_type',
+      },
+      {
+        entityId: 'entity-product-type',
+        relationKey: 'size_scale',
+      },
+    ]);
+    expect(fieldIds).toEqual(
+      new Set([
+        'field-product',
+        'field-product-type',
+        'field-size-scale',
+      ]),
+    );
+    expect(nodes[2].parameters).toMatchObject({
+      relationFieldId: 'field-product-type',
+      relationFieldColumn: 'cf_product_type',
+    });
+  });
+
+  it('raporteaza nodul cand relatia chiar nu exista', async () => {
+    const { service } = relationDependencyCompiler({});
+    const errors: any[] = [];
+
+    await (service as any).resolveDependencies(
+      [
+        {
+          id: 'start',
+          type: 'start',
+          parameters: { entity: 'product_variant' },
+        },
+        {
+          id: 'read-missing',
+          type: 'app_get_related',
+          parameters: {
+            sourceNodeId: 'start',
+            relationField: 'missing',
+            relationEntitySlug: 'product',
+          },
+        },
+      ],
+      new Set<string>(),
+      new Set<string>(),
+      new Set<string>(),
+      new Set<string>(),
+      errors,
+    );
+
+    expect(errors).toContainEqual({
+      code: 'relation_field_not_found',
+      message: 'Campul relatie configurat nu exista.',
+      nodeId: 'read-missing',
+    });
+  });
+
+  it('rezolva recursiv entitatea prin noduri intermediare', () => {
+    const service = compiler();
+    const nodes: any[] = [
+      {
+        id: 'start',
+        type: 'start',
+        parameters: { entity: 'product_variant' },
+      },
+      {
+        id: 'set-data',
+        type: 'set_data',
+        parameters: {},
+      },
+      {
+        id: 'update',
+        type: 'app_update_record',
+        parameters: {},
+      },
+      {
+        id: 'loop',
+        type: 'for_each',
+        parameters: { sourceNodeId: 'update' },
+      },
+    ];
+    const nodeById = new Map(
+      nodes.map((node) => [node.id, node]),
+    );
+    const edges = [
+      { source: 'start', target: 'set-data' },
+      { source: 'set-data', target: 'update' },
+    ];
+
+    expect(
+      (service as any).resolveSourceEntitySlug(
+        nodeById.get('loop'),
+        nodeById,
+        edges,
+      ),
+    ).toBe('product_variant');
   });
 
   it('permite filtre pe coloana sistem id fara metadata field', async () => {

@@ -273,7 +273,6 @@ function onDeleteSelectedNode() {
 }
 
 const toast = useToast();
-const { apiFetch } = useApi();
 const { getNodeType } = useNodeTypes();
 const {
   integrations: smtpIntegrations,
@@ -710,27 +709,6 @@ async function save() {
 
   const data = exportWorkflow();
   const enriched = await enrichBeforeSave(data);
-  const validation = await apiFetch<{
-    data: {
-      valid: boolean;
-      errors: Array<{ message: string }>;
-    };
-  }>("/v1/admin/workflows/validate", {
-    method: "POST",
-    body: {
-      ...enriched,
-      workflowId: props.workflowId,
-    },
-  });
-  if (!validation.data.valid) {
-    toast.add({
-      title: "Revizia va fi salvata cu erori",
-      description: validation.data.errors
-        .map((error) => error.message)
-        .join(" "),
-      color: "warning",
-    });
-  }
   emit("save", enriched);
   isDirty.value = false;
 }

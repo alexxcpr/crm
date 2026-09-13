@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatWorkflowValidationErrors } from '~/utils/workflowValidation'
+
 definePageMeta({ middleware: ['capability'], requiredCapability: 'builder.manage' })
 
 const route = useRoute()
@@ -41,6 +43,13 @@ const initialConnections = computed(() => {
     : workflow.value.connections ?? []
 })
 
+const formattedValidationErrors = computed(() =>
+  formatWorkflowValidationErrors(
+    workflow.value?.validationErrors ?? [],
+    initialNodes.value
+  )
+)
+
 async function onSave(payload: { nodes: any[], connections: any[] }) {
   const result = await updateWorkflow(workflowId, {
     name: name.value || undefined,
@@ -50,11 +59,15 @@ async function onSave(payload: { nodes: any[], connections: any[] }) {
 
   if (result) {
     workflow.value = await fetchWorkflow(workflowId) ?? result
+    const validationErrors = formatWorkflowValidationErrors(
+      result.validationErrors ?? [],
+      payload.nodes
+    )
     toast.add({
       title: result.isValid ? 'Workflow salvat' : 'Revizie salvata cu erori',
       description: result.isValid
         ? result.published ? 'Revizia valida a fost publicata automat.' : undefined
-        : (result.validationErrors ?? []).map((item: any) => item.message).join(' '),
+        : validationErrors.join(' • ') || 'Revizia contine erori de validare.',
       color: result.isValid ? 'success' : 'warning'
     })
     isDirty.value = false
@@ -225,13 +238,20 @@ const statusLabels: Record<string, string> = {
 
     <div v-if="activeTab === 'editor'" class="flex-1 min-h-0">
       <UAlert
-        v-if="workflow.isValid === false && workflow.validationErrors?.length"
+        v-if="workflow.isValid === false && formattedValidationErrors.length"
         color="error"
         variant="subtle"
         title="Revizia trebuie corectata"
-        :description="workflow.validationErrors.map((item: any) => item.message).join(' ')"
         class="m-4"
-      />
+      >
+        <template #description>
+          <ul class="list-disc space-y-1 pl-4">
+            <li v-for="(message, index) in formattedValidationErrors" :key="`${index}-${message}`">
+              {{ message }}
+            </li>
+          </ul>
+        </template>
+      </UAlert>
       <WorkflowBuilder
         ref="builderRef"
         :workflow-id="workflowId"
