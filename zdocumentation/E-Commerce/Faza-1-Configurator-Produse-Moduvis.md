@@ -656,7 +656,9 @@ flowchart TD
   PA01["PA01 Start"] --> PA02["PA02 Citește produs"]
   PA02 --> PA03["PA03 Citește poziție"]
   PA03 --> PA04["PA04 Citește vedere mockup"]
-  PA04 --> PA05["PA05–PA08 Validări"]
+  PA04 --> PA05["PA05–PA08 Validări relații"]
+  PA05 --> PA09["PA09 Calculează limite preview"]
+  PA09 --> PA10["PA10–PA11 Validări limite"]
 ```
 
 #### Noduri și inputuri
@@ -671,19 +673,24 @@ flowchart TD
 |x `PA06` | `Validare` | `PA03.cf_is_active` → `Este fals` | Mesaj: `Poziția de print este inactivă.` |
 |x `PA07` | `Validare` | `PA04.cf_is_active` → `Este fals` | Mesaj: `Vederea mockup este inactivă.` |
 |x `PA08` | `Validare` | `PA04.cf_is_mockup` → `Este fals` | Mesaj: `Vederea selectată nu poate fi folosită ca mockup în configurator.` |
+|x `PA09` | `Set/Calculează` | `preview_right_pct = (PA01.cf_preview_x_pct × 1) + (PA01.cf_preview_width_pct × 1)`; `preview_bottom_pct = (PA01.cf_preview_y_pct × 1) + (PA01.cf_preview_height_pct × 1)` | Calculează marginile dreaptă și inferioară. Înmulțirea cu `1` forțează conversia valorilor `NUMERIC` la număr și evită concatenarea șirurilor. |
+|x `PA10` | `Validare` | `PA09.preview_right_pct` → `Mai mare` → `Valoare fixă: 100` | Mesaj: `Zona de preview depășește marginea din dreapta.` |
+|x `PA11` | `Validare` | `PA09.preview_bottom_pct` → `Mai mare` → `Valoare fixă: 100` | Mesaj: `Zona de preview depășește marginea de jos.` |
 
-Conexiuni: `PA01 → PA02 → PA03 → PA04 → PA05 → PA06 → PA07 → PA08`.
+Conexiuni: `PA01 → PA02 → PA03 → PA04 → PA05 → PA06 → PA07 → PA08 → PA09 → PA10 → PA11`.
 
-Regulile simple sunt deja native: `max_width_mm` și `max_height_mm >= 1`, iar fiecare procent este între `0` și `100`. Motorul actual de condiții nu poate calcula suma a două câmpuri în operand, deci următoarele două reguli se validează obligatoriu în formularul Moduvis/Nuxt până se adaugă operanzi calculați în workflow:
+Regulile simple rămân native: `max_width_mm` și `max_height_mm >= 1`, iar fiecare procent este între `0` și `100`. Limitele compuse sunt impuse de `PA09–PA11` în workflow:
 
 ```text
 preview_x_pct + preview_width_pct <= 100
 preview_y_pct + preview_height_pct <= 100
 ```
 
+`preview_right_pct` și `preview_bottom_pct` sunt rezultate temporare ale nodului `Set/Calculează`. Nu sunt câmpuri ale entității și nu se persistă. Formularul Nuxt poate repeta aceste verificări pentru feedback imediat, dar workflow-ul `before_insert`/`before_update` este bariera obligatorie pentru orice client API.
+
 Teste minime: zonă validă; poziție inactivă; view inactiv; view cu `is_mockup=false`; dreptunghi care depășește marginea dreaptă sau inferioară.
 
-### 8.5. Workflow `validate_product_print_option`
+### x 8.5. Workflow `validate_product_print_option`
 
 #### Configurare
 
@@ -715,29 +722,29 @@ flowchart TD
 
 | ID | Tip | Inputuri |
 |---|---|---|
-| `PO01` | `Start` | Entitate: `product_print_options` |
-| `PO02` | `Citește Relație` | Sursă: `PO01`; relație: `print_area` |
-| `PO03` | `Citește Înregistrări` | Entitate: `products`; filtru `id` `Egal` `Din nod` → `PO02.cf_product`; Limit `1` |
-| `PO04` | `Citește Relație` | Sursă: `PO01`; relație: `print_format` |
-| `PO05` | `Citește Relație` | Sursă: `PO01`; relație: `print_method` |
+|x `PO01` | `Start` | Entitate: `product_print_options` |
+|x `PO02` | `Citește Relație` | Sursă: `PO01`; relație: `print_area` |
+|x `PO03` | `Citește Înregistrări` | Entitate: `products`; filtru `id` `Egal` `Din nod` → `PO02.cf_product`; Limit `1` |
+|x `PO04` | `Citește Relație` | Sursă: `PO01`; relație: `print_format` |
+|x `PO05` | `Citește Relație` | Sursă: `PO01`; relație: `print_method` |
 
 #### Validări și ramuri
 
 | ID | Tip | Configurare exactă |
 |---|---|---|
-| `PO06` | `Validare` | `PO02.cf_is_active` → `Este fals`; mesaj `Zona de print este inactivă.` |
-| `PO07` | `Validare` | `PO03.cf_is_active` → `Este fals`; mesaj `Produsul zonei de print este inactiv.` |
-| `PO08` | `Validare` | `PO04.cf_is_active` → `Este fals`; mesaj `Formatul de print este inactiv.` |
-| `PO09` | `Validare` | `PO05.cf_is_active` → `Este fals`; mesaj `Metoda de print este inactivă.` |
-| `PO10` | `Condiție (If/Else)` | Condiția 1: `PO04.cf_width_mm` → `Mai mic sau egal` → `PO02.cf_max_width_mm`; combinator `ȘI (AND)`; condiția 2: `PO04.cf_height_mm` → `Mai mic sau egal` → `PO02.cf_max_height_mm` |
-| `PO11` | `Condiție (If/Else)` | Condiția 1: `PO04.cf_height_mm` → `Mai mic sau egal` → `PO02.cf_max_width_mm`; combinator `ȘI (AND)`; condiția 2: `PO04.cf_width_mm` → `Mai mic sau egal` → `PO02.cf_max_height_mm` |
-| `PO12` | `Stop cu Eroare` | Mesaj: `Formatul de print nu încape în zona selectată, nici în orientare normală, nici rotit la 90°.` |
+|x `PO06` | `Validare` | `PO02.cf_is_active` → `Este fals`; mesaj `Zona de print este inactivă.` |
+|x `PO07` | `Validare` | `PO03.cf_is_active` → `Este fals`; mesaj `Produsul zonei de print este inactiv.` |
+|x `PO08` | `Validare` | `PO04.cf_is_active` → `Este fals`; mesaj `Formatul de print este inactiv.` |
+|x `PO09` | `Validare` | `PO05.cf_is_active` → `Este fals`; mesaj `Metoda de print este inactivă.` |
+|x `PO10` | `Condiție (If/Else)` | Condiția 1: `PO04.cf_width_mm` → `Mai mic sau egal` → `PO02.cf_max_width_mm`; combinator `ȘI (AND)`; condiția 2: `PO04.cf_height_mm` → `Mai mic sau egal` → `PO02.cf_max_height_mm` |
+|x `PO11` | `Condiție (If/Else)` | Condiția 1: `PO04.cf_height_mm` → `Mai mic sau egal` → `PO02.cf_max_width_mm`; combinator `ȘI (AND)`; condiția 2: `PO04.cf_width_mm` → `Mai mic sau egal` → `PO02.cf_max_height_mm` |
+|x `PO12` | `Stop cu Eroare` | Mesaj: `Formatul de print nu încape în zona selectată, nici în orientare normală, nici rotit la 90°.` |
 
 Conectezi citirile și validările liniar. Ieșirea `Adevărat` din `PO10` încheie cu succes; ieșirea `Fals` intră în `PO11`. Ieșirea `Adevărat` din `PO11` încheie cu succes, iar `Fals` intră în `PO12`.
 
 `sale_price >= 0`, `cost_price >= 0` și intervalul `min_dpi=72…1200` sunt reguli native de câmp; nu le dublezi cu noduri. Teste: încape normal; încape doar rotit; nu încape; fiecare lookup inactiv.
 
-### 8.6. Workflow `validate_artwork`
+### x 8.6. Workflow `validate_artwork`
 
 #### Configurare
 
@@ -753,12 +760,12 @@ Conectezi citirile și validările liniar. Ieșirea `Adevărat` din `PO10` înch
 
 | ID | Tip | Inputuri/configurare | Scop |
 |---|---|---|---|
-| `AW01` | `Start` | Entitate: `artworks` | Artwork-ul în curs de salvare. |
-| `AW02` | `Citește Relație` | Sursă: `AW01`; relație: `source_type` | Încarcă tipul sursei. |
-| `AW03` | `Citește Relație` | Sursă: `AW01`; relație: `status` | Încarcă statusul selectat. |
-| `AW04` | `Validare` | `AW02.cf_is_active` → `Este fals`; mesaj `Tipul sursei artwork este inactiv.` | Respinge lookup-uri dezactivate. |
-| `AW05` | `Validare` | `AW02.cf_slug` → `Diferit de` → `Valoare fixă: user_upload`; mesaj `În faza 1 sunt acceptate numai imaginile încărcate de utilizator.` | Blochează `ai_generated` până la faza AI. |
-| `AW06` | `Validare` | `AW03.cf_is_active` → `Este fals`; mesaj `Statusul artwork este inactiv.` | Nu permite statusuri scoase din uz. |
+|x `AW01` | `Start` | Entitate: `artworks` | Artwork-ul în curs de salvare. |
+|x `AW02` | `Citește Relație` | Sursă: `AW01`; relație: `source_type` | Încarcă tipul sursei. |
+|x `AW03` | `Citește Relație` | Sursă: `AW01`; relație: `status` | Încarcă statusul selectat. |
+|x `AW04` | `Validare` | `AW02.cf_is_active` → `Este fals`; mesaj `Tipul sursei artwork este inactiv.` | Respinge lookup-uri dezactivate. |
+|x `AW05` | `Validare` | `AW02.cf_slug` → `Diferit de` → `Valoare fixă: user_upload`; mesaj `În faza 1 sunt acceptate numai imaginile încărcate de utilizator.` | Blochează `ai_generated` până la faza AI. |
+|x `AW06` | `Validare` | `AW03.cf_is_active` → `Este fals`; mesaj `Statusul artwork este inactiv.` | Nu permite statusuri scoase din uz. |
 
 Conexiuni: `AW01 → AW02 → AW03 → AW04 → AW05 → AW06`.
 
@@ -766,7 +773,7 @@ Nu adăuga noduri care „calculează” metadatele fișierului. Serverul Nuxt d
 
 Teste: upload valid; `source_type` inactiv; `ai_generated`; status inactiv; extensie/MIME/dimensiune invalidă pentru regulile native.
 
-### 8.7. Workflow `validate_configuration_print`
+### de testat(?) 8.7. Workflow `validate_configuration_print`
 
 #### Configurare
 
@@ -800,37 +807,37 @@ flowchart TD
 
 | ID | Tip | Inputuri exacte |
 |---|---|---|
-| `CP01` | `Start` | Entitate: `configuration_prints` |
-| `CP02` | `Citește Relație` | Sursă `CP01`; relație `configuration` |
-| `CP03` | `Citește Înregistrări` | Entitate `configuration_statuses`; filtru `id` `Egal` `Din nod: CP02.cf_status`; Limit `1` |
-| `CP04` | `Citește Înregistrări` | Entitate `product_variants`; filtru `id` `Egal` `Din nod: CP02.cf_variant`; Limit `1` |
-| `CP05` | `Citește Înregistrări` | Entitate `products`; filtru `id` `Egal` `Din nod: CP04.cf_product`; Limit `1` |
-| `CP06` | `Citește Relație` | Sursă `CP01`; relație `print_option` |
-| `CP07` | `Citește Înregistrări` | Entitate `product_print_areas`; filtru `id` `Egal` `Din nod: CP06.cf_print_area`; Limit `1` |
-| `CP08` | `Citește Înregistrări` | Entitate `print_formats`; filtru `id` `Egal` `Din nod: CP06.cf_print_format`; Limit `1` |
-| `CP09` | `Citește Înregistrări` | Entitate `print_methods`; filtru `id` `Egal` `Din nod: CP06.cf_print_method`; Limit `1` |
-| `CP10` | `Citește Relație` | Sursă `CP01`; relație `artwork` |
-| `CP11` | `Citește Înregistrări` | Entitate `artwork_statuses`; filtru `id` `Egal` `Din nod: CP10.cf_status`; Limit `1` |
+|x `CP01` | `Start` | Entitate: `configuration_prints` |
+|x `CP02` | `Citește Relație` | Sursă `CP01`; relație `configuration` |
+|x `CP03` | `Citește Înregistrări` | Entitate `configuration_statuses`; filtru `id` `Egal` `Din nod: CP02.cf_status`; Limit `1` |
+|x `CP04` | `Citește Înregistrări` | Entitate `product_variants`; filtru `id` `Egal` `Din nod: CP02.cf_variant`; Limit `1` |
+|x `CP05` | `Citește Înregistrări` | Entitate `products`; filtru `id` `Egal` `Din nod: CP04.cf_product`; Limit `1` |
+|x `CP06` | `Citește Relație` | Sursă `CP01`; relație `print_option` |
+|x `CP07` | `Citește Înregistrări` | Entitate `product_print_areas`; filtru `id` `Egal` `Din nod: CP06.cf_print_area`; Limit `1` |
+|x `CP08` | `Citește Înregistrări` | Entitate `print_formats`; filtru `id` `Egal` `Din nod: CP06.cf_print_format`; Limit `1` |
+|x `CP09` | `Citește Înregistrări` | Entitate `print_methods`; filtru `id` `Egal` `Din nod: CP06.cf_print_method`; Limit `1` |
+|x `CP10` | `Citește Relație` | Sursă `CP01`; relație `artwork` |
+|x `CP11` | `Citește Înregistrări` | Entitate `artwork_statuses`; filtru `id` `Egal` `Din nod: CP10.cf_status`; Limit `1` |
 
 #### Nodurile de validare
 
 | ID | Condiția de eroare | Mesaj exact |
 |---|---|---|
-| `CP12` | `CP03.cf_is_active` → `Este fals` | `Statusul configurației este inactiv.` |
-| `CP13` | `CP03.cf_slug` → `Diferit de` → `Valoare fixă: draft` | `Configurația nu mai poate fi modificată deoarece nu este draft.` |
-| `CP14` | `CP04.cf_is_active` → `Este fals` | `Varianta produsului este inactivă.` |
-| `CP15` | `CP05.cf_is_active` → `Este fals` | `Produsul este inactiv.` |
-| `CP16` | `CP05.cf_is_published` → `Este fals` | `Produsul nu este publicat.` |
-| `CP17` | `CP06.cf_is_active` → `Este fals` | `Opțiunea de print este inactivă.` |
-| `CP18` | `CP07.cf_is_active` → `Este fals` | `Zona de print este inactivă.` |
-| `CP19` | `CP08.cf_is_active` → `Este fals` | `Formatul de print este inactiv.` |
-| `CP20` | `CP09.cf_is_active` → `Este fals` | `Metoda de print este inactivă.` |
-| `CP21` | `CP04.cf_product` → `Diferit de` → `Din nod: CP07.cf_product` | `Opțiunea de print nu aparține produsului variantei selectate.` |
-| `CP22` | `CP11.cf_is_active` → `Este fals` | `Statusul artwork este inactiv.` |
-| `CP23` | `CP11.cf_slug` → `Diferit de` → `Valoare fixă: ready` | `Imaginea nu este pregătită pentru print.` |
-| `CP24` | `CP02.cf_session_key_hash` → `Diferit de` → `Din nod: CP10.cf_session_key_hash` | `Imaginea nu aparține sesiunii acestei configurații.` |
-| `CP25` | patru condiții legate cu `ȘI (AND)`: `CP01.cf_rotation_deg Diferit de 0`, `Diferit de 90`, `Diferit de 180`, `Diferit de 270`; valorile din dreapta sunt fixe | `Rotația printului poate fi doar 0°, 90°, 180° sau 270°.` |
-| `CP26` | `CP01.cf_effective_dpi` → `Mai mic decat` → `Din nod: CP06.cf_min_dpi` | `Rezoluția imaginii este prea mică pentru formatul selectat.` |
+|? `CP12` | `CP03.cf_is_active` → `Este fals` | `Statusul configurației este inactiv.` |
+|? `CP13` | `CP03.cf_slug` → `Diferit de` → `Valoare fixă: draft` | `Configurația nu mai poate fi modificată deoarece nu este draft.` |
+|? `CP14` | `CP04.cf_is_active` → `Este fals` | `Varianta produsului este inactivă.` |
+|? `CP15` | `CP05.cf_is_active` → `Este fals` | `Produsul este inactiv.` |
+|? `CP16` | `CP05.cf_is_published` → `Este fals` | `Produsul nu este publicat.` |
+|? `CP17` | `CP06.cf_is_active` → `Este fals` | `Opțiunea de print este inactivă.` |
+|? `CP18` | `CP07.cf_is_active` → `Este fals` | `Zona de print este inactivă.` |
+|? `CP19` | `CP08.cf_is_active` → `Este fals` | `Formatul de print este inactiv.` |
+|? `CP20` | `CP09.cf_is_active` → `Este fals` | `Metoda de print este inactivă.` |
+|? `CP21` | `CP04.cf_product` → `Diferit de` → `Din nod: CP07.cf_product` | `Opțiunea de print nu aparține produsului variantei selectate.` |
+|? `CP22` | `CP11.cf_is_active` → `Este fals` | `Statusul artwork este inactiv.` |
+|? `CP23` | `CP11.cf_slug` → `Diferit de` → `Valoare fixă: ready` | `Imaginea nu este pregătită pentru print.` |
+|? `CP24` | `CP02.cf_session_key_hash` → `Diferit de` → `Din nod: CP10.cf_session_key_hash` | `Imaginea nu aparține sesiunii acestei configurații.` |
+|? `CP25` | patru condiții legate cu `ȘI (AND)`: `CP01.cf_rotation_deg Diferit de 0`, `Diferit de 90`, `Diferit de 180`, `Diferit de 270`; valorile din dreapta sunt fixe | `Rotația printului poate fi doar 0°, 90°, 180° sau 270°.` |
+|? `CP26` | `CP01.cf_effective_dpi` → `Mai mic decat` → `Din nod: CP06.cf_min_dpi` | `Rezoluția imaginii este prea mică pentru formatul selectat.` |
 
 La `CP25`, folosești operatorul `Diferit de` în toate cele patru rânduri și combinatorul `ȘI (AND)`. Cu `SAU (OR)`, orice rotație ar fi respinsă.
 
@@ -862,7 +869,7 @@ Calculul final trebuie să țină cont și de crop și `scale_pct`. Moduvis comp
 
 Teste: print valid; configurație nedraft; produs diferit; fiecare catalog inactiv; artwork neready; artwork din altă sesiune; rotație `25`; DPI sub prag; al doilea print în aceeași zonă; încercare de a trimite un preț fals.
 
-### 8.8. Workflow `validate_configuration_ready`
+### de testat(?) 8.8. Workflow `validate_configuration_ready`
 
 #### Configurare
 
@@ -896,18 +903,18 @@ flowchart TD
 
 | ID | Tip | Inputuri/configurare |
 |---|---|---|
-| `CR01` | `Start` | Entitate `product_configurations` |
-| `CR02` | `Citește Relație` | Sursă `CR01`; relație `status` |
-| `CR03` | `Validare` | `CR02.cf_is_active` → `Este fals`; mesaj `Statusul configurației este inactiv.` |
-| `CR04` | `Condiție (If/Else)` | `CR02.cf_slug` → `Egal cu` → `Valoare fixă: ready` |
-| `CR05` | `Citește Relație` | Pe ramura `Adevărat`; sursă `CR01`; relație `variant` |
-| `CR06` | `Citește Înregistrări` | Entitate `products`; filtru `id` `Egal` `Din nod: CR05.cf_product`; Limit `1` |
-| `CR07` | `Citește Înregistrări` | Entitate `configuration_prints`; filtru `cf_configuration` `Egal` `Din nod: CR01.id`; Limit `1` |
-| `CR08` | `Validare` | `CR07.id` → `Este gol (null)`; mesaj `Configurația trebuie să conțină cel puțin un print.` |
-| `CR09` | `Validare` | `CR05.cf_is_active` → `Este fals`; mesaj `Varianta configurației este inactivă.` |
-| `CR10` | `Validare` | `CR06.cf_is_active` → `Este fals`; mesaj `Produsul configurației este inactiv.` |
-| `CR11` | `Validare` | `CR06.cf_is_published` → `Este fals`; mesaj `Produsul configurației nu este publicat.` |
-| `CR12` | `Validare` | `CR01.cf_currency` → `Diferit de` → `Valoare fixă: RON`; mesaj `Moneda configurației trebuie să fie RON.` |
+|x `CR01` | `Start` | Entitate `product_configurations` |
+|x `CR02` | `Citește Relație` | Sursă `CR01`; relație `status` |
+|? `CR03` | `Validare` | `CR02.cf_is_active` → `Este fals`; mesaj `Statusul configurației este inactiv.` |
+|? `CR04` | `Condiție (If/Else)` | `CR02.cf_slug` → `Egal cu` → `Valoare fixă: ready` |
+|x `CR05` | `Citește Relație` | Pe ramura `Adevărat`; sursă `CR01`; relație `variant` |
+|x `CR06` | `Citește Înregistrări` | Entitate `products`; filtru `id` `Egal` `Din nod: CR05.cf_product`; Limit `1` |
+|x `CR07` | `Citește Înregistrări` | Entitate `configuration_prints`; filtru `cf_configuration` `Egal` `Din nod: CR01.id`; Limit `1` |
+|? `CR08` | `Validare` | `CR07.id` → `Este gol (null)`; mesaj `Configurația trebuie să conțină cel puțin un print.` |
+|? `CR09` | `Validare` | `CR05.cf_is_active` → `Este fals`; mesaj `Varianta configurației este inactivă.` |
+|? `CR10` | `Validare` | `CR06.cf_is_active` → `Este fals`; mesaj `Produsul configurației este inactiv.` |
+|? `CR11` | `Validare` | `CR06.cf_is_published` → `Este fals`; mesaj `Produsul configurației nu este publicat.` |
+|? `CR12` | `Validare` | `CR01.cf_currency` → `Diferit de` → `Valoare fixă: RON`; mesaj `Moneda configurației trebuie să fie RON.` |
 
 Ieșirea `Fals` a lui `CR04` poate rămâne final de succes: un update obișnuit al unui draft nu are nevoie de verificările finale.
 
@@ -959,20 +966,20 @@ flowchart TD
 
 | ID | Tip | Inputuri/configurare |
 |---|---|---|
-| `PP01` | `Start` | Entitate `products` |
-| `PP02` | `Condiție (If/Else)` | `PP01.cf_is_published` → `Este adevarat` |
-| `PP03` | `Citește Relație` | Ramura adevărată; sursă `PP01`; relație `product_type` |
-| `PP04` | `Citește Relație` | Sursă `PP01`; relație `fit` |
-| `PP05` | `Validare` | `PP01.cf_is_active` → `Este fals`; mesaj `Un produs inactiv nu poate fi publicat.` |
-| `PP06` | `Validare` | `PP03.cf_is_active` → `Este fals`; mesaj `Tipul produsului este inactiv.` |
-| `PP07` | `Validare` | `PP04.cf_is_active` → `Este fals`; mesaj `Croiala produsului este inactivă.` |
-| `PP08` | `Validare` | `PP01.cf_short_description` → `Este gol (null)`; mesaj `Completează descrierea scurtă înainte de publicare.` |
-| `PP09` | `Citește Înregistrări` | Entitate `product_media`; filtre `cf_product` `Egal` `Din nod: PP01.id` și `cf_is_active` `Egal` `Valoare fixă: true`; Limit `1` |
-| `PP10` | `Validare` | două condiții cu `ȘI (AND)`: `PP01.cf_primary_image` → `Este gol (null)`; `PP09.id` → `Este gol (null)`; mesaj `Produsul are nevoie de o imagine principală sau de cel puțin un media activ.` |
-| `PP11` | `Citește Înregistrări` | Entitate `product_variants`; filtre `cf_product` `Egal` `Din nod: PP01.id`, `cf_is_active` `Egal` `Valoare fixă: true`; Limit `1` |
-| `PP12` | `Validare` | `PP11.id` → `Este gol (null)`; mesaj `Produsul trebuie să aibă cel puțin o variantă activă.` |
-| `PP13` | `Citește Înregistrări` | Entitate `product_print_areas`; filtre `cf_product` `Egal` `Din nod: PP01.id`, `cf_is_active` `Egal` `Valoare fixă: true`; Limit `1` |
-| `PP14` | `Validare` | `PP13.id` → `Este gol (null)`; mesaj `Produsul trebuie să aibă cel puțin o zonă de print activă.` |
+|x `PP01` | `Start` | Entitate `products` |
+|? `PP02` | `Condiție (If/Else)` | `PP01.cf_is_published` → `Este adevarat` |
+|x `PP03` | `Citește Relație` | Ramura adevărată; sursă `PP01`; relație `product_type` |
+|x `PP04` | `Citește Relație` | Sursă `PP01`; relație `fit` |
+|? `PP05` | `Validare` | `PP01.cf_is_active` → `Este fals`; mesaj `Un produs inactiv nu poate fi publicat.` |
+|? `PP06` | `Validare` | `PP03.cf_is_active` → `Este fals`; mesaj `Tipul produsului este inactiv.` |
+|? `PP07` | `Validare` | `PP04.cf_is_active` → `Este fals`; mesaj `Croiala produsului este inactivă.` |
+|? `PP08` | `Validare` | `PP01.cf_short_description` → `Este gol (null)`; mesaj `Completează descrierea scurtă înainte de publicare.` |
+|? `PP09` | `Citește Înregistrări` | Entitate `product_media`; filtre `cf_product` `Egal` `Din nod: PP01.id` și `cf_is_active` `Egal` `Valoare fixă: true`; Limit `1` |
+|? `PP10` | `Validare` | două condiții cu `ȘI (AND)`: `PP01.cf_primary_image` → `Este gol (null)`; `PP09.id` → `Este gol (null)`; mesaj `Produsul are nevoie de o imagine principală sau de cel puțin un media activ.` |
+|? `PP11` | `Citește Înregistrări` | Entitate `product_variants`; filtre `cf_product` `Egal` `Din nod: PP01.id`, `cf_is_active` `Egal` `Valoare fixă: true`; Limit `1` |
+|? `PP12` | `Validare` | `PP11.id` → `Este gol (null)`; mesaj `Produsul trebuie să aibă cel puțin o variantă activă.` |
+|? `PP13` | `Citește Înregistrări` | Entitate `product_print_areas`; filtre `cf_product` `Egal` `Din nod: PP01.id`, `cf_is_active` `Egal` `Valoare fixă: true`; Limit `1` |
+|? `PP14` | `Validare` | `PP13.id` → `Este gol (null)`; mesaj `Produsul trebuie să aibă cel puțin o zonă de print activă.` |
 
 La `PP10`, condițiile trebuie legate cu `ȘI (AND)`: eroarea apare numai dacă lipsesc ambele surse de imagine. Nu adaugi o validare separată pentru `base_price`; regula nativă `R` + `VR={"min":0}` rulează deja înaintea workflow-ului.
 
@@ -992,7 +999,6 @@ Nu toate regulile pot fi delegate profilului integration token sau motorului act
 - verificarea server-side că ID-urile trimise de browser aparțin aceleiași configurații și sesiuni;
 - decodarea reală a imaginii, detectarea dimensiunilor, MIME-ului, transparenței și calculul SHA-256;
 - calculul DPI-ului, cropului, scalării și transformărilor grafice, inclusiv inversarea dimensiunilor la `90°/270°`;
-- regulile `preview_x_pct + preview_width_pct <= 100` și `preview_y_pct + preview_height_pct <= 100`;
 - verificarea că fiecare zonă activă are cel puțin o opțiune activă înainte de publicarea produsului;
 - recitirea tuturor artwork-urilor și confirmarea statusului `ready` înainte de finalizarea configurației;
 - recalcularea `quoted_base_price`, sumei printurilor și totalului din date Moduvis proaspăt citite;
@@ -1000,6 +1006,8 @@ Nu toate regulile pot fi delegate profilului integration token sau motorului act
 - generarea URL-urilor de download cu expirare scurtă.
 
 Pentru un `PUT` sau `DELETE`, Nuxt trebuie întâi să citească recordul și să compare `cf_session_key_hash`; endpointul Moduvis bazat pe ID nu poate diferenția doi clienți care folosesc același integration profile.
+
+Nuxt poate prevalida limitele dreptunghiului de preview pentru UX, însă regulile `preview_x_pct + preview_width_pct <= 100` și `preview_y_pct + preview_height_pct <= 100` sunt impuse autoritativ de workflow-ul `validate_product_print_area` descris la secțiunea 8.4.
 
 ## 9. Fluxul de date
 
@@ -1056,7 +1064,7 @@ sequenceDiagram
   N->>N: Decodează imaginea și calculează metadata + SHA-256
   N->>M: Rezolvă UUID-ul source_type=user_upload
   N->>M: POST artworks cu original_file=fileId și source_type UUID
-  M-->>N: artworkId; fișierul este legat de record
+  M-->>N: artworkId, iar fișierul este legat de record
 
   U->>N: Alege poziție, opțiune și imagine
   N->>M: Recitește option, area, format, variant și artwork

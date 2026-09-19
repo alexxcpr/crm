@@ -880,6 +880,8 @@ Zona definește suprafața fizică și coordonatele de preview pentru un anumit 
 | `rank` | Ordine | `integer/number` | `R, F, D=1` | — |
 | `is_active` | Activ | `boolean/checkbox` | `R, F, D=true` | — |
 
+Pe lângă limitele native ale fiecărui câmp, workflow-ul automat `validate_product_print_area`, declanșat la `entity.before_insert` și `entity.before_update`, impune `preview_x_pct + preview_width_pct <= 100` și `preview_y_pct + preview_height_pct <= 100`. Configurarea exactă `Set/Calculează → Validare` este descrisă în [Faza 1 — secțiunea 8.4](./Faza-1-Configurator-Produse-Moduvis.md#84-workflow-validate_product_print_area).
+
 ### 8.15. Opțiuni de print produs — `product_print_options`
 
 Doar opțiunile existente aici pot fi alese. O șapcă nu acceptă A3 dacă nu există o înregistrare activă pentru combinația respectivă. Metadate: nume `Opțiuni de print produs`, singular `Opțiune de print`, plural `Opțiuni de print`, icon `i-lucide-printer-check`, rank `15`.
@@ -988,24 +990,25 @@ Regulile complete, indiferent de stratul care le aplică, sunt:
 1. `product_variants.size` trebuie să aparțină sistemului de mărimi configurat pe `product.product_type`.
 2. Combinația `product + color + size` trebuie să fie unică.
 3. `product_print_options.print_format` trebuie să încapă în `product_print_areas.max_width_mm/max_height_mm`, ținând cont de orientarea permisă.
-4. Zona opțiunii de print trebuie să aparțină aceluiași produs ca varianta din configurație.
-5. O configurație poate avea maximum un print pentru aceeași zonă de print.
-6. `configuration_prints.rotation_deg` poate fi exclusiv `0`, `90`, `180` sau `270`; la `90`/`270` se inversează dimensiunile orientate folosite pentru încadrare și DPI.
-7. Artwork-ul trebuie să aparțină clientului autentificat sau sesiunii anonime curente.
-8. `artworks.source_type` trebuie să fie activ. Pentru `user_upload`, `generation_job` trebuie să fie null; pentru `ai_generated`, `generation_job` este obligatoriu și trebuie să aparțină aceleiași identități client/sesiune.
-9. Pentru artwork, configurare și coș trebuie să existe exact una dintre identități: `customer` pentru utilizator autentificat sau `session_key_hash` pentru guest.
-10. Un guest nu este asociat automat unui `customer` doar pentru că folosește aceeași adresă de email; asocierea cere autentificare sau verificarea emailului.
-11. Clientul poate citi și modifica numai coșurile, artwork-urile și configurațiile care îi aparțin explicit. `id_profile` Moduvis nu diferențiază clienții storefrontului.
-12. Niciun preț trimis de browser nu este acceptat. Nuxt recitește `products.base_price` și `product_print_options.sale_price` și calculează totalul cu aritmetică decimală.
-13. Metoda de livrare trebuie să fie activă; costul se recalculează din `shipping_methods.price` și `free_shipping_threshold`.
-14. La checkout se recalculează prețurile și se verifică din nou `is_active`, `is_published`, varianta, stocul și validitatea fișierelor.
-15. O comandă plătită, articolele ei și printurile snapshot nu mai sunt editabile comercial. Corecțiile se fac prin rambursări și evenimente noi.
-16. `stripe_events.stripe_event_id` se creează o singură dată. Dacă există deja, webhookul se consideră procesat idempotent.
-17. Comanda devine `paid` numai după un webhook Stripe cu semnătură validă și după verificarea sumei, monedei și a ID-ului comenzii.
-18. Suma rambursărilor nu poate depăși `payments.amount`, iar `refunded_amount` este suma derivată a rambursărilor reușite.
-19. Jobul de producție se creează numai pentru o comandă `paid` și maximum o dată pentru fiecare `order_item`, dacă nu există o rerulare explicită.
-20. `inventory_movements` este append-only; `stock_quantity` și `reserved_quantity` sunt proiecții actualizate din mișcări.
-21. Datele sensibile sau interne (`cost_price`, hashuri de sesiune, prompturi, erori interne) nu se copiază în răspunsul către browser.
+4. Dreptunghiul de preview trebuie să rămână în suprafață: `preview_x_pct + preview_width_pct <= 100` și `preview_y_pct + preview_height_pct <= 100`; workflow-ul `validate_product_print_area` este bariera autoritativă.
+5. Zona opțiunii de print trebuie să aparțină aceluiași produs ca varianta din configurație.
+6. O configurație poate avea maximum un print pentru aceeași zonă de print.
+7. `configuration_prints.rotation_deg` poate fi exclusiv `0`, `90`, `180` sau `270`; la `90`/`270` se inversează dimensiunile orientate folosite pentru încadrare și DPI.
+8. Artwork-ul trebuie să aparțină clientului autentificat sau sesiunii anonime curente.
+9. `artworks.source_type` trebuie să fie activ. Pentru `user_upload`, `generation_job` trebuie să fie null; pentru `ai_generated`, `generation_job` este obligatoriu și trebuie să aparțină aceleiași identități client/sesiune.
+10. Pentru artwork, configurare și coș trebuie să existe exact una dintre identități: `customer` pentru utilizator autentificat sau `session_key_hash` pentru guest.
+11. Un guest nu este asociat automat unui `customer` doar pentru că folosește aceeași adresă de email; asocierea cere autentificare sau verificarea emailului.
+12. Clientul poate citi și modifica numai coșurile, artwork-urile și configurațiile care îi aparțin explicit. `id_profile` Moduvis nu diferențiază clienții storefrontului.
+13. Niciun preț trimis de browser nu este acceptat. Nuxt recitește `products.base_price` și `product_print_options.sale_price` și calculează totalul cu aritmetică decimală.
+14. Metoda de livrare trebuie să fie activă; costul se recalculează din `shipping_methods.price` și `free_shipping_threshold`.
+15. La checkout se recalculează prețurile și se verifică din nou `is_active`, `is_published`, varianta, stocul și validitatea fișierelor.
+16. O comandă plătită, articolele ei și printurile snapshot nu mai sunt editabile comercial. Corecțiile se fac prin rambursări și evenimente noi.
+17. `stripe_events.stripe_event_id` se creează o singură dată. Dacă există deja, webhookul se consideră procesat idempotent.
+18. Comanda devine `paid` numai după un webhook Stripe cu semnătură validă și după verificarea sumei, monedei și a ID-ului comenzii.
+19. Suma rambursărilor nu poate depăși `payments.amount`, iar `refunded_amount` este suma derivată a rambursărilor reușite.
+20. Jobul de producție se creează numai pentru o comandă `paid` și maximum o dată pentru fiecare `order_item`, dacă nu există o rerulare explicită.
+21. `inventory_movements` este append-only; `stock_quantity` și `reserved_quantity` sunt proiecții actualizate din mișcări.
+22. Datele sensibile sau interne (`cost_price`, hashuri de sesiune, prompturi, erori interne) nu se copiază în răspunsul către browser.
 
 ### Limită importantă privind stocul
 
