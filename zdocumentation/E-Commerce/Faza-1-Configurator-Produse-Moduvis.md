@@ -1,5 +1,7 @@
 # Faza 1 — Catalog și configurator de print în Moduvis
 
+Planul aplicației publice care consumă această configurație este documentat separat în [Faza 1 — Frontend Clothing Customizer](./Faza-1-Frontend-Clothing-Customizer.md).
+
 Acest document acoperă numai prima bucată funcțională:
 
 1. afișarea produselor blank publicate;
